@@ -5,12 +5,14 @@ extends CharacterBody3D
 ## doors open the same way you do. Respawns where it started.
 
 @export var kind := "dummy"
-@export var max_hp := 100.0
+@export var max_hp := 100.0            # dummies; shamblers use shambler_hp
+@export var shambler_hp := 50.0        # rotten and fragile: two shots, or a long beating with fists
 @export var move_speed := 2.3
 @export var aggro_range := 12.0
 @export var attack_range := 1.45
 @export var attack_damage := 10.0
 @export var attack_cooldown := 1.3
+@export var investigate_time := 10.0   # how long a heard noise keeps pulling it in
 
 var hp := 100.0
 var dead := false
@@ -23,6 +25,8 @@ var _cd := 0.0
 var _since_hit := 99.0
 var _dead_t := 0.0
 var _sway := 0.0
+var _noise_pos := Vector3.ZERO   # where the last noise it heard came from
+var _noise_t := 0.0              # > 0 while it is still drawn to that spot
 var _mat: StandardMaterial3D
 var _visual: Node3D
 var _label: Label3D
@@ -34,6 +38,8 @@ func _ready() -> void:
 	collision_layer = 4
 	collision_mask = 1 | 2 | 4
 	home = global_position
+	if kind == "shambler":
+		max_hp = shambler_hp
 	hp = max_hp
 	_sway = randf() * TAU
 	if kind == "shambler":
@@ -91,6 +97,24 @@ func take_hit(dmg: float, dir: Vector3, knock: float) -> void:
 		_die()
 
 
+## A loud noise (a gunshot) went off at pos. Shamblers walk to where it came from; once you are
+## inside aggro_range they chase you as usual. Each new shot refreshes the spot and the timer.
+func hear_noise(pos: Vector3) -> void:
+	if dead or kind != "shambler":
+		return
+	_noise_pos = pos
+	_noise_t = investigate_time
+
+
+## Shoved back by the player: thrown along dir, no damage, and it needs a moment before it
+## can attack again.
+func shove(dir: Vector3, force: float) -> void:
+	if dead or kind == "dummy":
+		return
+	_knock += Vector3(dir.x, 0.0, dir.z) * force
+	_cd = maxf(_cd, 0.6)
+
+
 func _die() -> void:
 	dead = true
 	hp = 0.0
@@ -107,6 +131,7 @@ func _respawn() -> void:
 	global_position = home
 	velocity = Vector3.ZERO
 	_knock = Vector3.ZERO
+	_noise_t = 0.0
 
 
 func _physics_process(delta: float) -> void:
@@ -120,22 +145,30 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var want := Vector3.ZERO
+	_noise_t -= delta
 	if kind == "shambler" and player != null and not player.dead:
 		var to := player.global_position - global_position
 		to.y = 0.0
 		var dist := to.length()
-		if dist < aggro_range and dist > 0.01:
+		var chasing := dist < aggro_range
+		if not chasing and _noise_t > 0.0:
+			# Out of sight of you, but it heard a shot: head for where the noise came from.
+			to = _noise_pos - global_position
+			to.y = 0.0
+			dist = to.length()
+			if dist < 1.0:
+				_noise_t = 0.0   # got there, nothing to find
+		if (chasing or _noise_t > 0.0) and dist > 0.01:
 			var d := to / dist
 			_sway += delta * 3.0
 			var side := Vector3(-d.z, 0.0, d.x) * sin(_sway) * 0.35
 			want = (d + side).normalized() * move_speed
 			_visual.rotation.y = atan2(-d.x, -d.z)
-			if dist < attack_range:
+			if chasing and dist < attack_range:
 				want = Vector3.ZERO
 				if _cd <= 0.0:
 					_cd = attack_cooldown
-					player.take_damage(attack_damage, d, 6.0)
-					player.show_status("Hit! -%d HP" % roundi(attack_damage), 0.8)
+					player.take_attack(attack_damage, d, 6.0, self)   # the player may shove it off
 	elif kind == "dummy" and _since_hit > 3.0:
 		hp = max_hp
 

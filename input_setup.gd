@@ -31,8 +31,11 @@ static func apply() -> void:
 
 	# Tap = dash, hold = run.
 	_action("sprint", 0.5)
-	_key("sprint", KEY_SHIFT); _button("sprint", JOY_BUTTON_LEFT_SHOULDER)
-	_button("sprint", JOY_BUTTON_LEFT_STICK)
+	_key("sprint", KEY_SHIFT); _button("sprint", JOY_BUTTON_LEFT_STICK)
+
+	# HOLD to open the quick weapon wheel, point (mouse / right stick), release to equip.
+	_action("weapon_wheel", 0.5)
+	_key("weapon_wheel", KEY_TAB); _button("weapon_wheel", JOY_BUTTON_LEFT_SHOULDER)
 
 	_action("reload", 0.5)
 	_key("reload", KEY_R); _button("reload", JOY_BUTTON_X)
