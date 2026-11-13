@@ -132,7 +132,7 @@ var armed := false
 var using_pad := false
 var dead := false
 var mag := 8
-var reserve := 16
+var reserve := 8
 var facing := Vector3(0, 0, -1)
 var weapon := "fists"              # what's in hand: one of WEAPONS
 ## Distance to the first wall along each of SIGHT_RAYS directions (capped at sight_range).
@@ -1101,7 +1101,7 @@ func _reset_vitals() -> void:
 	stamina = max_stamina
 	winded = false
 	mag = mag_size
-	reserve = 16
+	reserve = 8   # one spare magazine: the rest you have to find
 	_reload_t = 0.0
 
 

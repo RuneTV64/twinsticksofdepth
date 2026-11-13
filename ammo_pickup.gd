@@ -2,8 +2,8 @@ class_name AmmoPickup
 extends Node3D
 ## First interaction in the game: put your weapon away, walk up, press Interact.
 
-@export var amount := 12
-@export var respawn_time := 12.0
+@export var amount := 8
+@export var respawn_time := 150.0   # slow: a looted spot is worth coming back to much later, not farming
 
 var _active := true
 var _t := 0.0

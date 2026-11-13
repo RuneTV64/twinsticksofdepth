@@ -12,6 +12,7 @@ extends CharacterBody3D
 @export var attack_range := 1.45
 @export var attack_damage := 10.0
 @export var attack_cooldown := 1.3
+@export var shambler_respawn := 90.0   # seconds a killed shambler stays gone, so a bullet buys real time
 @export var investigate_time := 10.0   # how long a heard noise keeps pulling it in
 @export var fade_time := 0.25          # seconds to fade out of (or into) the player's view
 
@@ -132,7 +133,7 @@ func _die() -> void:
 	hp = 0.0
 	visible = false
 	collision_layer = 0
-	_dead_t = 2.0 if kind == "dummy" else 7.0
+	_dead_t = 2.0 if kind == "dummy" else shambler_respawn
 
 
 func _respawn() -> void:

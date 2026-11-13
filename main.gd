@@ -1,9 +1,25 @@
 extends Node3D
-## Builds the whole test level in code: open yard, a small house with a normal door (south)
-## and a heavy locked door (east), training dummies, shamblers, and ammo crates.
+## Builds the whole test level in code.
+##  - Training yard (z -40..40): a small house with a normal door (south) and a heavy locked
+##    door (east), training dummies, a few shamblers, the tutorial ammo crate.
+##  - Cul-de-sac (north of the yard, through the gap in the wall): a short street ending in a
+##    turning circle, seven houses with doors and windows, a lot of zombies, and ammo hidden
+##    inside some of the houses.
+## North is -Z.
 
 const WALL_H := 2.6
 const WALL_T := 0.4
+const DOOR_W := 1.6       # matches Door.width
+const DOOR_H := 2.3       # wall above this over a doorway
+const WINDOW_W := 1.4
+const SILL_H := 0.9       # window opening runs from here...
+const HEAD_H := 2.0       # ...up to here. You can see and shoot through it, not climb through.
+
+# The whole playable area, for the ground, the outer wall and the fog-of-war map.
+const WORLD_X0 := -40.0
+const WORLD_X1 := 40.0
+const WORLD_Z0 := -112.0  # north edge
+const WORLD_Z1 := 40.0    # south edge
 
 var player: Player
 var rig: CamRig
@@ -37,6 +53,8 @@ func _ready() -> void:
 	fog = preload("res://fog.gd").new()
 	fog.player = player
 	fog.cam = rig.cam
+	fog.map_min = Vector2(WORLD_X0 - 4.0, WORLD_Z0 - 4.0)
+	fog.map_size = Vector2(WORLD_X1 - WORLD_X0 + 8.0, WORLD_Z1 - WORLD_Z0 + 8.0)
 	add_child(fog)
 
 	hud = Hud.new()
@@ -97,7 +115,7 @@ func _build_environment() -> void:
 	ground.collision_layer = 1
 	var gs := CollisionShape3D.new()
 	var gb := BoxShape3D.new()
-	gb.size = Vector3(90, 1, 90)
+	gb.size = Vector3(WORLD_X1 - WORLD_X0 + 10.0, 1, WORLD_Z1 - WORLD_Z0 + 10.0)
 	gs.shape = gb
 	ground.add_child(gs)
 	var gm := MeshInstance3D.new()
@@ -120,17 +138,22 @@ void fragment() {
 	smat.shader = sh
 	gm.material_override = smat
 	ground.add_child(gm)
-	ground.position = Vector3(0, -0.5, 0)
+	ground.position = Vector3((WORLD_X0 + WORLD_X1) * 0.5, -0.5, (WORLD_Z0 + WORLD_Z1) * 0.5)
 	add_child(ground)
 
 
 func _build_level() -> void:
 	var wall_col := Color(0.55, 0.52, 0.48)
-	# Yard boundary
-	_box(Vector3(0, WALL_H / 2, -40), Vector3(80, WALL_H, 1), wall_col)
-	_box(Vector3(0, WALL_H / 2, 40), Vector3(80, WALL_H, 1), wall_col)
-	_box(Vector3(-40, WALL_H / 2, 0), Vector3(1, WALL_H, 80), wall_col)
-	_box(Vector3(40, WALL_H / 2, 0), Vector3(1, WALL_H, 80), wall_col)
+	# Outer wall around the whole map
+	var mid_z := (WORLD_Z0 + WORLD_Z1) * 0.5
+	var len_z := WORLD_Z1 - WORLD_Z0 + 1.0
+	_box(Vector3(0, WALL_H / 2, WORLD_Z0), Vector3(81, WALL_H, 1), wall_col)
+	_box(Vector3(0, WALL_H / 2, WORLD_Z1), Vector3(81, WALL_H, 1), wall_col)
+	_box(Vector3(WORLD_X0, WALL_H / 2, mid_z), Vector3(1, WALL_H, len_z), wall_col)
+	_box(Vector3(WORLD_X1, WALL_H / 2, mid_z), Vector3(1, WALL_H, len_z), wall_col)
+	# Wall between the yard and the cul-de-sac, with a gap for the road (x -5..5)
+	_box(Vector3(-22.5, WALL_H / 2, -40), Vector3(35, WALL_H, 1), wall_col)
+	_box(Vector3(22.5, WALL_H / 2, -40), Vector3(35, WALL_H, 1), wall_col)
 
 	# House: x -7..7, z -22..-10
 	var hc := Color(0.62, 0.56, 0.47)
@@ -170,17 +193,197 @@ func _build_level() -> void:
 	for p in [Vector3(20, 0.05, -4), Vector3(22, 0.05, 2), Vector3(19, 0.05, 7)]:
 		_enemy("shambler", p)
 
-	# Ammo crates
-	for p in [Vector3(3, 0, 4), Vector3(0, 0, -20), Vector3(14, 0, 0)]:
-		var a := AmmoPickup.new()
-		a.position = p
-		add_child(a)
+	# Ammo: the tutorial crate by the spawn, and one in the yard house
+	for p in [Vector3(3, 0, 4), Vector3(0, 0, -20)]:
+		_ammo(p)
 
 	_sign(Vector3(3, 1.6, 4), "Ammo: weapon away, walk up, interact")
 	_sign(Vector3(0, 3.2, -9.6), "Walk into the door to push it")
 	_sign(Vector3(7.6, 3.2, -16), "Locked: dash into it")
 	_sign(Vector3(-15, 3.0, 2), "Dummies")
 	_sign(Vector3(20, 3.0, 0), "Shamblers")
+	_sign(Vector3(0, 3.4, -38), "Cul-de-sac ahead: ammo is in some of the houses")
+
+	_build_culdesac()
+
+
+# ------------------------------------------------------------------ cul-de-sac
+func _build_culdesac() -> void:
+	# Road in from the yard, ending in a turning circle.
+	var asphalt := Color(0.2, 0.2, 0.22)
+	var bulb := Vector3(0, 0, -78)
+	_flat_box(Vector3(0, 0.02, -51.5), Vector3(8, 0.04, 31), asphalt)
+	var circle := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 14.0
+	cm.bottom_radius = 14.0
+	cm.height = 0.04
+	circle.mesh = cm
+	var cmat := StandardMaterial3D.new()
+	cmat.albedo_color = asphalt
+	cmat.roughness = 0.95
+	circle.material_override = cmat
+	circle.position = bulb + Vector3(0, 0.02, 0)
+	add_child(circle)
+
+	# Houses: center (x, z), width (x), depth (z), which wall the front door is on.
+	_house(Vector2(-14, -53), 10, 12, "E", Color(0.66, 0.6, 0.5))          # street, west side
+	_house(Vector2(14, -53), 10, 12, "W", Color(0.58, 0.62, 0.66))         # street, east side
+	_house(Vector2(-27, -78), 10, 12, "E", Color(0.68, 0.58, 0.52))        # circle, west
+	_house(Vector2(27, -78), 10, 12, "W", Color(0.6, 0.66, 0.58), 0.0, -1.5)  # circle, east (back room)
+	_house(Vector2(-19, -98), 10, 10, "S", Color(0.64, 0.62, 0.55))        # circle, north-west
+	_house(Vector2(0, -102), 14, 10, "S", Color(0.7, 0.64, 0.56), 1.2)     # circle, north (side room)
+	_house(Vector2(19, -98), 10, 10, "S", Color(0.6, 0.58, 0.62))          # circle, north-east
+
+	# Abandoned cars on the circle: cover you can see and shoot over.
+	_box(Vector3(-5, 0.7, -80), Vector3(1.9, 1.4, 4.2), Color(0.5, 0.18, 0.16))
+	_box(Vector3(9, 0.7, -70), Vector3(4.2, 1.4, 1.9), Color(0.2, 0.3, 0.5))
+
+	# Ammo, inside four of the seven houses.
+	for p in [Vector3(-16, 0, -56), Vector3(30, 0, -82), Vector3(5, 0, -104.5), Vector3(21, 0, -100.5)]:
+		_ammo(p)
+
+	# Zombies: on the street, all over the circle, on the lawns, and waiting indoors.
+	var spots: Array[Vector3] = [
+		Vector3(-2, 0.05, -47), Vector3(2.5, 0.05, -55), Vector3(-1, 0.05, -62),
+		Vector3(0, 0.05, -78), Vector3(-6, 0.05, -72), Vector3(7, 0.05, -75), Vector3(-9, 0.05, -83),
+		Vector3(6, 0.05, -84), Vector3(0, 0.05, -88), Vector3(11, 0.05, -80), Vector3(-11, 0.05, -76),
+		Vector3(-18, 0.05, -66), Vector3(18, 0.05, -67), Vector3(-12, 0.05, -91), Vector3(12, 0.05, -91),
+		Vector3(14, 0.05, -55), Vector3(-28, 0.05, -76), Vector3(27, 0.05, -75),
+		Vector3(-19, 0.05, -99), Vector3(-3, 0.05, -103), Vector3(17, 0.05, -96),
+	]
+	for p in spots:
+		_enemy("shambler", p)
+
+
+## A house: four walls with a front door (flanked by windows) on door_side ("N", "S", "E" or
+## "W") and windows on the other walls. No roof, so you can see in from above once it's in view.
+## split_x / split_z add an inside wall (with an open doorway) that many meters off center,
+## running north-south / east-west, to make a second room.
+func _house(c: Vector2, w: float, d: float, door_side: String, col: Color,
+		split_x := 0.0, split_z := 0.0) -> void:
+	var x0 := c.x - w * 0.5
+	var x1 := c.x + w * 0.5
+	var z0 := c.y - d * 0.5   # north wall
+	var z1 := c.y + d * 0.5   # south wall
+	_flat_box(Vector3(c.x, 0.02, c.y), Vector3(w, 0.04, d), Color(0.4, 0.33, 0.26))   # floorboards
+	_wall(Vector2(x0, z0), Vector2(x1, z0), _openings(w, door_side == "N"), col)
+	_wall(Vector2(x0, z1), Vector2(x1, z1), _openings(w, door_side == "S"), col)
+	_wall(Vector2(x0, z0), Vector2(x0, z1), _openings(d, door_side == "W"), col)
+	_wall(Vector2(x1, z0), Vector2(x1, z1), _openings(d, door_side == "E"), col)
+	var inner := col.darkened(0.12)
+	if split_x != 0.0:
+		_wall(Vector2(c.x + split_x, z0), Vector2(c.x + split_x, z1),
+			[{"at": d * 0.5 - DOOR_W * 0.5, "w": DOOR_W, "kind": "gap"}], inner)
+	if split_z != 0.0:
+		_wall(Vector2(x0, c.y + split_z), Vector2(x1, c.y + split_z),
+			[{"at": w * 0.5 - DOOR_W * 0.5, "w": DOOR_W, "kind": "gap"}], inner)
+
+
+## Openings for one outside wall of the given length: a centered door with a window either
+## side, or just windows.
+func _openings(length: float, has_door: bool) -> Array:
+	var o := []
+	if has_door:
+		o.append({"at": length * 0.5 - DOOR_W * 0.5, "w": DOOR_W, "kind": "door"})
+		o.append({"at": length * 0.22 - WINDOW_W * 0.5, "w": WINDOW_W, "kind": "window"})
+		o.append({"at": length * 0.78 - WINDOW_W * 0.5, "w": WINDOW_W, "kind": "window"})
+	elif length >= 12.0:
+		o.append({"at": length * 0.3 - WINDOW_W * 0.5, "w": WINDOW_W, "kind": "window"})
+		o.append({"at": length * 0.7 - WINDOW_W * 0.5, "w": WINDOW_W, "kind": "window"})
+	else:
+		o.append({"at": length * 0.5 - WINDOW_W * 0.5, "w": WINDOW_W, "kind": "window"})
+	return o
+
+
+## A straight wall from a to b (XZ; must run along X or along Z) with openings cut into it.
+## Each opening is {"at": meters from the west/north end to its near edge, "w": width,
+## "kind": "door" (hinged Door), "window" (sill + glass) or "gap" (open doorway)}.
+func _wall(a: Vector2, b: Vector2, openings: Array, col: Color) -> void:
+	if a.x > b.x or a.y > b.y:
+		var t := a
+		a = b
+		b = t
+	var along_x := absf(b.x - a.x) > absf(b.y - a.y)
+	var length := (b - a).length()
+	openings.sort_custom(func(p, q): return p["at"] < q["at"])
+	var cursor := -WALL_T * 0.5   # run half a thickness past each end so corners close up
+	for o in openings:
+		var o0: float = o["at"]
+		var o1: float = o0 + float(o["w"])
+		_wall_piece(a, along_x, cursor, o0, 0.0, WALL_H, col)
+		match o["kind"]:
+			"window":
+				_wall_piece(a, along_x, o0, o1, 0.0, SILL_H, col)
+				_wall_piece(a, along_x, o0, o1, HEAD_H, WALL_H, col)
+				_glass(a, along_x, o0, o1)
+			"door":
+				_wall_piece(a, along_x, o0, o1, DOOR_H, WALL_H, col)
+				var door := Door.new()
+				if along_x:
+					door.position = Vector3(a.x + o0, 0, a.y)       # panel runs toward +X
+				else:
+					door.position = Vector3(a.x, 0, a.y + o1)       # turned: panel runs toward -Z
+					door.rotation.y = PI / 2
+				add_child(door)
+			_:
+				_wall_piece(a, along_x, o0, o1, DOOR_H, WALL_H, col)
+		cursor = o1
+	_wall_piece(a, along_x, cursor, length + WALL_T * 0.5, 0.0, WALL_H, col)
+
+
+## One solid block of a wall: from d0 to d1 meters along it, from height y0 up to y1.
+func _wall_piece(a: Vector2, along_x: bool, d0: float, d1: float, y0: float, y1: float, col: Color) -> void:
+	if d1 - d0 < 0.01:
+		return
+	var mid := (d0 + d1) * 0.5
+	var y := (y0 + y1) * 0.5
+	if along_x:
+		_box(Vector3(a.x + mid, y, a.y), Vector3(d1 - d0, y1 - y0, WALL_T), col)
+	else:
+		_box(Vector3(a.x, y, a.y + mid), Vector3(WALL_T, y1 - y0, d1 - d0), col)
+
+
+## Window glass: looks only. It doesn't stop sight, bullets or anything else (yet).
+func _glass(a: Vector2, along_x: bool, d0: float, d1: float) -> void:
+	var m := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	var mid := (d0 + d1) * 0.5
+	if along_x:
+		bm.size = Vector3(d1 - d0, HEAD_H - SILL_H, 0.05)
+		m.position = Vector3(a.x + mid, (SILL_H + HEAD_H) * 0.5, a.y)
+	else:
+		bm.size = Vector3(0.05, HEAD_H - SILL_H, d1 - d0)
+		m.position = Vector3(a.x, (SILL_H + HEAD_H) * 0.5, a.y + mid)
+	m.mesh = bm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.6, 0.8, 0.95, 0.28)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.roughness = 0.1
+	m.material_override = mat
+	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(m)
+
+
+## A flat colored slab with no collision (road, floorboards).
+func _flat_box(pos: Vector3, size: Vector3, col: Color) -> void:
+	var m := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	m.mesh = bm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = col
+	mat.roughness = 0.95
+	m.material_override = mat
+	m.position = pos
+	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(m)
+
+
+func _ammo(pos: Vector3) -> void:
+	var a := AmmoPickup.new()
+	a.position = pos
+	add_child(a)
 
 
 func _box(pos: Vector3, size: Vector3, col: Color) -> StaticBody3D:

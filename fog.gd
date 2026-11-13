@@ -14,8 +14,13 @@ extends Node3D
 @export var edge_soft := 0.7         # meters over which the edge of your view fades
 @export var see_past := 0.6          # meters past a ray's end still lit, so the wall it hit shows
 
-const MAP_SIZE := 96.0               # meters covered by the explored map, centered on the origin
-const MAP_CELLS := 192               # half-meter cells
+## The part of the world the explored map covers (XZ). Set these before adding the node.
+var map_min := Vector2(-48.0, -48.0)
+var map_size := Vector2(96.0, 96.0)
+const CELL := 0.5                    # meters per explored-map cell
+
+var _cells_x := 0
+var _cells_y := 0
 
 var player: Player
 var cam: Camera3D
@@ -39,7 +44,8 @@ uniform float half_fov;
 uniform float taper;
 uniform float sight_range;
 uniform float sight_near;
-uniform float map_size;
+uniform vec2 map_min;
+uniform vec2 map_size;
 uniform float explored_dim;
 uniform float unexplored_dim;
 uniform float now;
@@ -76,7 +82,7 @@ void fragment() {
 
 		// r = ever seen (0/1), g = when it was last seen (0 where never). Dividing the
 		// filtered g by the filtered r gives the last-seen time of the seen cells nearby.
-		vec2 e = texture(explored_tex, world.xz / map_size + 0.5).rg;
+		vec2 e = texture(explored_tex, (world.xz - map_min) / map_size).rg;
 		float seen = e.r;
 		float last_seen = e.g / max(e.r, 0.001);
 		float stale = smoothstep(stale_delay, stale_delay + stale_time, now - last_seen);
@@ -92,7 +98,9 @@ void fragment() {
 
 func _ready() -> void:
 	# Two float channels per cell: r = ever seen, g = game time it was last seen.
-	_explored = Image.create(MAP_CELLS, MAP_CELLS, false, Image.FORMAT_RGF)
+	_cells_x = int(ceil(map_size.x / CELL))
+	_cells_y = int(ceil(map_size.y / CELL))
+	_explored = Image.create(_cells_x, _cells_y, false, Image.FORMAT_RGF)
 	_explored.fill(Color(0, 0, 0))
 	_explored_tex = ImageTexture.create_from_image(_explored)
 
@@ -102,7 +110,8 @@ func _ready() -> void:
 	_mat.shader = sh
 	_mat.render_priority = 5   # over the world and faded enemies, under the reticle (10)
 	_mat.set_shader_parameter("explored_tex", _explored_tex)
-	_mat.set_shader_parameter("map_size", MAP_SIZE)
+	_mat.set_shader_parameter("map_min", map_min)
+	_mat.set_shader_parameter("map_size", Vector2(_cells_x, _cells_y) * CELL)
 
 	var quad := MeshInstance3D.new()
 	var qm := QuadMesh.new()
@@ -144,7 +153,7 @@ func _process(delta: float) -> void:
 func _mark_explored() -> void:
 	var origin := Vector2(player.global_position.x, player.global_position.z)
 	var white := Color(1.0, _clock, 0.0)
-	var cell := MAP_SIZE / MAP_CELLS
+	var cell := CELL
 	# Twice as many spokes as sight rays, so cells at the far end of the cone aren't skipped.
 	var spokes := Player.SIGHT_RAYS * 2
 	for i in spokes:
@@ -154,9 +163,9 @@ func _mark_explored() -> void:
 		var d := 0.0
 		while d <= reach:
 			var p := origin + dir * d
-			var cx := int(floor(p.x / cell + MAP_CELLS * 0.5))
-			var cy := int(floor(p.y / cell + MAP_CELLS * 0.5))
-			if cx >= 0 and cy >= 0 and cx < MAP_CELLS and cy < MAP_CELLS:
+			var cx := int(floor((p.x - map_min.x) / cell))
+			var cy := int(floor((p.y - map_min.y) / cell))
+			if cx >= 0 and cy >= 0 and cx < _cells_x and cy < _cells_y:
 				_explored.set_pixel(cx, cy, white)
 			d += cell * 0.9
 	_explored_tex.update(_explored)
@@ -164,9 +173,8 @@ func _mark_explored() -> void:
 
 ## Has this spot ever been in view?
 func is_explored(pos: Vector3) -> bool:
-	var cell := MAP_SIZE / MAP_CELLS
-	var cx := int(floor(pos.x / cell + MAP_CELLS * 0.5))
-	var cy := int(floor(pos.z / cell + MAP_CELLS * 0.5))
-	if cx < 0 or cy < 0 or cx >= MAP_CELLS or cy >= MAP_CELLS:
+	var cx := int(floor((pos.x - map_min.x) / CELL))
+	var cy := int(floor((pos.z - map_min.y) / CELL))
+	if cx < 0 or cy < 0 or cx >= _cells_x or cy >= _cells_y:
 		return false
 	return _explored.get_pixel(cx, cy).r > 0.5
