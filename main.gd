@@ -54,6 +54,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_4: _stat("endurance", 1)
 			KEY_5: _stat("weight", -1)
 			KEY_6: _stat("weight", 1)
+			KEY_7: _stat("dexterity", -1)
+			KEY_8: _stat("dexterity", 1)
 	elif event is InputEventMouseButton and event.pressed \
 			and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

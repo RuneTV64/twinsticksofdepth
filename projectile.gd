@@ -4,12 +4,15 @@ extends Node3D
 ## so it can't tunnel through thin things at high speed.
 
 var dir := Vector3(0, 0, -1)
-var speed := 45.0
+var speed := 140.0
 var damage := 25.0
 var knock := 3.0
 var max_dist := 40.0
 var exclude: Array[RID] = []
 var shooter: Player
+var aimed_at: Enemy = null      # enemy under the reticle when fired; bonuses apply only to it
+var aimed_mult := 1.0
+var headshot_chance := 0.0
 var _travel := 0.0
 
 
@@ -17,7 +20,7 @@ func _ready() -> void:
 	add_to_group("projectiles")
 	var m := MeshInstance3D.new()
 	var b := BoxMesh.new()
-	b.size = Vector3(0.1, 0.1, 0.6)
+	b.size = Vector3(0.07, 0.07, 2.2)   # long thin tracer: at gun speeds a short bolt is invisible
 	m.mesh = b
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -56,8 +59,17 @@ func _physics_process(delta: float) -> void:
 			queue_free()
 			return
 	if best_e != null:
-		best_e.take_hit(damage, dir, knock)
-		_report("HIT %s, hp now %d" % [best_e.kind, ceili(best_e.hp)])
+		if best_e == aimed_at and randf() < headshot_chance:
+			best_e.take_hit(best_e.hp + 1.0, dir, knock * 2.0)   # one-hit kill
+			_report("HEADSHOT on %s" % best_e.kind)
+			if is_instance_valid(shooter):
+				shooter.show_status("HEADSHOT!", 1.0)
+		elif best_e == aimed_at:
+			best_e.take_hit(damage * aimed_mult, dir, knock)
+			_report("AIMED HIT %s x%.2f, hp now %d" % [best_e.kind, aimed_mult, ceili(best_e.hp)])
+		else:
+			best_e.take_hit(damage, dir, knock)
+			_report("HIT %s, hp now %d" % [best_e.kind, ceili(best_e.hp)])
 		_impact(from.lerp(to, best_t))
 		queue_free()
 		return

@@ -7,10 +7,12 @@ extends Node3D
 @export var distance := 18.0
 @export var fov := 50.0
 @export var follow_sharpness := 7.0   # higher = snappier pan
+@export var kick_recover := 16.0      # higher = recoil jolt settles faster
 
 var target: Player
 var cam: Camera3D
 var _focus := Vector3.ZERO
+var _kick := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -33,4 +35,10 @@ func _physics_process(delta: float) -> void:
 	if target == null:
 		return
 	_focus = _focus.lerp(target.camera_focus(), 1.0 - exp(-follow_sharpness * delta))
-	global_position = _focus
+	_kick = _kick.lerp(Vector3.ZERO, 1.0 - exp(-kick_recover * delta))
+	global_position = _focus + _kick
+
+
+## A short positional jolt (recoil). It pans only, never rotates, and settles on its own.
+func kick(offset: Vector3) -> void:
+	_kick = (_kick + offset).limit_length(0.8)

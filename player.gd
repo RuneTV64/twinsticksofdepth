@@ -4,7 +4,7 @@ extends CharacterBody3D
 ##  WEAPON AWAY (default): face where you walk. Right stick / mouse moves a crosshair and the
 ##    camera pans to keep it centered; your facing doesn't change. Let go and the camera
 ##    returns to you and the crosshair hides. Attack button = Interact. Hold Sprint to run.
-##  READY (hold RB / right-click / Q): twin-stick. Right stick / mouse sets facing, the camera
+##  READY (hold LT / right-click / Q): twin-stick. Right stick / mouse sets facing, the camera
 ##    leads toward the aim point. Attack button attacks. Slower, no running (dash still works).
 ## Doors work in either stance: walk into them to push them, run or dash into them to barge.
 
@@ -12,43 +12,62 @@ extends CharacterBody3D
 @export var strength := 10.0
 @export var endurance := 10.0
 @export var weight := 8.0
+@export var dexterity := 10.0           # aimed-shot damage and headshot chance
 
 # Derived in recompute_stats()
-var walk_speed := 6.0
-var ready_speed := 3.9
-var run_speed := 9.0
-var dash_speed := 16.0
+var walk_speed := 4.6
+var ready_speed := 3.0
+var run_speed := 6.7
+var dash_speed := 12.0
 var dash_time := 0.18
 var max_stamina := 100.0
 var stamina_regen := 25.0
 var run_drain := 14.0
 var dash_cost := 20.0
-var barge_min_speed := 6.9
+var barge_min_speed := 5.3
 
 # ---------- Feel tuning ----------
-@export var accel := 55.0
-@export var decel := 45.0
+@export var base_walk_speed := 4.6      # walk speed at default stats, before burden/fitness
+@export var run_mult := 1.45            # run = walk x this
+@export var accel := 26.0               # lower = heavier start-up
+@export var decel := 30.0               # lower = longer slide to a stop
 @export var turn_speed := 14.0          # rad/s, weapon away
 @export var ready_turn_speed := 28.0    # rad/s, Ready on a stick (mouse aim is instant)
 @export var backpedal_mult := 0.75      # Ready: speed when moving directly away from aim
-@export var draw_time := 0.12           # Ready pressed -> can attack
+@export var draw_time := 0.12         # Ready pressed -> can attack
 @export var sprint_tap_time := 0.22     # release Sprint before this = dash, hold past it = run
 @export var look_range := 8.0           # weapon away: how far the crosshair can roam
 @export var aim_range := 10.0           # Ready: max reticle distance
-@export var ready_cam_lead := 0.45      # Ready: how far the camera leans toward the reticle
-@export var stick_look_speed := 14.0    # weapon away: crosshair speed on the stick (m/s)
+@export var aim_min_dist := 0.3         # Ready: reticle closer than this doesn't turn you
+@export var aim_stick_speed := 20.0     # Ready: reticle speed on the stick (m/s)
+@export var ready_cam_lead := 0.45     # Ready: how far the camera leans toward the reticle
+@export var stick_look_speed := 14.0  # weapon away: crosshair speed on the stick (m/s)
 @export var mouse_sens := 0.022         # world meters per mouse pixel
 @export var mouse_idle_hide := 1.2      # weapon away: idle mouse crosshair hides after this
 @export var interact_range := 1.9
 @export var max_health := 100.0
+
+# ---------- Fatigue: low stamina slows all movement ----------
+@export var fatigue_start := 0.5        # stamina fraction where you start slowing down
+@export var fatigue_min_speed := 0.65   # speed multiplier at zero stamina
+@export var fatigue_min_accel := 0.6    # accel multiplier at zero stamina (sluggish starts)
 
 # ---------- Weapon (placeholder ranged weapon; tech level is still open) ----------
 @export var mag_size := 8
 @export var fire_interval := 0.2
 @export var reload_time := 1.1
 @export var shot_damage := 25.0
-@export var shot_speed := 45.0
+@export var shot_speed := 140.0         # m/s; fast enough to read as a gunshot, not a thrown bolt
+@export var shot_kick := 2.6            # m/s shoved backward per shot
+@export var shot_cam_kick := 0.3        # meters the camera jolts back per shot
 @export var bash_damage := 12.0
+
+# ---------- Aimed shots (reticle red on the enemy you hit) ----------
+@export var aim_bonus_per_dex := 0.03          # +3% aimed damage per point of DEX
+@export var aim_bonus_per_firepower := 0.008   # +0.8% aimed damage per point of weapon damage
+@export var headshot_per_dex := 0.008          # +0.8% headshot chance per point of DEX
+@export var headshot_per_firepower := 0.002    # +0.2% headshot chance per point of weapon damage
+@export var headshot_max_chance := 0.6
 
 var health := 100.0
 var stamina := 100.0
@@ -66,6 +85,9 @@ var spawn_point := Vector3.ZERO
 var reticle_offset := Vector3.ZERO
 var reticle_visible := false
 var reticle_on_enemy := false
+var reticle_target: Enemy = null   # the enemy under the reticle (Ready only counts as "aimed")
+var aimed_mult := 1.5              # derived: damage multiplier for a shot aimed at its target
+var headshot_chance := 0.13        # derived: chance an aimed hit is a one-shot kill
 var interact_target: Node = null
 var status_text := ""
 var shots_fired := 0
@@ -169,7 +191,7 @@ func _ready() -> void:
 	_reset_vitals()
 
 
-## Defaults (STR 10 / END 10 / WT 8) give walk 6.0, run 9.0, 100 stamina.
+## Defaults (STR 10 / END 10 / WT 8) give walk 4.6, run 6.7, 100 stamina.
 ##  - burden = weight / strength. Carrying more than your frame handles slows you.
 ##  - endurance = stamina pool, regen, and a small bump to top speed.
 ##  - weight makes runs and dashes cost more, and dashes shorter.
@@ -180,9 +202,9 @@ func recompute_stats() -> void:
 	var burden := weight / strength
 	var mobility := clampf(1.0 - 0.4 * (burden - 0.8), 0.55, 1.25)
 	var fitness := 1.0 + 0.02 * (endurance - 10.0)
-	walk_speed = 6.0 * mobility * fitness
+	walk_speed = base_walk_speed * mobility * fitness
 	ready_speed = walk_speed * 0.65
-	run_speed = walk_speed * (1.5 + 0.01 * (endurance - 10.0))
+	run_speed = walk_speed * (run_mult + 0.01 * (endurance - 10.0))
 	max_stamina = 60.0 + endurance * 4.0
 	stamina_regen = 10.0 + endurance * 1.5
 	run_drain = 14.0 * (0.6 + 0.5 * burden)
@@ -190,12 +212,25 @@ func recompute_stats() -> void:
 	dash_speed = run_speed * 1.8
 	dash_time = 0.18 * clampf(1.15 - 0.2 * burden, 0.6, 1.1)
 	barge_min_speed = walk_speed * 1.15
+	# Aimed shots: dexterity and the weapon's firepower both raise the bonus and the headshot odds.
+	# Defaults (DEX 10, 25 damage) give x1.5 damage and a 13% headshot chance.
+	dexterity = maxf(dexterity, 1.0)
+	aimed_mult = 1.0 + dexterity * aim_bonus_per_dex + shot_damage * aim_bonus_per_firepower
+	headshot_chance = clampf(dexterity * headshot_per_dex + shot_damage * headshot_per_firepower,
+		0.0, headshot_max_chance)
 	stamina = minf(stamina, max_stamina)
 
 
 ## Strength + weight behind the hit, scaled by how fast you were going (dash hits hardest).
 func barge_power(speed: float) -> float:
 	return (strength + weight) * clampf(speed / run_speed, 0.0, 1.6)
+
+
+## 0 = fresh, 1 = completely spent. Starts climbing once stamina drops below fatigue_start.
+func fatigue() -> float:
+	if max_stamina <= 0.0 or fatigue_start <= 0.0:
+		return 0.0
+	return 1.0 - clampf((stamina / max_stamina) / fatigue_start, 0.0, 1.0)
 
 
 func camera_focus() -> Vector3:
@@ -283,8 +318,12 @@ func _physics_process(delta: float) -> void:
 			spd = ready_speed * lerpf(backpedal_mult, 1.0, back)
 		elif running:
 			spd = run_speed
+		var tired := fatigue()
+		spd *= lerpf(1.0, fatigue_min_speed, tired)
 		var want := move_dir * spd
-		var rate := accel if want.length() > 0.01 else decel
+		var rate := decel
+		if want.length() > 0.01:
+			rate = accel * lerpf(1.0, fatigue_min_accel, tired)
 		horiz = horiz.move_toward(want, rate * delta)
 	velocity.x = horiz.x
 	velocity.z = horiz.z
@@ -333,12 +372,9 @@ func _update_stance() -> void:
 		armed = true
 		running = false
 		_draw_t = draw_time
-		# Start the reticle where you were already looking, or just in front of you.
-		if reticle_visible and reticle_offset.length() > 1.5:
-			reticle_offset = reticle_offset.limit_length(aim_range)
-		else:
-			reticle_offset = facing * 4.0
-		facing = reticle_offset.normalized()
+		# The reticle always starts on you and is moved out from there. Facing holds until
+		# it has been pushed far enough to give a direction (see aim_min_dist).
+		reticle_offset = Vector3.ZERO
 	elif not want_ready and armed:
 		armed = false
 		_reload_t = 0.0   # putting it away cancels a reload
@@ -354,14 +390,11 @@ func _update_aim(delta: float) -> void:
 
 	if armed:
 		if using_pad:
+			# The stick pushes the reticle out from you like a cursor (it never jumps to a
+			# distance). It stays where you leave it until Ready is released.
 			if stick.length() > 0.05:
-				var target := stick3.normalized() * lerpf(2.5, aim_range, clampf(stick.length(), 0.0, 1.0))
-				reticle_offset = reticle_offset.lerp(target, 1.0 - exp(-25.0 * delta))
-			else:
-				reticle_offset = facing * clampf(reticle_offset.length(), 2.5, aim_range)
+				reticle_offset += stick3 * aim_stick_speed * delta
 		reticle_offset = reticle_offset.limit_length(aim_range)
-		if reticle_offset.length() < 0.6:
-			reticle_offset = (reticle_offset.normalized() if reticle_offset.length() > 0.001 else facing) * 0.6
 		reticle_visible = true
 	else:
 		if using_pad:
@@ -376,6 +409,7 @@ func _update_aim(delta: float) -> void:
 
 	# Reticle turns red over an enemy.
 	reticle_on_enemy = false
+	reticle_target = null
 	if reticle_visible:
 		var rp := global_position + reticle_offset
 		for e in get_tree().get_nodes_in_group("enemies"):
@@ -385,6 +419,7 @@ func _update_aim(delta: float) -> void:
 				d.y = 0.0
 				if d.length() < 0.95:
 					reticle_on_enemy = true
+					reticle_target = en
 					break
 
 
@@ -398,7 +433,8 @@ func _update_facing(delta: float, move_dir: Vector3) -> void:
 		want = _dash_dir
 	elif move_dir.length() > 0.1:
 		want = move_dir
-	if want.length() < 0.01:
+	# In Ready, a reticle sitting on (or very near) you gives no direction: keep facing as is.
+	if want.length() < (aim_min_dist if armed else 0.01):
 		return
 	want = want.normalized()
 	if armed and not using_pad:
@@ -500,7 +536,7 @@ func _barge(door: Door, spd: float, into: Vector3) -> void:
 
 
 # ---------------------------------------------------------------- combat + interact
-## Ready = right mouse button (read three ways), RB, or Q.
+## Ready = right mouse button (read three ways), LT, or Q.
 func ready_held() -> bool:
 	if Input.is_action_pressed("ready_weapon"):
 		return true
@@ -508,7 +544,7 @@ func ready_held() -> bool:
 		or (_has_mouse and (DisplayServer.mouse_get_button_state() & MOUSE_BUTTON_MASK_RIGHT) != 0)
 
 
-## Attack / Interact = left mouse button (read three ways), A, or RT.
+## Attack / Interact = left mouse button (read three ways), RT, or A.
 func attack_held() -> bool:
 	if Input.is_action_pressed("attack"):
 		return true
@@ -561,11 +597,18 @@ func _fire() -> void:
 	shot.damage = shot_damage
 	shot.exclude = [get_rid()]
 	shot.shooter = self
+	# Fired with the reticle on an enemy: the shot is "aimed" at that enemy.
+	if reticle_target != null:
+		shot.aimed_at = reticle_target
+		shot.aimed_mult = aimed_mult
+		shot.headshot_chance = headshot_chance
 	shots_fired += 1
 	print("[fire] #%d dir %s mag %d" % [shots_fired, facing, mag])
 	shot.position = global_position + Vector3(0.0, 1.1, 0.0) + facing * 0.3
 	get_parent().add_child(shot)
-	velocity -= facing * 0.8   # tiny kick
+	velocity -= facing * shot_kick
+	if camera_rig:
+		camera_rig.kick(-facing * shot_cam_kick)
 	if mag == 0 and reserve > 0:
 		_start_reload()
 
@@ -606,7 +649,7 @@ func interact_prompt() -> String:
 	var txt: String = interact_target.call("prompt_text", self)
 	if armed:
 		return "%s  (lower your weapon)" % txt
-	return "[%s]  %s" % ["A" if using_pad else "Left-click", txt]
+	return "[%s]  %s" % ["RT" if using_pad else "Left-click", txt]
 
 
 # ---------------------------------------------------------------- health
@@ -666,9 +709,10 @@ func _update_visuals(_delta: float) -> void:
 
 	_reticle.visible = reticle_visible and not dead
 	_reticle.global_position = global_position + reticle_offset + Vector3(0.0, 0.08, 0.0)
-	if reticle_on_enemy:
+	if not armed:
+		# Weapon away: just a look cursor, so keep it a quiet gray (no enemy highlight).
+		_reticle_mat.albedo_color = Color(0.62, 0.64, 0.66, 0.55)
+	elif reticle_on_enemy:
 		_reticle_mat.albedo_color = Color(1.0, 0.2, 0.15, 0.95)
-	elif armed:
-		_reticle_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.95)
 	else:
-		_reticle_mat.albedo_color = Color(0.85, 0.95, 1.0, 0.6)
+		_reticle_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.95)

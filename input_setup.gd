@@ -21,12 +21,13 @@ static func apply() -> void:
 	# Ready is HOLD. Q is a fallback for touchpads that can't hold right-click and click.
 	_action("ready_weapon", 0.5)
 	_mouse("ready_weapon", MOUSE_BUTTON_RIGHT); _key("ready_weapon", KEY_Q)
-	_button("ready_weapon", JOY_BUTTON_RIGHT_SHOULDER)
+	_axis("ready_weapon", JOY_AXIS_TRIGGER_LEFT, 1.0)
 
 	# Attack while Ready, Interact while the weapon is away. Same button.
 	_action("attack", 0.4)
-	_mouse("attack", MOUSE_BUTTON_LEFT); _button("attack", JOY_BUTTON_A)
-	_axis("attack", JOY_AXIS_TRIGGER_RIGHT, 1.0)
+	# Pad: RT is the main button; A stays as an alternate so Interact is also on a face button.
+	_mouse("attack", MOUSE_BUTTON_LEFT); _axis("attack", JOY_AXIS_TRIGGER_RIGHT, 1.0)
+	_button("attack", JOY_BUTTON_A)
 
 	# Tap = dash, hold = run.
 	_action("sprint", 0.5)

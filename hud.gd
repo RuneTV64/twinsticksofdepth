@@ -26,16 +26,17 @@ Reload  R"""
 const HELP_PAD := """CONTROLLER
 Move  Left stick
 Look (weapon away)  Right stick moves the crosshair, camera follows
-Ready (HOLD)  RB
-Attack (while Ready)  A  or  RT
-Interact (weapon away)  A
+Ready (HOLD)  LT
+Attack (while Ready)  RT
+Interact (weapon away)  RT  or  A
 Sprint  LB or L3: tap = dash, hold = run
 Reload  X"""
 
 const HELP_TAIL := """
 Doors: walk into them to push them open or shut.
 Run or dash into a shut one to barge it (it hurts).
-Stat test keys: 1/2 STR   3/4 END   5/6 WT
+Aim: a red reticle on an enemy = aimed shot (more damage, headshot chance)
+Stat test keys: 1/2 STR   3/4 END   5/6 WT   7/8 DEX
 F1 hide help    Esc free mouse"""
 
 
@@ -145,6 +146,8 @@ func _process(_delta: float) -> void:
 	var stance := "READY" if player.armed else "WEAPON AWAY"
 	if player.running:
 		stance += "  - running"
+	if player.fatigue() > 0.3:
+		stance += "  - fatigued"
 	_state.text = "%s    |    %s" % [stance, "Controller" if player.using_pad else "Mouse + Keyboard"]
 	_state.add_theme_color_override("font_color", Color(1.0, 0.75, 0.3) if player.armed else Color.WHITE)
 	_help.text = (HELP_PAD if player.using_pad else HELP_KM) + "\n" + HELP_TAIL
@@ -153,12 +156,15 @@ func _process(_delta: float) -> void:
 	_hp.value = player.health
 	_st.max_value = player.max_stamina
 	_st.value = player.stamina
-	_st_fill.bg_color = Color(0.9, 0.5, 0.15) if player.winded else Color(0.3, 0.8, 0.35)
+	# Green when fresh, sliding to yellow as fatigue sets in; orange while winded.
+	_st_fill.bg_color = Color(0.9, 0.5, 0.15) if player.winded \
+		else Color(0.3, 0.8, 0.35).lerp(Color(0.9, 0.8, 0.2), player.fatigue())
 
-	_stats.text = "STR %d  END %d  WT %d   ->  walk %.1f  ready %.1f  run %.1f  dash %.1f   barge power: run %d / dash %d" % [
-		roundi(player.strength), roundi(player.endurance), roundi(player.weight),
+	_stats.text = "STR %d  END %d  WT %d  DEX %d   ->  walk %.1f  ready %.1f  run %.1f  dash %.1f   barge power: run %d / dash %d   aimed x%.2f  headshot %d%%" % [
+		roundi(player.strength), roundi(player.endurance), roundi(player.weight), roundi(player.dexterity),
 		player.walk_speed, player.ready_speed, player.run_speed, player.dash_speed,
-		roundi(player.barge_power(player.run_speed)), roundi(player.barge_power(player.dash_speed))]
+		roundi(player.barge_power(player.run_speed)), roundi(player.barge_power(player.dash_speed)),
+		player.aimed_mult, roundi(player.headshot_chance * 100.0)]
 
 	_ammo.text = "%d / %d" % [player.mag, player.reserve]
 	_ammo.modulate = Color(1, 1, 1, 1.0 if player.armed else 0.45)
