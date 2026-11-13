@@ -8,6 +8,7 @@ const WALL_T := 0.4
 var player: Player
 var rig: CamRig
 var hud: Hud
+var fog: Node3D
 
 
 func _enter_tree() -> void:
@@ -31,6 +32,12 @@ func _ready() -> void:
 
 	for e in get_tree().get_nodes_in_group("enemies"):
 		(e as Enemy).player = player
+
+	# Fog of war: darkens whatever is outside the player's vision cone.
+	fog = preload("res://fog.gd").new()
+	fog.player = player
+	fog.cam = rig.cam
+	add_child(fog)
 
 	hud = Hud.new()
 	hud.player = player

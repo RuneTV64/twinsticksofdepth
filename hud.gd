@@ -20,7 +20,7 @@ const HELP_KM := """MOUSE + KEYBOARD
 Move  WASD
 Look (weapon away)  Mouse moves the crosshair, camera follows
 Ready (HOLD)  Right mouse button
-Attack  Left-click (gun: while Ready)
+Attack (while Ready)  Left-click
 Interact (weapon away)  Left-click
 Sprint  Shift: tap = dash, hold = run
 Weapon wheel (HOLD)  Tab, point with the mouse, release
@@ -30,7 +30,7 @@ const HELP_PAD := """CONTROLLER
 Move  Left stick
 Look (weapon away)  Right stick moves the crosshair, camera follows
 Ready (HOLD)  LT
-Attack  RT (gun: while Ready)
+Attack (while Ready)  RT
 Interact (weapon away)  RT  or  A
 Sprint  L3: tap = dash, hold = run
 Weapon wheel (HOLD)  LB, point with the right stick, release
@@ -40,10 +40,10 @@ const HELP_TAIL := """
 Doors: walk into them to push them open or shut.
 Run or dash into a shut one to barge it (it hurts).
 Aim: a red reticle on an enemy = aimed shot (more damage, headshot chance)
-Unarmed: attack = punch (weak; works on the run, a bit harder standing still).
-Unarmed + Ready: TAP attack = punch, HOLD attack = shove them back.
-Ready and facing a zombie also shoves off its bite. Shoving costs stamina;
-out of stamina = bites land until you recover.
+Unarmed + Ready: attack = punch (weak; a bit harder standing still).
+Hold Ready and face a zombie: when it gets within reach you shove it back,
+and any zombies right beside it. Each shove costs stamina;
+out of stamina = no shoves, bites land until you recover.
 Stat test keys: 1/2 STR   3/4 END   5/6 WT   7/8 DEX
 F1 hide help    Esc free mouse"""
 
@@ -186,8 +186,6 @@ func _process(_delta: float) -> void:
 	if player.armed and player.is_melee():
 		if not player.is_guarding():
 			stance += "  - SPENT"
-		elif player.shoving:
-			stance += "  - shoving"
 		else:
 			stance += "  - guarding"
 	if player.running:

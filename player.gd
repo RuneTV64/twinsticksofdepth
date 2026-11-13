@@ -72,8 +72,8 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 
 # ---------- Unarmed ----------
 # Punches are a last resort: weak, unreliable (damage varies, some whiff), but cheap and quick,
-# and they never stop you moving. Weapon away: attack punches (you can do it running).
-# Ready: TAP attack to punch, HOLD attack to shove.
+# and they never stop you moving. They need Ready, like any attack (weapon away, the attack
+# button is Interact only).
 @export var punch_damage_min := 2.0
 @export var punch_damage_max := 5.0
 @export var punch_still_mult := 1.4     # planted feet hit a little harder than a punch on the move
@@ -88,20 +88,28 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var punch_tired_slow := 1.4     # at zero stamina, punches take this many times longer
 @export var punch_tired_damage := 0.5   # at zero stamina, punch damage is multiplied by this
 @export var melee_look_range := 2.5     # Ready unarmed: how far the (hidden) look point roams
-# Shove (Ready, HOLD attack): throws back everything in reach in front of you. No damage; it
-# buys space. Repeats while held.
-@export var shove_hold_time := 0.2      # Ready: attack held this long is a shove, released sooner is a punch
-@export var shove_interval := 0.7       # seconds between shoves while held
-@export var shove_range := 1.7          # meters
-@export var shove_arc_dot := 0.4        # shoves enemies within this cone of your facing (dot)
+# Shove: automatic. Hold Ready unarmed, and when a zombie comes within reach in front of you,
+# you throw it back, along with any zombies right beside it. No damage; it buys space.
+@export var shove_interval := 0.7       # seconds before you can shove again
+@export var shove_range := 1.7          # meters; a zombie this close in front of you gets shoved
+@export var shove_arc_dot := 0.4        # "in front" = within this cone of your facing (dot)
+@export var shove_adjacent := 1.4       # meters; zombies this close to a shoved one go with it
 @export var shove_force := 9.0          # m/s the enemy is thrown back (about 2 m of travel)
-@export var shove_cost := 12.0          # stamina when a shove connects
-@export var shove_whiff_cost := 3.0     # stamina when it pushes at nothing
+@export var shove_cost := 12.0          # stamina per shove
 # Guard: Ready unarmed and facing an attacker stops its hit and costs stamina instead. Against
 # a zombie that is a last-moment shove before the bite. (Proper blocking is for fighting people.)
 @export var block_arc_dot := 0.5        # attacker must be within this cone of your facing (dot)
 @export var block_stamina_per_damage := 2.5   # stamina spent per point of damage stopped
 @export var block_regen_delay := 1.0    # seconds after a shove before stamina regenerates
+# ---------- Vision ----------
+# You see a cone in front of you plus a small circle all around; walls cut both short. Enemies
+# outside it fade out and the fog of war covers what you can't see (see fog.gd).
+@export var sight_fov_deg := 110.0      # full width of the cone
+@export var sight_range := 26.0         # meters, how far the cone reaches
+@export var sight_near := 3.0           # meters, all-round awareness (behind you too)
+@export var sight_eye_height := 1.5     # rays go out at this height, so low cover doesn't block sight
+const SIGHT_RAYS := 240                 # one every 1.5 degrees, all the way round
+
 @export var cam_stance_sharpness := 3.0 # how gently the camera settles after Ready / lower / weapon swap
 
 ## Weapons on the quick wheel, in slot order (slot 0 is at the left, going clockwise).
@@ -127,8 +135,12 @@ var mag := 8
 var reserve := 16
 var facing := Vector3(0, 0, -1)
 var weapon := "fists"              # what's in hand: one of WEAPONS
-var shoving := false               # Ready unarmed with attack held past shove_hold_time
-var _atk_hold := 0.0               # how long attack has been held, 0 when it isn't
+## Distance to the first wall along each of SIGHT_RAYS directions (capped at sight_range).
+## Ray i points at angle -PI + i * TAU / SIGHT_RAYS in the XZ plane (0 = +X, PI/2 = +Z).
+## Refreshed every physics tick. The cone itself is applied on top: see sight_reach_angle().
+var sight_rays := PackedFloat32Array()
+var _sight_query: PhysicsRayQueryParameters3D
+var _shove_cd := 0.0               # > 0 until you can shove again
 var _cam_carry := Vector3.ZERO     # camera offset left over from a stance change, eased to zero
 var wheel_open := false            # quick weapon wheel is up (Tab / LB held)
 var wheel_choice := -1             # slot highlighted on the wheel, -1 = none yet
@@ -185,6 +197,7 @@ var _reticle_mat: StandardMaterial3D
 
 
 func _ready() -> void:
+	add_to_group("player")
 	collision_layer = 2
 	collision_mask = 1 | 4
 	floor_snap_length = 0.3
@@ -482,6 +495,7 @@ func _physics_process(delta: float) -> void:
 	_handle_collisions(pre_vel)
 
 	_update_facing(delta, move_dir)
+	_update_sight()
 	_update_line_of_fire()
 	_update_combat()
 	_update_interact()
@@ -495,6 +509,7 @@ func _tick_timers(delta: float) -> void:
 	_stagger -= delta
 	_barge_cd -= delta
 	_bash_cd -= delta
+	_shove_cd -= delta
 	_swing_t -= delta
 	_block_t -= delta
 	_cam_carry = _cam_carry.lerp(Vector3.ZERO, 1.0 - exp(-cam_stance_sharpness * delta))
@@ -602,6 +617,68 @@ func current_reticle_range() -> float:
 
 func muzzle_position() -> Vector3:
 	return global_position + Vector3(0.0, 1.1, 0.0) + facing * 0.3
+
+
+# ---------------------------------------------------------------- vision
+const SIGHT_TAPER := 0.1   # radians over which the cone's edge falls from full range to sight_near
+
+
+## Angle you're facing in the XZ plane, same convention as the sight rays.
+func facing_angle() -> float:
+	return atan2(facing.z, facing.x)
+
+
+## How far you'd see in direction a with no walls: full range inside the cone, the short
+## all-round distance outside it, tapering across the cone's edge. (fog.gd's shader has the
+## same formula.)
+func sight_limit(a: float) -> float:
+	var off := absf(wrapf(a - facing_angle(), -PI, PI))
+	var half := deg_to_rad(sight_fov_deg) * 0.5
+	return lerpf(sight_range, sight_near, smoothstep(half, half + SIGHT_TAPER, off))
+
+
+## How far you can actually see in direction a right now: the cone, cut short by walls.
+func sight_reach_angle(a: float) -> float:
+	if sight_rays.size() != SIGHT_RAYS:
+		return 0.0
+	var f := (wrapf(a, -PI, PI) + PI) / TAU * SIGHT_RAYS
+	var i0 := int(floor(f)) % SIGHT_RAYS
+	var wall := lerpf(sight_rays[i0], sight_rays[(i0 + 1) % SIGHT_RAYS], f - floor(f))
+	return minf(wall, sight_limit(a))
+
+
+## Sweep the rays: how far it is to the first wall or door in every direction.
+func _update_sight() -> void:
+	if sight_rays.size() != SIGHT_RAYS:
+		sight_rays.resize(SIGHT_RAYS)
+	if _sight_query == null:
+		_sight_query = PhysicsRayQueryParameters3D.new()
+		_sight_query.collision_mask = 1
+	var space := get_world_3d().direct_space_state
+	var eye := global_position + Vector3(0.0, sight_eye_height, 0.0)
+	_sight_query.from = eye
+	for i in SIGHT_RAYS:
+		var a := -PI + i * TAU / SIGHT_RAYS
+		var reach := sight_range
+		_sight_query.to = eye + Vector3(cos(a), 0.0, sin(a)) * reach
+		var hit := space.intersect_ray(_sight_query)
+		if not hit.is_empty():
+			reach = eye.distance_to(hit["position"])
+		sight_rays[i] = reach
+
+
+## How far you can see toward a world position's direction right now.
+func sight_reach_toward(pos: Vector3) -> float:
+	return sight_reach_angle(atan2(pos.z - global_position.z, pos.x - global_position.x))
+
+
+## Is this spot in view: inside the cone (or right next to you) with nothing solid between?
+## radius lets something with a body count as seen when its near edge is in view.
+func can_see(pos: Vector3, radius := 0.4) -> bool:
+	if dead:
+		return false
+	var d := Vector2(pos.x - global_position.x, pos.z - global_position.z).length()
+	return d <= sight_reach_toward(pos) + radius
 
 
 ## The reticle is red only when a shot fired right now would really hit an enemy. This traces
@@ -774,10 +851,6 @@ func _update_combat() -> void:
 	attack_tapped = Input.is_action_just_pressed("attack") or _lmb_edge or (held and not _attack_was_held)
 	_attack_was_held = held
 	_lmb_edge = false
-	# Tap vs hold: a tap is attack let go before shove_hold_time.
-	var tap_released := not held and _atk_hold > 0.0 and _atk_hold < shove_hold_time
-	_atk_hold = _atk_hold + get_physics_process_delta_time() if held else 0.0
-	shoving = false
 	# A punch already under way lands when its windup runs out, whatever else is going on.
 	if _swing_t > 0.0 and not _swing_landed and _swing_total - _swing_t >= _swing_windup:
 		_land_punch()
@@ -789,14 +862,11 @@ func _update_combat() -> void:
 		if _draw_t > 0.0 or _stagger > 0.0 or _reload_t > 0.0:
 			return
 		if is_melee():
-			# Ready unarmed: tap = punch, hold = shove (repeats while held).
-			if tap_released:
-				if _fire_cd <= 0.0:
-					_punch()
-			elif held and _atk_hold >= shove_hold_time:
-				shoving = true
-				if _fire_cd <= 0.0:
-					_shove()
+			# Ready unarmed: zombies that get within reach are shoved back on their own;
+			# attack punches.
+			_auto_shove()
+			if held and _fire_cd <= 0.0:
+				_punch()
 		elif attack_held() and _fire_cd <= 0.0:
 			if mag > 0:
 				_fire()
@@ -804,11 +874,9 @@ func _update_combat() -> void:
 				_start_reload()
 			elif attack_tapped:
 				_bash()
-	elif interact_target != null:
-		if attack_tapped:
-			interact_target.call("interact", self)
-	elif is_melee() and held and _fire_cd <= 0.0 and _stagger <= 0.0:
-		_punch()   # fists need no readying: punch with the weapon away, even on the run
+	elif attack_tapped and interact_target != null:
+		# Weapon away: the attack button only ever interacts. Punching needs Ready.
+		interact_target.call("interact", self)
 
 
 func _start_reload() -> void:
@@ -895,23 +963,40 @@ func _land_punch() -> void:
 
 ## Shove everything in reach in front of you straight back. No damage. Needs your guard:
 ## once you're spent you can't shove until you've caught your breath.
-func _shove() -> void:
-	_fire_cd = shove_interval
-	if not is_guarding():
-		show_status("Too spent to shove", 0.8)
+func _auto_shove() -> void:
+	if _shove_cd > 0.0 or not is_guarding():
 		return
-	_block_t = 0.25
-	var hit := false
+	var alive: Array[Enemy] = []
 	for e in get_tree().get_nodes_in_group("enemies"):
 		var en := e as Enemy
-		if en == null or en.dead:
-			continue
+		if en != null and not en.dead and en.kind != "dummy":
+			alive.append(en)
+	# Whoever has come within reach in front of you sets it off...
+	var shoved: Array[Enemy] = []
+	for en in alive:
 		var to := en.global_position - global_position
 		to.y = 0.0
 		if to.length() < shove_range and to.normalized().dot(facing) > shove_arc_dot:
-			en.shove(to.normalized(), shove_force)
-			hit = true
-	_spend_guard(shove_cost if hit else shove_whiff_cost)
+			shoved.append(en)
+	if shoved.is_empty():
+		return
+	# ...and anything standing right beside them goes too.
+	var in_reach := shoved.size()
+	for en in alive:
+		if shoved.has(en):
+			continue
+		for i in in_reach:
+			if en.global_position.distance_to(shoved[i].global_position) < shove_adjacent:
+				shoved.append(en)
+				break
+	for en in shoved:
+		var away := en.global_position - global_position
+		away.y = 0.0
+		en.shove(away.normalized(), shove_force)
+	_shove_cd = shove_interval
+	_block_t = 0.25
+	show_status("Shoved back", 0.5)
+	_spend_guard(shove_cost)
 
 
 ## Stamina spent holding something off. Running dry breaks your guard.

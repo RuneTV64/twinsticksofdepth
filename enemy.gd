@@ -13,6 +13,7 @@ extends CharacterBody3D
 @export var attack_damage := 10.0
 @export var attack_cooldown := 1.3
 @export var investigate_time := 10.0   # how long a heard noise keeps pulling it in
+@export var fade_time := 0.25          # seconds to fade out of (or into) the player's view
 
 var hp := 100.0
 var dead := false
@@ -25,6 +26,7 @@ var _cd := 0.0
 var _since_hit := 99.0
 var _dead_t := 0.0
 var _sway := 0.0
+var _alpha := 1.0                # 1 = in the player's view, fades to 0 when it isn't
 var _noise_pos := Vector3.ZERO   # where the last noise it heard came from
 var _noise_t := 0.0              # > 0 while it is still drawn to that spot
 var _mat: StandardMaterial3D
@@ -106,6 +108,16 @@ func hear_noise(pos: Vector3) -> void:
 	_noise_t = investigate_time
 
 
+## You only see an enemy while it's in the player's view; out of it, it fades away (it is
+## still there, still moving, still dangerous).
+func _update_fade(delta: float) -> void:
+	var seen := player == null or player.can_see(global_position)
+	_alpha = move_toward(_alpha, 1.0 if seen else 0.0, delta / maxf(fade_time, 0.01))
+	_visual.visible = _alpha > 0.02
+	_mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED if _alpha > 0.99 \
+		else BaseMaterial3D.TRANSPARENCY_ALPHA
+
+
 ## Shoved back by the player: thrown along dir, no damage, and it needs a moment before it
 ## can attack again.
 func shove(dir: Vector3, force: float) -> void:
@@ -138,6 +150,7 @@ func _physics_process(delta: float) -> void:
 	_flash -= delta
 	_cd -= delta
 	_since_hit += delta
+	_update_fade(delta)
 	if dead:
 		_dead_t -= delta
 		if _dead_t <= 0.0:
@@ -190,6 +203,8 @@ func _physics_process(delta: float) -> void:
 			var n := get_slide_collision(i).get_normal()
 			door.push(global_position, -Vector3(n.x, 0.0, n.z).normalized(), move_speed)
 
-	_mat.albedo_color = Color(1, 1, 1) if _flash > 0.0 else _base_color
-	_label.visible = _since_hit < 2.5
+	var col := Color(1, 1, 1) if _flash > 0.0 else _base_color
+	col.a = _alpha
+	_mat.albedo_color = col
+	_label.visible = _since_hit < 2.5 and _alpha > 0.5
 	_label.text = "%d" % ceili(hp)

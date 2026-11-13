@@ -8,6 +8,9 @@ extends Node3D
 var _active := true
 var _t := 0.0
 var _mesh: MeshInstance3D
+var _mat: StandardMaterial3D
+var _alpha := 0.0          # 1 = in the player's view; fades out when it isn't
+var _player: Player
 
 
 func _ready() -> void:
@@ -16,16 +19,31 @@ func _ready() -> void:
 	var b := BoxMesh.new()
 	b.size = Vector3(0.6, 0.35, 0.4)
 	_mesh.mesh = b
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.85, 0.7, 0.2)
-	mat.emission_enabled = true
-	mat.emission = Color(0.5, 0.4, 0.05)
-	_mesh.material_override = mat
+	_mat = StandardMaterial3D.new()
+	_mat.albedo_color = Color(0.85, 0.7, 0.2)
+	_mat.emission_enabled = true
+	_mat.emission = Color(0.5, 0.4, 0.05)
+	_mesh.material_override = _mat
 	_mesh.position.y = 0.4
 	add_child(_mesh)
 
 
+## Like enemies, items only show while the player can see them. You remember the place, not
+## whether the thing is still there.
+func _update_fade(delta: float) -> void:
+	if _player == null:
+		_player = get_tree().get_first_node_in_group("player") as Player
+	var seen := _player == null or _player.can_see(global_position, 0.3)
+	_alpha = move_toward(_alpha, 1.0 if seen else 0.0, delta / 0.25)
+	_mesh.visible = _alpha > 0.02
+	_mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED if _alpha > 0.99 \
+		else BaseMaterial3D.TRANSPARENCY_ALPHA
+	_mat.albedo_color.a = _alpha
+	_mat.emission_energy_multiplier = _alpha
+
+
 func _process(delta: float) -> void:
+	_update_fade(delta)
 	if not _active:
 		_t -= delta
 		if _t <= 0.0:
