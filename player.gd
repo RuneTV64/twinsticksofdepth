@@ -36,8 +36,11 @@ var barge_min_speed := 5.3
 @export var backpedal_mult := 0.75      # Ready: speed when moving directly away from aim
 @export var draw_time := 0.12         # Ready pressed -> can attack
 @export var sprint_tap_time := 0.22     # release Sprint before this = dash, hold past it = run
-@export var look_range := 8.0           # weapon away: how far the crosshair can roam
-@export var aim_range := 10.0           # Ready: max reticle distance
+@export var reticle_range := 10.0       # how far the reticle can roam, in both stances
+# Gear adds to the base range per stance. Set these when equipment changes (they can change
+# at any time; the reticle is re-clamped every frame).
+var look_range_bonus := 0.0             # weapon away: e.g. binoculars
+var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var aim_min_dist := 0.3         # Ready: reticle closer than this doesn't turn you
 @export var aim_stick_speed := 20.0     # Ready: reticle speed on the stick (m/s)
 @export var ready_cam_lead := 0.45     # Ready: how far the camera leans toward the reticle
@@ -277,7 +280,7 @@ func _input(event: InputEvent) -> void:
 		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not dead:
 			var rel: Vector2 = event.relative
 			reticle_offset += Vector3(rel.x, 0.0, rel.y) * mouse_sens
-			reticle_offset = reticle_offset.limit_length(aim_range if armed else look_range)
+			reticle_offset = reticle_offset.limit_length(current_reticle_range())
 			_mouse_idle = 0.0
 	elif event is InputEventJoypadButton:
 		using_pad = true
@@ -337,6 +340,7 @@ func _physics_process(delta: float) -> void:
 	_handle_collisions(pre_vel)
 
 	_update_facing(delta, move_dir)
+	_update_line_of_fire()
 	_update_combat()
 	_update_interact()
 	_update_visuals(delta)
@@ -368,18 +372,26 @@ func _tick_timers(delta: float) -> void:
 # ---------------------------------------------------------------- stance + aim
 func _update_stance() -> void:
 	var want_ready := ready_held()
+	# If you're actively aiming during a stance change (right stick tilted, or the mouse moved
+	# recently enough that the crosshair is still showing), the reticle carries over instead of
+	# resetting, so you can ready (or lower) mid-aim without losing your place.
+	var aim_active := _mouse_idle < mouse_idle_hide
+	if using_pad:
+		aim_active = Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down", 0.2).length() > 0.05
 	if want_ready and not armed:
 		armed = true
 		running = false
 		_draw_t = draw_time
-		# The reticle always starts on you and is moved out from there. Facing holds until
+		# Otherwise the reticle starts on you and is moved out from there. Facing holds until
 		# it has been pushed far enough to give a direction (see aim_min_dist).
-		reticle_offset = Vector3.ZERO
+		if not aim_active:
+			reticle_offset = Vector3.ZERO
 	elif not want_ready and armed:
 		armed = false
 		_reload_t = 0.0   # putting it away cancels a reload
-		reticle_offset = Vector3.ZERO
-		_mouse_idle = 99.0
+		if not aim_active:
+			reticle_offset = Vector3.ZERO
+			_mouse_idle = 99.0
 
 
 func _update_aim(delta: float) -> void:
@@ -394,7 +406,7 @@ func _update_aim(delta: float) -> void:
 			# distance). It stays where you leave it until Ready is released.
 			if stick.length() > 0.05:
 				reticle_offset += stick3 * aim_stick_speed * delta
-		reticle_offset = reticle_offset.limit_length(aim_range)
+		reticle_offset = reticle_offset.limit_length(current_reticle_range())
 		reticle_visible = true
 	else:
 		if using_pad:
@@ -405,22 +417,49 @@ func _update_aim(delta: float) -> void:
 			reticle_visible = _mouse_idle < mouse_idle_hide
 		if not reticle_visible:
 			reticle_offset = Vector3.ZERO
-		reticle_offset = reticle_offset.limit_length(look_range)
+		reticle_offset = reticle_offset.limit_length(current_reticle_range())
 
-	# Reticle turns red over an enemy.
+
+
+## Max reticle distance right now: the shared base plus whatever the current stance's gear adds.
+func current_reticle_range() -> float:
+	return maxf(reticle_range + (aim_range_bonus if armed else look_range_bonus), 0.5)
+
+
+func muzzle_position() -> Vector3:
+	return global_position + Vector3(0.0, 1.1, 0.0) + facing * 0.3
+
+
+## The reticle is red only when a shot fired right now would really hit an enemy. This traces
+## the same path the projectile takes (from the muzzle, along your current facing, same hit
+## radius and wall check), so a wall, a shut door, a body in the way, or a facing that hasn't
+## turned onto the target yet all keep it white.
+func _update_line_of_fire() -> void:
 	reticle_on_enemy = false
 	reticle_target = null
-	if reticle_visible:
-		var rp := global_position + reticle_offset
-		for e in get_tree().get_nodes_in_group("enemies"):
-			var en := e as Enemy
-			if en and not en.dead:
-				var d := en.global_position - rp
-				d.y = 0.0
-				if d.length() < 0.95:
-					reticle_on_enemy = true
-					reticle_target = en
-					break
+	if not armed or dead:
+		return
+	var from := muzzle_position()
+	var to := from + facing * Projectile.MAX_DIST
+	var best_t := 2.0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		var en := e as Enemy
+		if en == null or en.dead:
+			continue
+		var t := Projectile.segment_hit(from, to, en.global_position, Projectile.HIT_RADIUS)
+		if t >= 0.0 and t < best_t:
+			best_t = t
+			reticle_target = en
+	if reticle_target == null:
+		return
+	var q := PhysicsRayQueryParameters3D.create(from, to, 1, [get_rid()])
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if not hit.is_empty():
+		var hp: Vector3 = hit["position"]
+		if from.distance_to(hp) / Projectile.MAX_DIST < best_t:
+			reticle_target = null   # something solid is in the way
+			return
+	reticle_on_enemy = true
 
 
 func _update_facing(delta: float, move_dir: Vector3) -> void:
@@ -604,7 +643,7 @@ func _fire() -> void:
 		shot.headshot_chance = headshot_chance
 	shots_fired += 1
 	print("[fire] #%d dir %s mag %d" % [shots_fired, facing, mag])
-	shot.position = global_position + Vector3(0.0, 1.1, 0.0) + facing * 0.3
+	shot.position = muzzle_position()
 	get_parent().add_child(shot)
 	velocity -= facing * shot_kick
 	if camera_rig:

@@ -45,7 +45,7 @@ In Ready, the reticle turns red over an enemy. A shot fired while it's red is ai
 
 ## Tuning
 All the feel settings are exported variables at the top of each script:
-- **player.gd:** `base_walk_speed`, `run_mult`, accel and decel, `fatigue_start`, `fatigue_min_speed`, `fatigue_min_accel`, turn speeds, `draw_time`, `sprint_tap_time`, look and aim range, `ready_cam_lead`, mouse sensitivity, weapon stats.
+- **player.gd:** `base_walk_speed`, `run_mult`, accel and decel, `fatigue_start`, `fatigue_min_speed`, `fatigue_min_accel`, turn speeds, `draw_time`, `sprint_tap_time`, `reticle_range` (shared by both stances; `look_range_bonus` and `aim_range_bonus` are set by gear such as binoculars or scopes), `ready_cam_lead`, mouse sensitivity, weapon stats.
 - **camera_rig.gd:** pitch, distance, FOV, `follow_sharpness`.
 - **door.gd:** toughness, locked, max swing angle.
 - **enemy.gd:** speed, aggro range, damage.

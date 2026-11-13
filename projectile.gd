@@ -7,7 +7,10 @@ var dir := Vector3(0, 0, -1)
 var speed := 140.0
 var damage := 25.0
 var knock := 3.0
-var max_dist := 40.0
+const MAX_DIST := 40.0
+const HIT_RADIUS := 0.55    # how close (XZ) the shot must pass to an enemy's center to hit
+
+var max_dist := MAX_DIST
 var exclude: Array[RID] = []
 var shooter: Player
 var aimed_at: Enemy = null      # enemy under the reticle when fired; bonuses apply only to it
@@ -43,7 +46,7 @@ func _physics_process(delta: float) -> void:
 		var en := e as Enemy
 		if en == null or en.dead:
 			continue
-		var t := _segment_hit(from, to, en.global_position, 0.55)
+		var t := segment_hit(from, to, en.global_position, HIT_RADIUS)
 		if t >= 0.0 and t < best_t:
 			best_t = t
 			best_e = en
@@ -81,7 +84,8 @@ func _physics_process(delta: float) -> void:
 
 
 ## Fraction 0..1 along from->to where it passes within `radius` of a standing enemy (XZ), or -1.
-func _segment_hit(from: Vector3, to: Vector3, c: Vector3, radius: float) -> float:
+## Static so the player's aim check uses exactly the same test as the shot itself.
+static func segment_hit(from: Vector3, to: Vector3, c: Vector3, radius: float) -> float:
 	var a := Vector2(from.x, from.z)
 	var b := Vector2(to.x, to.z)
 	var p := Vector2(c.x, c.z)
