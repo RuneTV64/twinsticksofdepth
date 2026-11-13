@@ -1,0 +1,9 @@
+# Godot 4+ editor cache and imports
+.godot/
+/android/
+
+# Exports
+*.pck
+*.exe
+/build/
+/export/
