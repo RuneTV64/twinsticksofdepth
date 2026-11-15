@@ -143,7 +143,12 @@ func _make_perf_label() -> void:
 	layer.layer = 10
 	add_child(layer)
 	_perf = Label.new()
-	_perf.position = Vector2(20, 330)
+	# top right, under the INPUT CHECK box, clear of the help text
+	_perf.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_perf.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_perf.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_perf.offset_top = 300.0
+	_perf.offset_right = -20.0
 	_perf.add_theme_font_size_override("font_size", 20)
 	_perf.add_theme_color_override("font_outline_color", Color.BLACK)
 	_perf.add_theme_constant_override("outline_size", 6)
