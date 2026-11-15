@@ -57,8 +57,8 @@ extends CharacterBody3D
 ## Closer than this (m) two zombies are pushed straight back out to it within a tick: bodies don't overlap.
 @export var min_gap := 0.55
 
-## Microseconds spent on zombies since the crowd readout last read them (main.gd, F5): posing the bodies, and
-## everything else a zombie does each tick (thinking, moving, colliding).
+## Microseconds spent on zombies since the crowd readout last read them (main.gd, F5): posing the bodies (each drawn
+## frame), and everything a zombie does each physics tick (thinking, moving, colliding).
 static var anim_usec := 0
 static var zombie_usec := 0
 
@@ -351,7 +351,11 @@ func _physics_process(delta: float) -> void:
 		zombie_usec += Time.get_ticks_usec() - t0
 
 
-func _animate_timed(delta: float) -> void:
+## The body is posed once per drawn frame, not in the physics tick: it's only for looks, and a slow frame then costs
+## one posing, not one per physics tick it has to catch up on. zombie_body.gd poses far zombies less often.
+func _process(delta: float) -> void:
+	if body == null or (dead and _corpse_t <= 0.0):
+		return
 	var t0 := Time.get_ticks_usec()
 	body.animate(self, delta)
 	anim_usec += Time.get_ticks_usec() - t0
@@ -371,7 +375,6 @@ func _tick(delta: float) -> void:
 			# The corpse lies there, then dithers away.
 			body.set_fade(clampf(_corpse_t / 2.0, 0.0, 1.0) * _alpha)
 			body.visible = _corpse_t > 0.0
-			_animate_timed(delta)
 		if _dead_t <= 0.0:
 			_respawn()
 		return
@@ -420,7 +423,6 @@ func _tick(delta: float) -> void:
 
 	if body != null:
 		_visual.rotation.y = atan2(-facing.x, -facing.z)
-		_animate_timed(delta)
 	else:
 		var col := Color(1, 1, 1) if _flash > 0.0 else _base_color
 		col.a = _alpha

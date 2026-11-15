@@ -31,6 +31,7 @@ const CROWD_STEP := 50
 var _crowd: Array[Enemy] = []
 var _perf: Label
 var _perf_t := 0.0
+var _perf_frames := 0
 
 
 func _enter_tree() -> void:
@@ -156,21 +157,24 @@ func _make_perf_label() -> void:
 	layer.add_child(_perf)
 
 
-## Twice a second: frame rate, how many zombies, and where each frame's time goes. "per tick" is per physics tick.
+## Twice a second: frame rate, how many zombies, and where the time goes. Posing is per drawn frame; zombie AI and
+## movement is per physics tick (60 a second, each with 16.7 ms to spare).
 func _process(delta: float) -> void:
 	if _perf == null or not _perf.visible:
 		Enemy.anim_usec = 0
 		Enemy.zombie_usec = 0
 		return
 	_perf_t += delta
+	_perf_frames += 1
 	if _perf_t < 0.5:
 		return
 	var ticks := maxf(_perf_t * Engine.physics_ticks_per_second, 1.0)
-	var anim_ms := Enemy.anim_usec / ticks / 1000.0
-	var rest_ms := (Enemy.zombie_usec - Enemy.anim_usec) / ticks / 1000.0
+	var anim_ms := Enemy.anim_usec / float(_perf_frames) / 1000.0
+	var ai_ms := Enemy.zombie_usec / ticks / 1000.0
 	Enemy.anim_usec = 0
 	Enemy.zombie_usec = 0
 	_perf_t = 0.0
+	_perf_frames = 0
 	var alive := 0
 	var seen := 0
 	for e in get_tree().get_nodes_in_group("enemies"):
@@ -179,15 +183,11 @@ func _process(delta: float) -> void:
 			alive += 1
 			if en._alpha > 0.0:
 				seen += 1
-	_perf.text = "CROWD TEST   F5 +%d   F6 clear   F7 can't be hurt: %s
-" % [CROWD_STEP, "ON" if player.invulnerable else "OFF"] \
-		+ "%d FPS   frame %.1f ms   physics %.1f ms
-" % [Engine.get_frames_per_second(),
+	_perf.text = "CROWD TEST   F5 +%d   F6 clear   F7 can't be hurt: %s\n" % [CROWD_STEP, "ON" if player.invulnerable else "OFF"] \
+		+ "%d FPS   frame %.1f ms   physics %.1f ms\n" % [Engine.get_frames_per_second(),
 			Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0] \
-		+ "zombies %d (%d in view)
-" % [alive, seen] \
-		+ "zombie posing %.2f ms per tick   zombie AI+movement %.2f ms per tick
-" % [anim_ms, rest_ms] \
+		+ "zombies %d (%d in view)\n" % [alive, seen] \
+		+ "zombie posing %.2f ms per frame   zombie AI+movement %.2f ms per tick\n" % [anim_ms, ai_ms] \
 		+ "draw calls %d   triangles %dk" % [Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
 			int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME) / 1000.0)]
 

@@ -139,8 +139,15 @@ changes, update both, and keep them the same files.
   once per tick; soft push inside `personal_space` 0.75 m, hard push out of `min_gap` 0.55 m; neighbours looked up
   every other tick, half the crowd each tick). The dissolve is only re-sent when it changes. Cloud bench, 226 zombies:
   zombie AI+movement 20.2 -> 13.6 ms/tick (fade 5.1 -> 1.6, separation 2.5, move_and_slide 5.3, think 3.2); posing
-  ~19 ms/tick is now the biggest cost. Next candidates: lower update rates far up the screen, C++ posing once poses
-  settle.
+  ~19 ms/tick is now the biggest cost.
+- Owner's PC after that (RTX 5070): 126 zombies 76 FPS, physics 14.7 ms; 176 zombies fell to 13 FPS because the
+  physics tick passed 16.7 ms (21.2) and Godot ran several ticks per frame to catch up. So posing left the physics
+  tick: `Enemy._process()` poses the body once per drawn frame, and `ZombieBody` poses by distance from the player:
+  every frame within `full_rate_within` 6 m, 30/s to `half_rate_within` 14 m, 20/s beyond, 10/s out of view, each
+  zombie offset. Cloud bench, 226 zombies: posing work 467 -> 175 ms per second; physics ticks 23.6 -> 51.5 per
+  second. The readout shows posing per frame and zombie AI per tick. Still to find: about 6-9 ms of the owner's
+  physics tick that grows with zombies but isn't zombie AI (guess: skeleton updates, Jolt). C++ posing once poses
+  settle. Test harnesses that pose zombies by hand must `set_process(false)` as well as physics.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera (`low_beyond` 21 m,
   `mid_within` 19.5 m; on screen zombies are 15 to 29 m away), at most 2 swaps a frame. Godot's automatic mesh LODs
   are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.

@@ -135,6 +135,7 @@ func _build(sheet: String, only: int) -> void:
 			e.position = Vector3(c * cw, y, 0.0)
 			_root.add_child(e)
 			e.set_physics_process(false)
+			e.set_process(false)   # posed here by hand, frozen at the time shown
 			e.body.shambler.call("show_parts", row[1])
 			e.body.shambler.call("set_skin", row[2], 1, 1, 2, 3.0, 11.0, 0.5, 0.4)
 			e.body.reroll_style()

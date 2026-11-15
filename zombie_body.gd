@@ -37,6 +37,10 @@ const SHADER := preload("res://assets/characters/ShamblerMale_Muscular/zombie_de
 @export var mid_within := 19.5
 ## Where cut-off pieces are put, from the shambler node (Shambler -> ZombieBody -> visual -> Enemy -> the level).
 @export var pieces_parent := NodePath("../../../..")
+## How often the body is posed, by distance from the player (m): every frame up close, then 30 and 20 times a second.
+## Out of the player's view, 10. Each zombie is offset, so a crowd's posing spreads over the frames.
+@export var full_rate_within := 6.0
+@export var half_rate_within := 14.0
 
 ## A part came off and flew away as a piece (passed on from shambler.gd).
 signal piece_spawned(slot: String, piece: Node)
@@ -102,7 +106,7 @@ var _stumble := 0.0
 var _stumble_cd := 3.0
 var _hold_t := 0.0
 var _was_hurt := 0.0
-var _skip := 0
+var _pose_acc := randf() * 0.05   # time since last posed; starts offset so a crowd doesn't pose on the same frame
 var _first := true
 var _dissolve := -1.0           # the dissolve last sent to the parts; -1 = send next time
 var _low := false
@@ -215,6 +219,18 @@ func _make_shambler(path: String, from: Node3D, copy := true) -> bool:
 	return true
 
 
+## Seconds between posings for this zombie now (see full_rate_within).
+func _pose_interval(e: Enemy) -> float:
+	if e._alpha <= 0.0 and not e.dead:
+		return 0.1
+	if e.player == null:
+		return 0.0
+	var d := Vector2(e.global_position.x - e.player.global_position.x, e.global_position.z - e.player.global_position.z).length()
+	if d < full_rate_within:
+		return 0.0
+	return 1.0 / 30.0 if d < half_rate_within else 1.0 / 20.0
+
+
 ## Mid model near the camera, low model far from it. Swaps are spread out so a whole crowd never swaps at once.
 func _update_detail(e: Enemy) -> void:
 	if e.dead or e._alpha <= 0.0:
@@ -226,7 +242,7 @@ func _update_detail(e: Enemy) -> void:
 	var want_low := d > (mid_within if _low else low_beyond)
 	if want_low == _low:
 		return
-	var frame := Engine.get_physics_frames()
+	var frame := Engine.get_process_frames()
 	if frame != _swap_frame:
 		_swap_frame = frame
 		_swaps = 0
@@ -318,12 +334,11 @@ func animate(e: Enemy, delta: float) -> void:
 	if _skel == null:
 		return
 	_update_detail(e)
-	# Out of view and not close: pose a quarter as often (it still moves, just isn't looked at).
-	_skip = (_skip + 1) % 4
-	if e._alpha <= 0.0 and _skip != 0 and not e.dead:
+	_pose_acc += delta
+	if _pose_acc < _pose_interval(e) and not _first:
 		return
-	if e._alpha <= 0.0:
-		delta *= 4.0
+	delta = minf(_pose_acc, 0.25)
+	_pose_acc = 0.0
 	_t += delta
 	for i in _n:
 		_tq[i] = Quaternion.IDENTITY
