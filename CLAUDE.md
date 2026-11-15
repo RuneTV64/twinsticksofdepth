@@ -7,9 +7,11 @@ the character models, shaders and their scripts are in `assets/characters/` and 
 ## Working with the owner
 
 - Commit and push to the session's working branch. Push to `main` only when the owner says so for that change; it
-  has always been a fast-forward. The owner also works from home: rigging and animation of MaleBody_Muscular
-  (fitted to the player) were done there and may not be on GitHub yet, so never overwrite or rewrite main, and
-  remind them to `git pull --rebase origin main` before they push.
+  has always been a fast-forward. Never overwrite or rewrite main.
+- The owner works at their own PC (Windows, PowerShell, Godot 4.7.2) alongside the session, and commits there too
+  (the player rig, `player_body.gd`, came from there). Talk to them as being at it: after a push to main, give them
+  `git pull --rebase origin main` to run now. Opening the project in Godot can rewrite `.import`/`.uid` files,
+  which blocks a pull; commit matching ones to the repo, or have them `git restore .` first.
 - Approved assets (pills say Approved): ask before changing them. MaleBody_Muscular is approved and locked;
   MaleBody_Muscular_Skins and ShamblerMale_Muscular were approved on 15 Nov 2026.
 - The owner reviews by looking at renders. Show before/after sheets, and say plainly what a render can't show.
