@@ -245,17 +245,17 @@ func _update_fade(delta: float) -> void:
 	var seen := player == null or player.can_see(global_position)
 	_alpha = move_toward(_alpha, 1.0 if seen else 0.0, delta / maxf(fade_time, 0.01))
 	if body != null:
-		var show := _alpha > 0.02 or _corpse_t > 0.0
-		if _visual.visible != show:
-			_visual.visible = show
+		var shown := _alpha > 0.02 or _corpse_t > 0.0
+		if _visual.visible != shown:
+			_visual.visible = shown
 		if not dead:
 			body.set_fade(_alpha)
 		return
 	if _visual.visible != (_alpha > 0.02):
 		_visual.visible = _alpha > 0.02
-	var tr := BaseMaterial3D.TRANSPARENCY_DISABLED if _alpha > 0.99 else BaseMaterial3D.TRANSPARENCY_ALPHA
-	if _mat.transparency != tr:
-		_mat.transparency = tr
+	var mode := BaseMaterial3D.TRANSPARENCY_DISABLED if _alpha > 0.99 else BaseMaterial3D.TRANSPARENCY_ALPHA
+	if _mat.transparency != mode:
+		_mat.transparency = mode
 
 
 ## Shoved back by the player: thrown along dir, no damage, and it needs a moment before it

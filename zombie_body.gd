@@ -469,9 +469,9 @@ func animate(e: Enemy, delta: float) -> void:
 	var near := clampf((4.0 - gap) / 2.0, 0.0, 1.0) if e.chasing else 0.0
 
 	if _prone_w > 0.5:
-		_pose_crawl(e, delta, speed, rt, stiff, drag, tgt, reaching)
+		_pose_crawl(e, delta, speed, rt, tgt, reaching)
 	else:
-		_pose_walk(e, delta, speed, rt, stiff, drag, blo, frail, stum, tgt, near, reaching)
+		_pose_walk(e, delta, speed, rt, blo, stum, tgt, near, reaching)
 
 	# ---- flinch: thrown back and twisted away from the hit
 	_tq[_chest] = _tq[_chest] * _rx(-0.55 * _flinch) * _ry(0.35 * _flinch * _flinch_side)
@@ -540,8 +540,8 @@ func animate(e: Enemy, delta: float) -> void:
 
 
 # ---------------------------------------------------------------------- upright: the shamble
-func _pose_walk(e: Enemy, delta: float, speed: float, rt: float, stiff: float, drag: float, blo: float,
-		frail: float, stum: float, tgt: Vector3, near: float, reaching: bool) -> void:
+func _pose_walk(e: Enemy, delta: float, speed: float, rt: float, blo: float, stum: float, tgt: Vector3,
+		near: float, reaching: bool) -> void:
 	var stride := lerpf(1.15, 0.75, drag) * (1.0 - 0.15 * blo)
 	_phase = fposmod(_phase + TAU * speed / stride * delta, TAU)
 	var m := _move_w
@@ -638,8 +638,7 @@ func _pose_walk(e: Enemy, delta: float, speed: float, rt: float, stiff: float, d
 
 
 # ---------------------------------------------------------------------- face down: the crawl
-func _pose_crawl(e: Enemy, delta: float, speed: float, rt: float, stiff: float, drag: float, tgt: Vector3,
-		reaching: bool) -> void:
+func _pose_crawl(e: Enemy, delta: float, speed: float, rt: float, tgt: Vector3, reaching: bool) -> void:
 	# One pull of each arm moves him about 0.7 m; the worse he is, the more each pull struggles.
 	var pull_len := lerpf(0.75, 0.5, drag)
 	_crawl_phase = fposmod(_crawl_phase + TAU * maxf(speed, 0.15 * float(e.chasing)) / pull_len * delta, TAU)
