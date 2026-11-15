@@ -176,6 +176,11 @@ changes, update both, and keep them the same files.
   model files are loaded once (`ZombieBody._scene()`), and a swap is `shambler.use_model()`: same skeleton, bones and
   bind poses at every level (checked), so only the merged mesh changes (~0.02 ms). Never call `load()` per frame or
   per spawn; keep the resource.
+- **Where we stopped (15 Nov 2026):** 226 zombies piled on the player run ~77-80 FPS on the owner's RTX 5070, but
+  drop to ~50-55 FPS while the cursor pans the camera (it was ~44 before detail swaps went mesh-only). Not found yet.
+  Suspect: panning brings more zombies within the mid-model distance (triangles 7.8M -> 10.6M, GPU skinning). The
+  owner pressed L once and saw little change, but L was only on the working branch then, not main, so that test may
+  not have run; redo it once L is on main. Next: Visual Profiler (CPU vs GPU) while panning, then fix whichever side.
 - Debug keys: F1 help, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
