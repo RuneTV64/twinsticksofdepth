@@ -30,7 +30,8 @@ All game design assets go into our claude.ai **Artifacts**, not just this repo, 
 devices and pulled into any chat. That covers models, shaders, asset scripts, previews, design docs and plans.
 
 - Character assets: the **Godot Assets** artifact, https://claude.ai/artifact/WRBAYq3aDXi9hMi5zS2wzC
-  (MaleBody_Muscular, ShamblerMale_Muscular). Find others with the Artifact tool's `list` action.
+  (MaleBody_Muscular, MaleBody_Muscular_Skins, ShamblerMale_Muscular). Find others with the Artifact tool's
+  `list` action.
 - Before starting asset work, check the Artifacts first. Work done in an earlier chat may only be there, not in git.
 - Layout inside an asset artifact: `files/<AssetName>/`. Models are `.glb.b64.txt` (base64 of the .glb, since
   artifacts can't hold .glb). Godot scripts and shaders are `.gd.txt` / `.gdshader.txt`. The recipe that builds
@@ -57,6 +58,27 @@ devices and pulled into any chat. That covers models, shaders, asset scripts, pr
 - Nothing hangs off the zombie model. Spilling guts, blood, bits of brain and intestine, and limbs flying off
   and piling up on the ground are live effects in the game (pixel particle effects and loose pieces), not part
   of the character model.
+
+## Character shaders: how they are built
+
+The living skin shader and the zombie decay shader are generated, not hand-written. Everything is in the Godot
+Assets artifact; nothing below is in this repo.
+
+- A Godot project needs, for a shambler: the three `ShamblerMale_Muscular*.glb`, `zombie_decay.gdshader`,
+  `shambler.gd`, `freshness.gd`, `living_body.gd` and `anatomy_map.gd`. For a living body: the three
+  `MaleBody_Muscular*.glb`, `body_living.gdshader` and `living_body.gd`.
+- Details painted by place on the body (freckles, hair, rot, grime, the insides of wounds) read each vertex's rest
+  position from `CUSTOM0`, not `VERTEX`, so they stay on the skin when limbs move. Any new body model must export
+  it (glTF `TEXCOORD_2` = rest x, y; `TEXCOORD_3` = rest z, rest normal y), as `export_glb.js` does.
+- To rebuild the shambler, in `files/ShamblerMale_Muscular/source/` (with MaleBody_Muscular's
+  `male_body_muscular.js` and `rig.js` beside it): `node gen_anatomy_map.js <out>` makes `anatomy_map.gd` and
+  `anatomy_consts.json`; `node gen_decay_shader.js zombie_skin.gdshader zombie_decay.gdshader` makes the shader
+  (it reads `anatomy_consts.json` and `skin_tones.js`); `node export_shambler.js <out>` makes the GLBs. Change the
+  anatomy in `anatomy.js`, the wounds in `shambler.js`, the colors in `gen_decay_shader.js`.
+- The owner accepted the shader work on 15 Nov 2026 (artifact Version 31). Still unchecked: Forward+ on Godot
+  4.7, a real animation, and the cost of the depth painting on a real graphics card.
+- Next on the model side, when asked: the cut-off pieces (forearm and hand, lower leg and foot, head) as
+  separate meshes for the flying-limb effect; faces; build types.
 
 ## Testing Godot assets in a cloud session
 
