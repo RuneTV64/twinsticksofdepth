@@ -184,7 +184,7 @@ func reroll_style() -> void:
 ## The model files, loaded once and kept: load() takes about a millisecond each call even for a file already loaded,
 ## and it was being called on every spawn and every detail swap (several a frame while the camera pans).
 static var _scenes := {}
-## Test switch (main.gd, F8): every zombie on the low model, to see what the mid model costs.
+## Test switch (main.gd, L): every zombie on the low model, to see what the mid model costs.
 static var force_low := false
 
 

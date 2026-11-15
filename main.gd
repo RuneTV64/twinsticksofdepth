@@ -91,7 +91,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_8: _stat("dexterity", 1)
 			KEY_F5: _add_crowd(CROWD_STEP)
 			KEY_F6: _clear_crowd()
-			KEY_F8:
+			KEY_L:   # (not F8: that's the Godot editor's Stop Running Project)
 				ZombieBody.force_low = not ZombieBody.force_low
 				player.show_status("All zombies on the low model: %s" % ("ON" if ZombieBody.force_low else "OFF"), 1.5)
 			KEY_F7:
@@ -186,7 +186,7 @@ func _process(delta: float) -> void:
 			alive += 1
 			if en._alpha > 0.0:
 				seen += 1
-	_perf.text = "CROWD TEST   F5 +%d   F6 clear   F7 can't be hurt: %s   F8 all low model: %s\n" % [CROWD_STEP,
+	_perf.text = "CROWD TEST   F5 +%d   F6 clear   F7 can't be hurt: %s   L all low model: %s\n" % [CROWD_STEP,
 			"ON" if player.invulnerable else "OFF", "ON" if ZombieBody.force_low else "OFF"] \
 		+ "%d FPS   frame %.1f ms   physics %.1f ms\n" % [Engine.get_frames_per_second(),
 			Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0] \
