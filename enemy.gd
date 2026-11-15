@@ -49,6 +49,11 @@ extends CharacterBody3D
 @export var corpse_time := 30.0        # s a dead zombie lies there before it fades (stand-in for the clean-up lore)
 @export var fall_apart_every := 20.0   # s: how often the most rotted get a chance to shed a part on their own
 
+## Microseconds spent on zombies since the crowd readout last read them (main.gd, F5): posing the bodies, and
+## everything else a zombie does each tick (thinking, moving, colliding).
+static var anim_usec := 0
+static var zombie_usec := 0
+
 var hp := 100.0
 var dead := false
 var home := Vector3.ZERO
@@ -321,6 +326,19 @@ func _on_piece(slot: String, piece: Node) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	var t0 := Time.get_ticks_usec()
+	_tick(delta)
+	if body != null:
+		zombie_usec += Time.get_ticks_usec() - t0
+
+
+func _animate_timed(delta: float) -> void:
+	var t0 := Time.get_ticks_usec()
+	body.animate(self, delta)
+	anim_usec += Time.get_ticks_usec() - t0
+
+
+func _tick(delta: float) -> void:
 	_flash -= delta
 	_cd -= delta
 	hurt_t -= delta
@@ -334,7 +352,7 @@ func _physics_process(delta: float) -> void:
 			# The corpse lies there, then dithers away.
 			body.set_fade(clampf(_corpse_t / 2.0, 0.0, 1.0) * _alpha)
 			body.visible = _corpse_t > 0.0
-			body.animate(self, delta)
+			_animate_timed(delta)
 		if _dead_t <= 0.0:
 			_respawn()
 		return
@@ -367,7 +385,7 @@ func _physics_process(delta: float) -> void:
 
 	if body != null:
 		_visual.rotation.y = atan2(-facing.x, -facing.z)
-		body.animate(self, delta)
+		_animate_timed(delta)
 	else:
 		var col := Color(1, 1, 1) if _flash > 0.0 else _base_color
 		col.a = _alpha

@@ -46,6 +46,7 @@ and any zombies right beside it. Each shove costs stamina;
 out of stamina = no shoves, bites land until you recover.
 Grabbed: Ready and face it to shove it off, or wiggle the move keys to break free.
 Stat test keys: 1/2 STR   3/4 END   5/6 WT   7/8 DEX
+Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt
 F1 hide help    Esc free mouse"""
 
 

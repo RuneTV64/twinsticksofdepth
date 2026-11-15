@@ -184,6 +184,7 @@ var _dash_t := 0.0
 var _dash_dir := Vector3.ZERO
 var _stagger := 0.0
 var held_by: Array[Enemy] = []   # zombies that have hold of you
+var invulnerable := false          # test switch (F7): nothing hurts you
 var _struggle := 0.0
 var _last_mv := Vector2.ZERO
 var _barge_cd := 0.0
@@ -1157,7 +1158,7 @@ func _update_held(delta: float, mv: Vector2) -> void:
 
 
 func take_damage(amount: float, dir: Vector3, knock: float) -> void:
-	if dead:
+	if dead or invulnerable:
 		return
 	health -= amount
 	_hurt_t = 0.15

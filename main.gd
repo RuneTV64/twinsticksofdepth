@@ -26,6 +26,12 @@ var rig: CamRig
 var hud: Hud
 var fog: Node3D
 
+# Crowd test (F5 / F6 / F7): extra shamblers to find out how many the game can take, and where the time goes.
+const CROWD_STEP := 50
+var _crowd: Array[Enemy] = []
+var _perf: Label
+var _perf_t := 0.0
+
 
 func _enter_tree() -> void:
 	InputSetup.apply()
@@ -60,6 +66,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.player = player
 	add_child(hud)
+	_make_perf_label()
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -81,9 +88,103 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_6: _stat("weight", 1)
 			KEY_7: _stat("dexterity", -1)
 			KEY_8: _stat("dexterity", 1)
+			KEY_F5: _add_crowd(CROWD_STEP)
+			KEY_F6: _clear_crowd()
+			KEY_F7:
+				player.invulnerable = not player.invulnerable
+				player.show_status("Can't be hurt: %s" % ("ON" if player.invulnerable else "OFF"), 1.5)
 	elif event is InputEventMouseButton and event.pressed \
 			and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+# ------------------------------------------------------------------ crowd test
+## Add n shamblers in front of you, 6 to 20 m out, where there's open floor. They come straight for you.
+func _add_crowd(n: int) -> void:
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsPointQueryParameters3D.new()
+	q.collision_mask = 1 | 2
+	var made := 0
+	var tries := 0
+	while made < n and tries < n * 20:
+		tries += 1
+		var a := atan2(-player.facing.x, -player.facing.z) + randf_range(-0.9, 0.9)
+		var r := randf_range(6.0, 20.0)
+		var pos := player.global_position + Vector3(-sin(a), 0.0, -cos(a)) * r
+		if pos.x < WORLD_X0 + 1.0 or pos.x > WORLD_X1 - 1.0 or pos.z < WORLD_Z0 + 1.0 or pos.z > WORLD_Z1 - 1.0:
+			continue
+		q.position = pos + Vector3.UP * 0.9
+		if not space.intersect_point(q, 1).is_empty():
+			continue   # inside a wall or a house
+		var e := Enemy.new()
+		e.kind = "shambler"
+		e.position = Vector3(pos.x, 0.05, pos.z)
+		add_child(e)
+		e.player = player
+		e.aggro_range = 40.0
+		_crowd.append(e)
+		made += 1
+	_perf.visible = true
+	player.show_status("Crowd: %d extra shamblers" % _crowd.size(), 1.5)
+
+
+func _clear_crowd() -> void:
+	for e in _crowd:
+		if is_instance_valid(e):
+			player.release_grab(e)
+			e.queue_free()
+	_crowd.clear()
+	_perf.visible = false
+	player.show_status("Crowd cleared", 1.0)
+
+
+func _make_perf_label() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 10
+	add_child(layer)
+	_perf = Label.new()
+	_perf.position = Vector2(20, 330)
+	_perf.add_theme_font_size_override("font_size", 20)
+	_perf.add_theme_color_override("font_outline_color", Color.BLACK)
+	_perf.add_theme_constant_override("outline_size", 6)
+	_perf.visible = false
+	layer.add_child(_perf)
+
+
+## Twice a second: frame rate, how many zombies, and where each frame's time goes. "per tick" is per physics tick.
+func _process(delta: float) -> void:
+	if _perf == null or not _perf.visible:
+		Enemy.anim_usec = 0
+		Enemy.zombie_usec = 0
+		return
+	_perf_t += delta
+	if _perf_t < 0.5:
+		return
+	var ticks := maxf(_perf_t * Engine.physics_ticks_per_second, 1.0)
+	var anim_ms := Enemy.anim_usec / ticks / 1000.0
+	var rest_ms := (Enemy.zombie_usec - Enemy.anim_usec) / ticks / 1000.0
+	Enemy.anim_usec = 0
+	Enemy.zombie_usec = 0
+	_perf_t = 0.0
+	var alive := 0
+	var seen := 0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		var en := e as Enemy
+		if en != null and en.body != null and not en.dead:
+			alive += 1
+			if en._alpha > 0.0:
+				seen += 1
+	_perf.text = "CROWD TEST   F5 +%d   F6 clear   F7 can't be hurt: %s
+" % [CROWD_STEP, "ON" if player.invulnerable else "OFF"] \
+		+ "%d FPS   frame %.1f ms   physics %.1f ms
+" % [Engine.get_frames_per_second(),
+			Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0] \
+		+ "zombies %d (%d in view)
+" % [alive, seen] \
+		+ "zombie posing %.2f ms per tick   zombie AI+movement %.2f ms per tick
+" % [anim_ms, rest_ms] \
+		+ "draw calls %d   triangles %dk" % [Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME) / 1000.0)]
 
 
 func _stat(stat: String, d: int) -> void:
