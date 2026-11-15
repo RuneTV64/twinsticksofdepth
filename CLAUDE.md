@@ -160,6 +160,11 @@ changes, update both, and keep them the same files.
   steps, not every frame. Build later time-based systems (world time, seasons, the clean-up lore) the same way:
   event-driven or on a slow clock. Owner's PC then: horde walking in, 226 zombies 77 FPS; piled on the player, 28 FPS
   (posing 11.4 ms/frame: everyone is within 6 m, so all pose at 60/s).
+- Posing budget: `ZombieBody` ranks live zombies by distance from the player 4 times a second; only the nearest
+  `full_rate_count` (30) within 6 m pose at 60/s, the rest of the crowd within 14 m at 30/s. Zombies reaching for,
+  holding, biting or lunging at the player always pose at 60/s. A 226-pile: 83 -> 30 zombies at 60/s (all 226
+  within 6 m would be about 13,600 -> 7,700 poses/s). The cloud machine runs at ~7 FPS, below every posing rate,
+  so it can't show rate limits; count rates (`rate_snapshot`) instead of timing them there.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera (`low_beyond` 21 m,
   `mid_within` 19.5 m; on screen zombies are 15 to 29 m away), at most 2 swaps a frame. Godot's automatic mesh LODs
   are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.

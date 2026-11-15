@@ -42,6 +42,10 @@ const SHADER := preload("res://assets/characters/ShamblerMale_Muscular/zombie_de
 ## crowd's posing spreads over the frames.
 @export var full_rate_within := 6.0
 @export var half_rate_within := 14.0
+## Posing budget: only the nearest this many zombies within full_rate_within pose at 60 a second; the rest of a
+## crowd around the player poses at 30 (no one can tell the back rows of a mob apart at that). Zombies reaching for,
+## holding, biting or lunging at the player always get the full rate. The ranking is redone 4 times a second.
+@export var full_rate_count := 30
 
 ## A part came off and flew away as a piece (passed on from shambler.gd).
 signal piece_spawned(slot: String, piece: Node)
@@ -107,6 +111,8 @@ var _stumble := 0.0
 var _stumble_cd := 3.0
 var _hold_t := 0.0
 var _was_hurt := 0.0
+var _rank := 0                 # this zombie's place in the crowd by distance from the player (see full_rate_count)
+static var _ranked_at := -1000
 var _pose_acc := randf() * 0.05   # time since last posed; starts offset so a crowd doesn't pose on the same frame
 var _first := true
 var _dissolve := -1.0           # the dissolve last sent to the parts; -1 = send next time
@@ -222,16 +228,37 @@ func _make_shambler(path: String, from: Node3D, copy := true) -> bool:
 	return true
 
 
-## Seconds between posings for this zombie now (see full_rate_within).
+## Seconds between posings for this zombie now (see full_rate_within and full_rate_count).
 func _pose_interval(e: Enemy) -> float:
 	if e._alpha <= 0.0 and not e.dead:
 		return 0.1
 	if e.player == null:
 		return 0.0
+	var full := 1.0 / 60.0 - 0.0005   # (a hair under, so a 60 FPS frame never skips one)
+	if e.state != "walk" and e.state != "down" and not e.dead:
+		return full                     # it's got its hands on you, or its teeth in: always smooth
+	var now := Time.get_ticks_msec()
+	if now - _ranked_at > 250:
+		_ranked_at = now
+		_rank_crowd(e.player, get_tree())
 	var d := Vector2(e.global_position.x - e.player.global_position.x, e.global_position.z - e.player.global_position.z).length()
-	if d < full_rate_within:
-		return 1.0 / 60.0 - 0.0005   # (a hair under, so a 60 FPS frame never skips one)
+	if d < full_rate_within and _rank < full_rate_count:
+		return full
 	return 1.0 / 30.0 if d < half_rate_within else 1.0 / 20.0
+
+
+## Rank every live zombie by distance from the player (0 = nearest), for the posing budget.
+static func _rank_crowd(player: Node3D, tree: SceneTree) -> void:
+	var pp := player.global_position
+	var list: Array = []
+	for n in tree.get_nodes_in_group("enemies"):
+		var z := n as Enemy
+		if z != null and z.body != null and not z.dead:
+			var d := Vector2(z.global_position.x - pp.x, z.global_position.z - pp.z).length_squared()
+			list.append([d, z.body])
+	list.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+	for i in list.size():
+		(list[i][1] as ZombieBody)._rank = i
 
 
 ## Mid model near the camera, low model far from it. Swaps are spread out so a whole crowd never swaps at once.
