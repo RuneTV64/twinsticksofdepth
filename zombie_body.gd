@@ -37,8 +37,9 @@ const SHADER := preload("res://assets/characters/ShamblerMale_Muscular/zombie_de
 @export var mid_within := 19.5
 ## Where cut-off pieces are put, from the shambler node (Shambler -> ZombieBody -> visual -> Enemy -> the level).
 @export var pieces_parent := NodePath("../../../..")
-## How often the body is posed, by distance from the player (m): every frame up close, then 30 and 20 times a second.
-## Out of the player's view, 10. Each zombie is offset, so a crowd's posing spreads over the frames.
+## How often the body is posed, by distance from the player (m): 60 times a second up close (every frame at 60 FPS, but
+## not 144 times a second on a fast screen), then 30 and 20. Out of the player's view, 10. Each zombie is offset, so a
+## crowd's posing spreads over the frames.
 @export var full_rate_within := 6.0
 @export var half_rate_within := 14.0
 
@@ -210,6 +211,8 @@ func _make_shambler(path: String, from: Node3D, copy := true) -> bool:
 	shambler = sh
 	_skel = skels[0]
 	_dissolve = -1.0
+	_c_frame = -1
+	sh.connect("rolled", func(_p: Dictionary, _c: bool) -> void: _c_frame = -1)   # parts changed: re-read
 	sh.connect("piece_spawned", _on_piece)
 	for m in sh.find_children("*", "MeshInstance3D", true, false):
 		var gi := m as GeometryInstance3D
@@ -227,7 +230,7 @@ func _pose_interval(e: Enemy) -> float:
 		return 0.0
 	var d := Vector2(e.global_position.x - e.player.global_position.x, e.global_position.z - e.player.global_position.z).length()
 	if d < full_rate_within:
-		return 0.0
+		return 1.0 / 60.0 - 0.0005   # (a hair under, so a 60 FPS frame never skips one)
 	return 1.0 / 30.0 if d < half_rate_within else 1.0 / 20.0
 
 
@@ -263,8 +266,33 @@ func _bone(bone_name: String) -> int:
 
 
 # ====================================================================== what he has left
+# These are asked dozens of times per pose and per AI tick, so they're read from the shambler at most once a frame
+# (and again at once when its parts change: see _make_shambler).
+var _c_frame := -1
+var _c_parts := {}
+var _c_fresh := 1.0
+var _c_rigor := 0.0
+
+
+func _cache() -> void:
+	var frame := Engine.get_process_frames()
+	if frame == _c_frame:
+		return
+	_c_frame = frame
+	if shambler == null:
+		_c_parts = {}
+		_c_fresh = 1.0
+		_c_rigor = 0.0
+		return
+	_c_parts = shambler.get("parts")
+	var f: Freshness = shambler.get("freshness")
+	_c_fresh = f.value if f != null else 1.0
+	_c_rigor = f.rigor() if f != null else 0.0
+
+
 func part(slot: String) -> String:
-	return shambler.get("parts").get(slot, "Intact") if shambler != null else "Intact"
+	_cache()
+	return _c_parts.get(slot, "Intact")
 
 
 func has_hand(k: int) -> bool:
@@ -284,12 +312,13 @@ func has_head() -> bool:
 
 
 func freshness() -> float:
-	var f: Freshness = shambler.get("freshness") if shambler != null else null
-	return f.value if f != null else 1.0
+	_cache()
+	return _c_fresh
 
 
 func rigor() -> float:
-	return shambler.call("rigor") if shambler != null else 0.0
+	_cache()
+	return _c_rigor
 
 
 ## How far rot slows and breaks his movement: 0 fresh, 1 as far gone as it gets.

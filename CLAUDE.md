@@ -148,6 +148,12 @@ changes, update both, and keep them the same files.
   second. The readout shows posing per frame and zombie AI per tick. Still to find: about 6-9 ms of the owner's
   physics tick that grows with zombies but isn't zombie AI (guess: skeleton updates, Jolt). C++ posing once poses
   settle. Test harnesses that pose zombies by hand must `set_process(false)` as well as physics.
+- Owner's profiler (226 zombies): `_update_fade` was most of the script time (setting `_visual.visible` etc. every
+  tick even when unchanged); now Enemy only sets engine properties when they change, and script time fell ~56%.
+  Then: ZombieBody caches parts/freshness/rigor once a frame (re-read when parts change); zombies beyond
+  `half_rate_beyond` 14 m that are only walking/crawling think and move every other tick covering two (cloud, crowd
+  walking in from 21-35 m: zombie AI work -27%, physics keeps 60 ticks/s); close-up posing is capped at 60/s.
+  The cloud machine's numbers swing a lot between runs; compare per-second work, and trust the owner's PC.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera (`low_beyond` 21 m,
   `mid_within` 19.5 m; on screen zombies are 15 to 29 m away), at most 2 swaps a frame. Godot's automatic mesh LODs
   are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.

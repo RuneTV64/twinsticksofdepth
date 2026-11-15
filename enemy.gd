@@ -56,6 +56,9 @@ extends CharacterBody3D
 @export var separation := 3.0
 ## Closer than this (m) two zombies are pushed straight back out to it within a tick: bodies don't overlap.
 @export var min_gap := 0.55
+## Farther than this from the player (m), a zombie that's only walking or crawling thinks and moves every other
+## physics tick, covering two ticks each time. Up close, or reaching, holding, biting, lunging or knocked back: every tick.
+@export var half_rate_beyond := 14.0
 
 ## Microseconds spent on zombies since the crowd readout last read them (main.gd, F5): posing the bodies (each drawn
 ## frame), and everything a zombie does each physics tick (thinking, moving, colliding).
@@ -101,7 +104,8 @@ var _apart_t := 0.0
 var _pace := 1.0                 # this zombie's own speed, rolled with it
 var _soft := Vector3.ZERO        # last push from the crowd around it
 var _hard := Vector3.ZERO
-var _crowd_slot := randi() % 2   # which ticks it looks up its neighbours
+var _crowd_slot := randi() % 2   # which ticks it looks up its neighbours (and, far away, thinks and moves)
+var _mult := 1.0                 # 2 on a far zombie's tick: it covers two ticks' worth
 var _mat: StandardMaterial3D
 var _visual: Node3D
 var _label: Label3D
@@ -353,9 +357,23 @@ func _on_piece(slot: String, piece: Node) -> void:
 
 func _physics_process(delta: float) -> void:
 	var t0 := Time.get_ticks_usec()
-	_tick(delta)
+	_mult = 1.0
+	if _half_rate():
+		if (Engine.get_physics_frames() + _crowd_slot) % 2 == 1:
+			return   # the other half of the crowd's turn
+		_mult = 2.0
+	_tick(delta * _mult)
 	if body != null:
 		zombie_usec += Time.get_ticks_usec() - t0
+
+
+func _half_rate() -> bool:
+	if body == null or dead or player == null or _knock.length_squared() > 0.25:
+		return false
+	if state != "walk" and state != "down":
+		return false
+	var d := Vector2(global_position.x - player.global_position.x, global_position.z - player.global_position.z)
+	return d.length_squared() > half_rate_beyond * half_rate_beyond
 
 
 ## The body is posed once per drawn frame, not in the physics tick: it's only for looks, and a slow frame then costs
@@ -418,7 +436,11 @@ func _tick(delta: float) -> void:
 	if kind == "dummy":
 		velocity.x = _knock.x
 		velocity.z = _knock.z
+	velocity.x *= _mult
+	velocity.z *= _mult
 	move_and_slide()
+	velocity.x /= _mult
+	velocity.z /= _mult
 
 	# Shamblers push doors open just like the player does.
 	for i in get_slide_collision_count():
