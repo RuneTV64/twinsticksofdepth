@@ -14,8 +14,11 @@ Godot 4 twin-stick game. Everything in the level is built in code (see README.md
 - Time passes in the game, with seasons. A zombie's Freshness (see freshness.gd) is meant to move on with it, so
   zombies age through the decay stages into those late-stage forms. Seasonal decay rates (summer fast, winter
   slow) are to be added with the time system, not before.
-- Skin tones: don't use "olive" as a tone name, since it's tied to a particular ethnic group. Use descriptive
-  names (the living white group is Pale, Light, Tan; zombie complexions are fair, tan, dark).
+- Skin tone naming treats everyone the same: no one is labelled by a color word (white, black, brown, red,
+  yellow, olive). Living skin tone groups are named by heritage (European, African, Latin American, Asian,
+  Middle Eastern & South Asian) and tones get material or pigment names (European: Porcelain, Cream, Fawn;
+  African: Umber, Mahogany, Ebony; Latin American: Golden, Copper, Bronze; Asian: Wheat, Honey, Almond;
+  Middle Eastern & South Asian: Sand, Caramel, Chestnut). Zombie complexions are light, medium, deep.
 
 ## Where game design assets live
 
