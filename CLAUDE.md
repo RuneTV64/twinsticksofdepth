@@ -2,6 +2,16 @@
 
 Godot 4 twin-stick game. Everything in the level is built in code (see README.md).
 
+## Naming: zombies and shamblers
+
+- **Zombies** is the name for the undead as a whole group.
+- **Shamblers** are one kind of zombie: the most common, slow, and they walk straight at you. Other kinds will get
+  their own nicknames, with different AI and some different physical features.
+- Shamblers come in all the same body types as the living, and in every complexion, because they were people.
+  So shaders and scripts made for them are named for shamblers (e.g. `shambler_decay.gdshader`), not "zombie".
+- Skin tones: don't use "olive" as a tone name, since it's tied to a particular ethnic group. Use descriptive
+  names (the white group is Pale, Light, Tan; shambler complexions are fair, tan, dark).
+
 ## Where game design assets live
 
 All game design assets go into our claude.ai **Artifacts**, not just this repo, so they can be shared across
