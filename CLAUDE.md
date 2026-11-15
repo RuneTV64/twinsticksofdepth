@@ -9,10 +9,13 @@ Godot 4 twin-stick game. Everything in the level is built in code (see README.md
   their own nicknames, with different AI and some different physical features.
 - Every zombie is made from a person, so most use the same base body models as the living, in every body type and
   complexion. Late-stage zombies will get a couple of variant models of their own.
+- So shared zombie assets get general names (`zombie_decay.gdshader` colors every zombie by Freshness);
+  `shambler.gd` is the spawner for shamblers specifically.
 - Time passes in the game, with seasons. A zombie's Freshness (see freshness.gd) is meant to move on with it, so
-  zombies age through the decay stages into those late-stage forms.
+  zombies age through the decay stages into those late-stage forms. Seasonal decay rates (summer fast, winter
+  slow) are to be added with the time system, not before.
 - Skin tones: don't use "olive" as a tone name, since it's tied to a particular ethnic group. Use descriptive
-  names (the white group is Pale, Light, Tan; shambler complexions are fair, tan, dark).
+  names (the living white group is Pale, Light, Tan; zombie complexions are fair, tan, dark).
 
 ## Where game design assets live
 
