@@ -184,6 +184,8 @@ func reroll_style() -> void:
 ## The model files, loaded once and kept: load() takes about a millisecond each call even for a file already loaded,
 ## and it was being called on every spawn and every detail swap (several a frame while the camera pans).
 static var _scenes := {}
+## Test switch (main.gd, F8): every zombie on the low model, to see what the mid model costs.
+static var force_low := false
 
 
 static func _scene(path: String) -> PackedScene:
@@ -283,7 +285,7 @@ func _update_detail(e: Enemy) -> void:
 	if cam == null:
 		return
 	var d := cam.global_position.distance_to(e.global_position + Vector3.UP * 0.9)
-	var want_low := d > (mid_within if _low else low_beyond)
+	var want_low := force_low or d > (mid_within if _low else low_beyond)
 	if want_low == _low:
 		return
 	var frame := Engine.get_process_frames()
