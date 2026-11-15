@@ -119,7 +119,7 @@ var _dissolve := -1.0           # the dissolve last sent to the parts; -1 = send
 var _low := false
 static var _swap_frame := -1
 static var _swaps := 0
-const SWAPS_PER_FRAME := 2      # spread a crowd's model swaps over a few frames
+const SWAPS_PER_FRAME := 8      # spread a crowd's model swaps over a few frames (each is just a mesh swap now)
 
 
 func _ready() -> void:
@@ -181,10 +181,23 @@ func reroll_style() -> void:
 	_dead_q[_head] = _ry(0.5 if _dead_q[_neck].y > 0.0 else -0.5)
 
 
+## The model files, loaded once and kept: load() takes about a millisecond each call even for a file already loaded,
+## and it was being called on every spawn and every detail swap (several a frame while the camera pans).
+static var _scenes := {}
+
+
+static func _scene(path: String) -> PackedScene:
+	if not _scenes.has(path):
+		_scenes[path] = load(path)
+	return _scenes[path]
+
+
 ## A new zombie (after a respawn): a fresh shambler, rolled anew. Built fresh rather than re-rolled, so the parts
 ## shown before don't keep holding shader values.
 func new_zombie() -> void:
-	_make_shambler(LOW_PATH if _low else MODEL_PATH, shambler, false)
+	_make_shambler(MODEL_PATH, shambler, false)
+	if _low:
+		shambler.call("use_model", _scene(LOW_PATH))
 	reroll_style()
 	_first = true   # starts standing (or lying, for a crawler), not getting up from where the last one died
 
@@ -192,7 +205,7 @@ func new_zombie() -> void:
 ## Build the shambler from a model file, replacing `from` if given. With `copy`, it becomes the same zombie as `from`
 ## (a detail swap); otherwise it rolls a new one.
 func _make_shambler(path: String, from: Node3D, copy := true) -> bool:
-	var packed := load(path) as PackedScene
+	var packed := _scene(path)
 	if packed == null:
 		push_error("ZombieBody: can't load %s" % path)
 		return false
@@ -200,7 +213,7 @@ func _make_shambler(path: String, from: Node3D, copy := true) -> bool:
 	sh.name = "Shambler"
 	sh.set_script(SHAMBLER_SCRIPT)
 	sh.set("skin_shader", SHADER)
-	sh.set("pieces_scene", load(PIECES_PATH))
+	sh.set("pieces_scene", _scene(PIECES_PATH))
 	sh.set("pieces_parent", pieces_parent)
 	sh.set("roll_on_ready", from == null or not copy)
 	sh.add_child(packed.instantiate())
@@ -218,6 +231,7 @@ func _make_shambler(path: String, from: Node3D, copy := true) -> bool:
 	_skel = skels[0]
 	_dissolve = -1.0
 	sh.connect("rolled", func(_p: Dictionary, _c: bool) -> void: refresh())   # parts changed (or rolled anew)
+	sh.connect("skin_set", refresh)   # a new Freshness or look (set_skin, turn_from)
 	sh.connect("piece_spawned", _on_piece)
 	for m in sh.find_children("*", "MeshInstance3D", true, false):
 		var gi := m as GeometryInstance3D
@@ -279,9 +293,9 @@ func _update_detail(e: Enemy) -> void:
 	if _swaps >= SWAPS_PER_FRAME:
 		return
 	_swaps += 1
-	if _make_shambler(LOW_PATH if want_low else MODEL_PATH, shambler):
+	# Same skeleton at both levels: only the merged mesh changes (shambler.use_model), no new nodes.
+	if shambler.call("use_model", _scene(LOW_PATH if want_low else MODEL_PATH)):
 		_low = want_low
-		set_fade(e._alpha)
 
 
 func _bone(bone_name: String) -> int:

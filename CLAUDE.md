@@ -170,9 +170,14 @@ changes, update both, and keep them the same files.
   zombie is 1 draw call (+ shadow) and 16 per-object shader values instead of 6-7 meshes. Merged meshes are cached by
   model and mix of parts and shared; a new mix takes ~1-4 ms to build once (dismembering may build one). 126
   zombies: draw calls 2,370 -> 558, zombie meshes 756 -> 126; even Compatibility no longer overflows its shader
-  values. Exact: same vertices, triangles and data channels as the parts.
+  values. Exact: same vertices, triangles and data channels as the parts. Owner's PC: 226 piled 45 -> 80 FPS, draw
+  calls 4,402 -> 860; horde walking in 98 -> 139 FPS. It dropped to ~44 FPS while panning the camera: every
+  mid/low swap rebuilt the zombie and called `load()`, which costs ~1 ms per call even for a loaded file. Now the
+  model files are loaded once (`ZombieBody._scene()`), and a swap is `shambler.use_model()`: same skeleton, bones and
+  bind poses at every level (checked), so only the merged mesh changes (~0.02 ms). Never call `load()` per frame or
+  per spawn; keep the resource.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera (`low_beyond` 21 m,
-  `mid_within` 19.5 m; on screen zombies are 15 to 29 m away), at most 2 swaps a frame. Godot's automatic mesh LODs
+  `mid_within` 19.5 m; on screen zombies are 15 to 29 m away) with `shambler.use_model()`, at most 8 a frame. Godot's automatic mesh LODs
   are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.
 
 ## Character shaders and models: how they are built

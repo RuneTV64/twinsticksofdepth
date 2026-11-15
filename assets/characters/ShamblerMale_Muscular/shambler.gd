@@ -16,6 +16,8 @@ extends Node3D
 signal rolled(parts: Dictionary, crawler: bool)
 signal dismembered(slot: String, crawler: bool)
 signal piece_spawned(slot: String, piece: ShamblerPiece)
+## His look or Freshness was set (set_skin, turn_from, copy_look): anything that works things out from them should redo it.
+signal skin_set
 
 const SLOTS := ["Head", "Torso", "ArmL", "ArmR", "LegL", "LegR"]
 const STATES := ["Intact", "Rotted", "Destroyed"]   # what a spawn can roll
@@ -81,6 +83,8 @@ var neck_blood := 0.0    # set from the head's state: 1 decapitated, less for a 
 
 var _meshes := {}        # "Slot_State" -> MeshInstance3D
 var _merged: MeshInstance3D   # the parts shown, as one mesh (merge_parts)
+var _model_meshes := {}  # "Slot_State" -> Mesh of the detail level in use (use_model); empty = this node's own
+static var _model_sets := {}   # model scene path -> {"Slot_State": Mesh}, loaded once and shared
 static var _merged_cache := {}   # "model id|Head_Intact|Torso_Rotted|..." -> ArrayMesh, shared by every shambler with that mix
 var _skeleton: Skeleton3D
 static var _material: ShaderMaterial
@@ -172,6 +176,7 @@ func set_skin(fresh: float, tone := 1, look := 1, hair := 2, look_seed_value := 
 	gore = blood
 	grime = dirt
 	_apply_skin()
+	skin_set.emit()
 
 
 ## Become the same zombie as `other` (another shambler, e.g. the same one at another detail level): the same parts,
@@ -191,6 +196,7 @@ func copy_look(other: Node3D) -> void:
 	grime = other.grime
 	show_parts(other.parts)
 	_apply_skin()
+	skin_set.emit()
 
 
 ## Turn a living person into this shambler: same skin tone, freckles, vitiligo, age and hair, just turned.
@@ -360,18 +366,46 @@ func shown_meshes() -> Array[MeshInstance3D]:
 	return out
 
 
+## Draw this shambler from another detail level of the same model (ShamblerMale_Muscular.glb, _mid or _low): all three
+## share the skeleton, bones and bind poses, so only the merged mesh changes. No nodes are made; the part meshes of
+## each level are loaded once and shared. Needs merge_parts. Returns false if it can't.
+func use_model(scene: PackedScene) -> bool:
+	if not merge_parts or scene == null:
+		return false
+	var key := scene.resource_path
+	if not _model_sets.has(key):
+		var found := {}
+		var inst := scene.instantiate()
+		for m in inst.find_children("*", "MeshInstance3D", true, false):
+			found[String(m.name)] = (m as MeshInstance3D).mesh
+		inst.free()
+		_model_sets[key] = found
+	_model_meshes = _model_sets[key]
+	var keys: Array[String] = []
+	for k in _meshes:
+		var bits := String(k).split("_")
+		if parts.get(bits[0], "Intact") == bits[1]:
+			keys.append(k)
+	_show_merged(keys)
+	return true
+
+
+func _part_mesh(key: String) -> Mesh:
+	return _model_meshes.get(key, (_meshes[key] as MeshInstance3D).mesh)
+
+
 # Show the given part meshes as one merged mesh, built (or found in the cache) for exactly that mix.
 func _show_merged(keys: Array[String]) -> void:
 	if keys.is_empty() or _skeleton == null:
 		return
 	keys.sort()
 	var first: MeshInstance3D = _meshes[keys[0]]
-	var id := "%d|%s" % [first.mesh.get_instance_id(), "|".join(keys)]
+	var id := "%d|%s" % [_part_mesh(keys[0]).get_instance_id(), "|".join(keys)]
 	var mesh: ArrayMesh = _merged_cache.get(id)
 	if mesh == null:
 		var parts_list: Array[Mesh] = []
 		for k in keys:
-			parts_list.append((_meshes[k] as MeshInstance3D).mesh)
+			parts_list.append(_part_mesh(k))
 		mesh = merge_meshes(parts_list)
 		_merged_cache[id] = mesh
 		if _merged_cache.size() > 160:

@@ -14,7 +14,10 @@ not every frame, so a floor full of pieces costs nothing between steps.
 And `shambler.gd` (owner's call, 15 Nov 2026) shows the parts as one merged mesh (`merge_parts`, on): one draw call,
 one shadow and one set of per-shambler shader values per shambler instead of 6 or 7. The merged mesh has exactly the
 parts' vertices, triangles and data (rest position included); shamblers with the same mix share it, and a new mix is
-built once, the first time it's needed. `shown_meshes()` returns what carries the skin now.
+built once, the first time it's needed. `shown_meshes()` returns what carries the skin now. `use_model(scene)`
+switches a shambler to another detail level (the three GLBs share skeleton, bones and bind poses) by swapping only
+the merged mesh, and `set_skin()` now sends `skin_set` so anything that works things out from his look or Freshness
+can redo it.
 
 ## Files
 
