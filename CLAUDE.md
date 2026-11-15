@@ -89,9 +89,16 @@ changes, update both, and keep them the same files.
 - Pieces rot with their own Freshness and then fade away (`zombie_decay_piece.gdshader`'s `dissolve`). The timing
   (`piece_rot_seconds` 180, `piece_fade_seconds` 3) is a stand-in.
 - **Next:** the owner has an in-lore mechanic for how pieces (and probably bodies) go away, to be designed in a new
-  session. Ask them for the lore first. The hooks are ready: `piece_auto_fade` off makes a piece only send
-  `rotted_away`; `piece_rot_seconds` 0 stops its own rotting so the mechanic can drive `piece.freshness.value`;
-  `piece.fade_away()` fades one out.
+  session. What the owner has said so far (15 Nov 2026):
+  - Rotting corpses draw maggots, flies and, eventually, worms. These are the agents that eat and clean up the
+    rot, and they can also be gathered as resources.
+  - Maggots turn into swarming flies, which fly away when the meat is gone.
+  - When the worms are done, they crawl into the ground.
+  Ask the owner for the rest before building (for example: when each one arrives, how they're gathered, what
+  they're worth, whether they eat whole bodies or only pieces). The hooks are ready: `piece_auto_fade` off makes a
+  piece only send `rotted_away`; `piece_rot_seconds` 0 stops its own rotting so the mechanic can drive
+  `piece.freshness.value`; `piece.fade_away()` fades one out. The decay shader already draws wriggling maggots in
+  wounds and insides from the Bloated stage through Putrid; those could become the mechanic's maggots.
 - Later, when asked: blood and bits as particles; faces (then a jaw that drops on the head piece, the pierced-brain
   head death, and a destroyed face); build types; seasonal decay rates with the time system.
 
