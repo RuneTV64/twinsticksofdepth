@@ -41,6 +41,9 @@ devices and pulled into any chat. That covers models, shaders, asset scripts, pr
 - "Dark and gritty" is the game's setting and themes, not a rule that every asset is dark. The mood comes from
   places, lighting and story; assets get natural colors (a farmland area can be pretty). Don't darken palettes
   just to look gritty: dead bodies go pale first and only darken as they rot, for example.
+- Zombie wounds are messy, not a clean anatomy model. The anatomy underneath is real (bones, organs), but it's
+  smeared with blood, clots and muck, with reds and darks inside, and things spill out: gut, strips of flesh,
+  strands, clots. Keep wounds big. Bones are sized from the body's own joints and skin, not from textbook sizes.
 
 ## Testing Godot assets in a cloud session
 
