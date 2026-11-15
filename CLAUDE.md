@@ -45,6 +45,10 @@ devices and pulled into any chat. That covers models, shaders, asset scripts, pr
   the shader paints the anatomy on that surface (ribs, organs, bone; in the torso from the anatomy map) and
   smears it with blood, clots and muck: reds and darks inside, not a clean anatomy model. Don't add bones or
   organs as models; it costs too many triangles. Keep wounds big.
+- Painted insides must have depth and sit where the real anatomy is. The torso's anatomy map stores how far in
+  each bone and organ is, and the shader follows the line of sight through it, so bones stand in front of organs
+  and slide across them as the view moves. Check the layout against real anatomy (for example, ribs slope down to
+  the front and are evenly spaced there, not bunched).
 - Nothing hangs off the zombie model. Spilling guts, blood, bits of brain and intestine, and limbs flying off
   and piling up on the ground are live effects in the game (pixel particle effects and loose pieces), not part
   of the character model.
