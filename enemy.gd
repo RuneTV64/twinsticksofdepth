@@ -109,9 +109,7 @@ func _ready() -> void:
 	if kind == "shambler":
 		body = ZombieBody.new()
 		_visual.add_child(body)
-		# Cut-off pieces land in the level, not inside the zombie (Shambler -> ZombieBody -> visual -> Enemy -> level).
-		body.shambler.set("pieces_parent", NodePath("../../../.."))
-		body.shambler.connect("piece_spawned", _on_piece)
+		body.piece_spawned.connect(_on_piece)   # cut-off pieces land in the level (see ZombieBody.pieces_parent)
 		_new_zombie(false)
 	else:
 		_mat = StandardMaterial3D.new()
@@ -139,8 +137,7 @@ func _ready() -> void:
 ## A fresh roll: who he was, how long dead, what's missing, how he moves.
 func _new_zombie(reroll := true) -> void:
 	if reroll:   # the first roll happens in shambler.gd's own _ready
-		body.shambler.call("roll")
-		body.reroll_style()
+		body.new_zombie()
 	_pace = randf_range(0.88, 1.12)
 	crawling = body.legs() < 2
 	_set_state("walk")

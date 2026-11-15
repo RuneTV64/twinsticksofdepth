@@ -102,9 +102,9 @@ func _ready() -> void:
 		_material = ShaderMaterial.new()
 		_material.shader = skin_shader
 		_material.set_shader_parameter("anatomy_map", AnatomyMap.texture())   # what the shader paints inside the torso's wounds
-	if _material != null:
-		for m in _meshes.values():
-			m.material_override = _material
+	# The skin, and its per-shambler values, go only on the parts being shown (show_parts), never on hidden ones:
+	# the renderer reserves a block of 16 per-object shader values for every mesh that has any set, hidden or not,
+	# so 6 or 7 parts instead of 19 lets about three times as many shamblers on screen.
 	if roll_on_ready:
 		roll()
 
@@ -167,6 +167,25 @@ func set_skin(fresh: float, tone := 1, look := 1, hair := 2, look_seed_value := 
 	_apply_skin()
 
 
+## Become the same zombie as `other` (another shambler, e.g. the same one at another detail level): the same parts,
+## the same Freshness (shared, so it keeps rotting as one), the same person and the same blood and grime.
+func copy_look(other: Node3D) -> void:
+	if freshness != null and freshness.changed.is_connected(_apply_skin):
+		freshness.changed.disconnect(_apply_skin)
+	freshness = other.freshness
+	if freshness != null:
+		freshness.changed.connect(_apply_skin)
+	skin_tone = other.skin_tone
+	variant = other.variant
+	hair_color = other.hair_color
+	look_seed = other.look_seed
+	decay_seed = other.decay_seed
+	gore = other.gore
+	grime = other.grime
+	show_parts(other.parts)
+	_apply_skin()
+
+
 ## Turn a living person into this shambler: same skin tone, freckles, vitiligo, age and hair, just turned.
 func turn_from(person: LivingBody, fresh := 1.0) -> void:
 	set_skin(fresh, person.skin_tone, person.variant, person.hair_color, person.look_seed, randf_range(0.0, 100.0), gore, grime)
@@ -182,11 +201,12 @@ func show_parts(picked: Dictionary) -> void:
 	is_decapitated = parts["Head"] == "Decapitated"
 	for key in _meshes:
 		var bits := String(key).split("_")
-		_meshes[key].visible = parts[bits[0]] == bits[1]
+		var shown: bool = parts[bits[0]] == bits[1]
+		_meshes[key].visible = shown
+		_meshes[key].material_override = _material if shown else null
 	# a head that's off, or a torn neck, bleeds down over the shoulders, chest and back
 	neck_blood = {"Decapitated": 1.0, "Destroyed": 0.5, "Rotted": 0.3}.get(parts["Head"], 0.0)
-	for m in _meshes.values():
-		m.set_instance_shader_parameter("neck_blood", neck_blood)
+	_apply_skin()
 	rolled.emit(parts, is_crawler)
 
 
@@ -312,7 +332,8 @@ func rigor() -> float:
 
 func _apply_skin() -> void:
 	for m in _meshes.values():
-		_skin_params(m)
+		if m.visible and m.material_override != null:   # only the parts shown (see _ready)
+			_skin_params(m)
 
 
 func _skin_params(m: GeometryInstance3D) -> void:

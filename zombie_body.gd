@@ -20,6 +20,8 @@ extends Node3D
 ## (which faces -Z), turned half a turn, the same as the player's body.
 
 const MODEL_PATH := "res://assets/characters/ShamblerMale_Muscular/ShamblerMale_Muscular_mid.glb"
+## Swapped in when the zombie is far from the camera (the upper part of the screen): 5,000 triangles against 15,000.
+const LOW_PATH := "res://assets/characters/ShamblerMale_Muscular/ShamblerMale_Muscular_low.glb"
 const PIECES_PATH := "res://assets/characters/ShamblerMale_Muscular/ShamblerMale_Muscular_Pieces_mid.glb"
 const SHAMBLER_SCRIPT := preload("res://assets/characters/ShamblerMale_Muscular/shambler.gd")
 ## The pieces' version of the decay shader: the same shader plus `dissolve`, which also gives a dithered fade when a
@@ -28,6 +30,16 @@ const SHADER := preload("res://assets/characters/ShamblerMale_Muscular/zombie_de
 
 ## How quickly the bones chase the pose they're asked for.
 @export var pose_sharpness := 14.0
+## Meters from the camera past which the low model is used, and under which the mid model comes back. The gap keeps
+## a zombie walking along the line from flipping back and forth. The camera sits 18 m from the player, so on screen
+## zombies are about 15 m (bottom edge) to 29 m (top edge) away.
+@export var low_beyond := 21.0
+@export var mid_within := 19.5
+## Where cut-off pieces are put, from the shambler node (Shambler -> ZombieBody -> visual -> Enemy -> the level).
+@export var pieces_parent := NodePath("../../../..")
+
+## A part came off and flew away as a piece (passed on from shambler.gd).
+signal piece_spawned(slot: String, piece: Node)
 
 const HINGE_L := {
 	"Index": Vector3(0.5894, -0.1737, -0.7889),
@@ -92,29 +104,16 @@ var _hold_t := 0.0
 var _was_hurt := 0.0
 var _skip := 0
 var _first := true
+var _low := false
+static var _swap_frame := -1
+static var _swaps := 0
+const SWAPS_PER_FRAME := 2      # spread a crowd's model swaps over a few frames
 
 
 func _ready() -> void:
 	rotation.y = PI
-	var packed := load(MODEL_PATH) as PackedScene
-	if packed == null:
-		push_error("ZombieBody: can't load %s" % MODEL_PATH)
+	if not _make_shambler(MODEL_PATH, null):   # shambler.gd's _ready rolls his parts, Freshness and look
 		return
-	shambler = Node3D.new()
-	shambler.name = "Shambler"
-	shambler.set_script(SHAMBLER_SCRIPT)
-	shambler.set("skin_shader", SHADER)
-	shambler.set("pieces_scene", load(PIECES_PATH))
-	shambler.add_child(packed.instantiate())
-	add_child(shambler)          # shambler.gd's _ready rolls his parts, Freshness and look
-	var skels := shambler.find_children("*", "Skeleton3D", true, false)
-	if skels.is_empty():
-		push_error("ZombieBody: %s has no skeleton" % MODEL_PATH)
-		return
-	_skel = skels[0]
-	shambler.connect("piece_spawned", _on_piece)
-	for m in shambler.find_children("*", "MeshInstance3D", true, false):
-		(m as GeometryInstance3D).extra_cull_margin = 1.5
 	_aim_light_at_sun.call_deferred()
 
 	_n = _skel.get_bone_count()
@@ -168,6 +167,73 @@ func reroll_style() -> void:
 		_dead_q[_leg[k][2]] = _rx(0.9)
 	_dead_q[_neck] = _ry(0.6 if _rng.randf() < 0.5 else -0.6)
 	_dead_q[_head] = _ry(0.5 if _dead_q[_neck].y > 0.0 else -0.5)
+
+
+## A new zombie (after a respawn): a fresh shambler, rolled anew. Built fresh rather than re-rolled, so the parts
+## shown before don't keep holding shader values.
+func new_zombie() -> void:
+	_make_shambler(LOW_PATH if _low else MODEL_PATH, shambler, false)
+	reroll_style()
+	_first = true   # starts standing (or lying, for a crawler), not getting up from where the last one died
+
+
+## Build the shambler from a model file, replacing `from` if given. With `copy`, it becomes the same zombie as `from`
+## (a detail swap); otherwise it rolls a new one.
+func _make_shambler(path: String, from: Node3D, copy := true) -> bool:
+	var packed := load(path) as PackedScene
+	if packed == null:
+		push_error("ZombieBody: can't load %s" % path)
+		return false
+	var sh := Node3D.new()
+	sh.name = "Shambler"
+	sh.set_script(SHAMBLER_SCRIPT)
+	sh.set("skin_shader", SHADER)
+	sh.set("pieces_scene", load(PIECES_PATH))
+	sh.set("pieces_parent", pieces_parent)
+	sh.set("roll_on_ready", from == null or not copy)
+	sh.add_child(packed.instantiate())
+	if from != null:
+		remove_child(from)
+		from.queue_free()
+	add_child(sh)
+	if from != null and copy:
+		sh.call("copy_look", from)
+	var skels := sh.find_children("*", "Skeleton3D", true, false)
+	if skels.is_empty():
+		push_error("ZombieBody: %s has no skeleton" % path)
+		return false
+	shambler = sh
+	_skel = skels[0]
+	sh.connect("piece_spawned", _on_piece)
+	for m in sh.find_children("*", "MeshInstance3D", true, false):
+		var gi := m as GeometryInstance3D
+		gi.extra_cull_margin = 1.5
+		# The shader reads per-vertex data the automatic simplified meshes don't keep; the low model is the far one.
+		gi.lod_bias = 64.0
+	return true
+
+
+## Mid model near the camera, low model far from it. Swaps are spread out so a whole crowd never swaps at once.
+func _update_detail(e: Enemy) -> void:
+	if e.dead or e._alpha <= 0.0:
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	var d := cam.global_position.distance_to(e.global_position + Vector3.UP * 0.9)
+	var want_low := d > (mid_within if _low else low_beyond)
+	if want_low == _low:
+		return
+	var frame := Engine.get_physics_frames()
+	if frame != _swap_frame:
+		_swap_frame = frame
+		_swaps = 0
+	if _swaps >= SWAPS_PER_FRAME:
+		return
+	_swaps += 1
+	if _make_shambler(LOW_PATH if want_low else MODEL_PATH, shambler):
+		_low = want_low
+		set_fade(e._alpha)
 
 
 func _bone(bone_name: String) -> int:
@@ -235,16 +301,18 @@ func set_fade(alpha: float) -> void:
 			(m as GeometryInstance3D).set_instance_shader_parameter("dissolve", d)
 
 
-func _on_piece(_slot: String, piece: Node) -> void:
+func _on_piece(slot: String, piece: Node) -> void:
 	var mi := piece.find_children("*", "MeshInstance3D", true, false)
 	if not mi.is_empty():
 		_light_material((mi[0] as MeshInstance3D).material_override as ShaderMaterial)
+	piece_spawned.emit(slot, piece)
 
 
 # ====================================================================== the pose
 func animate(e: Enemy, delta: float) -> void:
 	if _skel == null:
 		return
+	_update_detail(e)
 	# Out of view and not close: pose a quarter as often (it still moves, just isn't looked at).
 	_skip = (_skip + 1) % 4
 	if e._alpha <= 0.0 and _skip != 0 and not e.dead:
@@ -257,6 +325,7 @@ func animate(e: Enemy, delta: float) -> void:
 	if _first:
 		_first = false
 		_prone_w = 1.0 if e.crawling else 0.0   # spawned lying down: no fall
+		_dead_w = 0.0
 
 	var f := freshness()
 	var rt := 1.0 - f

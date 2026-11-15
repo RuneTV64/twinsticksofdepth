@@ -5,7 +5,10 @@ Zombie version of MaleBody_Muscular, built from swappable parts so every shamble
 Status: **approved**, 15 Nov 2026. The decay shader and scripts have been compiled and test-rendered in Godot 4.5.
 Since 15 Nov 2026 the game's shamblers use it: `zombie_body.gd` in the game repo loads the mid model with `shambler.gd`
 and animates it (walk by decay stage, crawl, grab, bite, lunge, falls; see `preview/zombie_anim_*.png`, in review).
-Nothing in this asset changed for that.
+The model and shaders didn't change for that. `shambler.gd` changed in two small ways (approved by the owner,
+15 Nov 2026): the skin material and its per-shambler values now go only on the parts being shown, because the renderer
+reserves 16 per-object shader values for every mesh that has any set, hidden or not (about 100 per shambler instead
+of 300); and `copy_look(other)` makes a shambler the same zombie as another, for swapping between detail levels.
 
 ## Files
 

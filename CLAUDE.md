@@ -124,8 +124,14 @@ changes, update both, and keep them the same files.
   all the timings and damage (exports in `enemy.gd`, held/struggle in `player.gd`).
 - The decay shader lights in view space; `zombie_body.gd` points its `key_dir` at the level sun as the camera sees
   it (the camera never turns), so zombies are lit like the player. If the camera ever rotates, update it per frame.
-- Each shambler uses about 190 per-object shader values (19 part meshes x 10 instance uniforms). Forward+ has room
-  for about 65,000; the Compatibility renderer only 4,096 (about 20 shamblers). Matters only for a mobile/web build.
+- Per-object shader values: the renderer reserves a block of 16 for every mesh that has any instance uniform set,
+  hidden or not (measured in 4.7.2). So `shambler.gd` puts the skin and its values only on the 6 or 7 parts shown,
+  and `ZombieBody.new_zombie()` builds a fresh shambler on respawn: about 100 values per zombie. Forward+ has 65,536
+  by default (about 650 zombies; raise `rendering/limits/global_shader_variables/buffer_size` for more);
+  Compatibility has 4,096 (about 40). A dismembered part's old mesh keeps its block until respawn.
+- Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera (`low_beyond` 21 m,
+  `mid_within` 19.5 m; on screen zombies are 15 to 29 m away), at most 2 swaps a frame. Godot's automatic mesh LODs
+  are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.
 
 ## Character shaders and models: how they are built
 
