@@ -3,6 +3,8 @@
 # long he's been dead (his Freshness): fresh ones are pale and drained, older ones go green, then black, then leathery.
 # A destroyed leg makes a crawler: read is_crawler (or listen to `rolled`) to pick crawler movement and animations.
 # Head_Decapitated is never rolled at spawn. Call dismember("Head") when a hit takes the head off.
+# With pieces_scene set, dismember() also throws off the part that came away (the forearm and hand, the lower leg and
+# foot, or the head) as a physics piece that starts exactly where that part was.
 #
 # Use: make a scene from ShamblerMale_Muscular.glb (New Inherited Scene), attach this script to its root, save it.
 # Each instance of that scene rolls itself when it enters the tree.
@@ -12,6 +14,7 @@ extends Node3D
 
 signal rolled(parts: Dictionary, crawler: bool)
 signal dismembered(slot: String, crawler: bool)
+signal piece_spawned(slot: String, piece: RigidBody3D)
 
 const SLOTS := ["Head", "Torso", "ArmL", "ArmR", "LegL", "LegR"]
 const STATES := ["Intact", "Rotted", "Destroyed"]   # what a spawn can roll
@@ -42,6 +45,13 @@ const PLAY_STATES := {"Head": ["Decapitated"]}       # only switched to in play
 @export var gore_range := Vector2(0.15, 0.85)
 @export var skin_shader: Shader = preload("zombie_decay.gdshader")
 
+@export_group("Pieces")
+## ShamblerMale_Muscular_Pieces.glb (or _mid or _low). When set, dismember() throws off the part that came away as a
+## physics piece, made from that part as it looked (Intact or Rotted, or a Destroyed head).
+@export var pieces_scene: PackedScene
+## Where the pieces are added. Empty: this shambler's parent.
+@export var pieces_parent: NodePath
+
 var parts := {}          # slot -> state shown now
 var is_crawler := false
 var is_decapitated := false
@@ -56,7 +66,12 @@ var grime := 0.5
 var neck_blood := 0.0    # set from the head's state: 1 decapitated, less for a torn neck
 
 var _meshes := {}        # "Slot_State" -> MeshInstance3D
+var _skeleton: Skeleton3D
 static var _material: ShaderMaterial
+const PIECE_BONE := {"Head": "Head", "ArmL": "ForearmRollL", "ArmR": "ForearmRollR", "LegL": "CalfL", "LegR": "CalfR"}
+const PIECE_MASS := {"Head": 5.0, "Arm": 1.2, "Leg": 3.5}   # kg
+static var _piece_meshes := {}   # pieces scene path -> {"ArmL_Intact": Mesh, ...}
+static var _piece_shapes := {}   # Mesh -> its collision shape
 
 
 func _ready() -> void:
@@ -65,6 +80,9 @@ func _ready() -> void:
 		var bits := key.split("_")
 		if bits.size() == 2 and bits[0] in SLOTS and (bits[1] in STATES or bits[1] in PLAY_STATES.get(bits[0], [])):
 			_meshes[key] = m
+	var sks := find_children("*", "Skeleton3D", true, false)
+	if not sks.is_empty():
+		_skeleton = sks[0]
 	var expected := SLOTS.size() * STATES.size()
 	for slot in PLAY_STATES:
 		expected += PLAY_STATES[slot].size()
@@ -163,15 +181,69 @@ func show_parts(picked: Dictionary) -> void:
 
 
 ## Take a part off in play: the head becomes the decapitated neck stump, an arm or leg becomes Destroyed.
-## Losing a leg turns the shambler into a crawler.
-func dismember(slot: String) -> void:
+## Losing a leg turns the shambler into a crawler. With pieces_scene set, the part that came away flies off as a
+## physics piece (also sent with piece_spawned), pushed by `impulse`; the piece is returned, or null.
+func dismember(slot: String, impulse := Vector3.ZERO) -> RigidBody3D:
 	if not slot in SLOTS or slot == "Torso":
 		push_warning("Shambler: can't dismember %s" % slot)
-		return
+		return null
+	var before: String = parts.get(slot, "Intact")
 	var next := parts.duplicate()
 	next[slot] = "Decapitated" if slot == "Head" else "Destroyed"
 	show_parts(next)
+	var piece: RigidBody3D = null
+	if before != next[slot]:
+		piece = spawn_piece(slot, before, impulse)
 	dismembered.emit(slot, is_crawler)
+	return piece
+
+
+## Make the loose piece for a part that came off: `slot`, and the state it was in before (Intact or Rotted, or for the
+## head also Destroyed). It starts exactly where that part was on the body, with this shambler's look, as a
+## RigidBody3D with a convex collision shape. Returns null without pieces_scene, or for a state with no piece.
+func spawn_piece(slot: String, from_state: String, impulse := Vector3.ZERO) -> RigidBody3D:
+	if pieces_scene == null or _skeleton == null or not PIECE_BONE.has(slot):
+		return null
+	var mesh: Mesh = _pieces().get("%s_%s" % [slot, from_state])
+	var bone := _skeleton.find_bone(PIECE_BONE[slot])
+	if mesh == null or bone < 0:
+		return null
+	var body := RigidBody3D.new()
+	body.name = "%s_piece" % slot
+	body.mass = PIECE_MASS["Head" if slot == "Head" else slot.left(3)]
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = _material
+	body.add_child(mi)
+	var cs := CollisionShape3D.new()
+	if not _piece_shapes.has(mesh):
+		_piece_shapes[mesh] = mesh.create_convex_shape(true, true)
+	cs.shape = _piece_shapes[mesh]
+	body.add_child(cs)
+	var host: Node = get_node_or_null(pieces_parent) if not pieces_parent.is_empty() else get_parent()
+	if host == null:
+		host = get_tree().current_scene
+	host.add_child(body)
+	# the piece is modelled in its bone's frame, so the bone's pose puts it exactly where the part was
+	var t := _skeleton.global_transform * _skeleton.get_bone_global_pose(bone)
+	body.global_transform = Transform3D(t.basis.orthonormalized(), t.origin)
+	_skin_params(mi)
+	if impulse != Vector3.ZERO:
+		body.apply_central_impulse(impulse)
+	piece_spawned.emit(slot, body)
+	return body
+
+
+func _pieces() -> Dictionary:
+	var key := pieces_scene.resource_path
+	if not _piece_meshes.has(key):
+		var found := {}
+		var inst := pieces_scene.instantiate()
+		for m in inst.find_children("*", "MeshInstance3D", true, false):
+			found[String(m.name)] = m.mesh
+		inst.free()
+		_piece_meshes[key] = found
+	return _piece_meshes[key]
 
 
 ## Decay stage name: "Fresh", "Rigor", "Bloated", "Putrid" or "Dried".
@@ -185,14 +257,18 @@ func rigor() -> float:
 
 
 func _apply_skin() -> void:
-	var f := freshness.value if freshness != null else 1.0
 	for m in _meshes.values():
-		m.set_instance_shader_parameter("freshness", f)
-		m.set_instance_shader_parameter("skin_tone", skin_tone)
-		m.set_instance_shader_parameter("variant", variant)
-		m.set_instance_shader_parameter("hair_color", hair_color)
-		m.set_instance_shader_parameter("look_seed", look_seed)
-		m.set_instance_shader_parameter("decay_seed", decay_seed)
-		m.set_instance_shader_parameter("gore", gore)
-		m.set_instance_shader_parameter("grime", grime)
-		m.set_instance_shader_parameter("neck_blood", neck_blood)
+		_skin_params(m)
+
+
+func _skin_params(m: GeometryInstance3D) -> void:
+	var f := freshness.value if freshness != null else 1.0
+	m.set_instance_shader_parameter("freshness", f)
+	m.set_instance_shader_parameter("skin_tone", skin_tone)
+	m.set_instance_shader_parameter("variant", variant)
+	m.set_instance_shader_parameter("hair_color", hair_color)
+	m.set_instance_shader_parameter("look_seed", look_seed)
+	m.set_instance_shader_parameter("decay_seed", decay_seed)
+	m.set_instance_shader_parameter("gore", gore)
+	m.set_instance_shader_parameter("grime", grime)
+	m.set_instance_shader_parameter("neck_blood", neck_blood)

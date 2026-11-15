@@ -379,7 +379,8 @@ void fragment() {
 	//  15 the muscle inside a limb, gouged where the wound is: the bone is painted as a round shape standing out of it
 	//  14 the inner wall of the torso: bones in front of it and, where it's torn through, organs behind (anatomy map)
 	//  13 the skull under the scalp: where it's broken away, the brain below it (anatomy map)
-	//  12 the cut of a severed neck: the vertebra standing proud, the open windpipe, gullet and vessels to look down
+	//  12 the cut of a severed neck: the vertebra standing proud, the open windpipe, gullet and vessels to look into;
+	//     on the stump, or (COLOR.g) on the underside of the head that came off
 	// For each, the line of sight through this pixel is followed to what it meets first, so near things hide far
 	// things and slide across them as the view moves.
 	// From here on code is the material: 9 bone, 10 cartilage, 11 lung or brain, 12 heart and liver, 13 stomach and
@@ -476,13 +477,19 @@ void fragment() {
 			else rot=mvar>2.5?0.47:(mvar>1.5?0.79:(mvar>0.5?0.74:0.6));                    // fat, the dark of the cavity, the torn edge, or the muscle wall
 		}else{
 			// The cut of a severed neck: a slanted cut, with things standing a little above it or opening down into it.
+			// COLOR.g marks the other side of the same cut, the underside of a head that came off: there the tissue is
+			// above the cut, the vertebra hangs a little below it, and the tubes open upward.
+			bool piece=COLOR.g>0.5;
 			float s=-0.012,ds=0.045/45.0;
 			code=15.0;rot=0.79;inShade=0.9;                                                // nothing met: looking down an open tube
 			for(int k=0;k<45;k++){
 				vec3 q=v_body+rd*s;
 				vec4 nk=neckAt(q.xz);
-				float top=1.5900-0.1800*q.z+nk.x;
-				if(q.y<=top){code=nk.y;rot=nk.z;inShade=clamp((top-q.y)*25.0+nk.w,0.0,0.9);body=q;break;}
+				// (on the head's underside the cut is measured from this very point of it, which is ragged, not from the
+				// ideal slanted cut, so the depth shading follows the real torn surface)
+				float top=piece?v_body.y-0.1800*(q.z-v_body.z)-nk.x:1.5900-0.1800*q.z+nk.x;
+				float into=piece?q.y-top:top-q.y;
+				if(into>=0.0){code=nk.y;rot=nk.z;inShade=clamp(into*25.0+nk.w,0.0,0.9);body=q;break;}
 				s+=ds;
 			}
 		}

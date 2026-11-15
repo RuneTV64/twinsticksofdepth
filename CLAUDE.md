@@ -81,8 +81,10 @@ Assets artifact and in `assets/characters/` (the recipe under each asset's `sour
 - The owner approved ShamblerMale_Muscular and the living skins on 15 Nov 2026 (both pills say Approved), so
   ask before changing them, as with the body. Still unchecked: Forward+ on Godot 4.7, a real animation, and the
   cost of the depth painting on a real graphics card.
-- Next on the model side, when asked: the cut-off pieces (forearm and hand, lower leg and foot, head) as
-  separate meshes for the flying-limb effect; faces; build types.
+- The cut-off pieces (forearm and hand, lower leg and foot, head) are in `ShamblerMale_Muscular_Pieces*.glb`, built
+  by `buildPiece()` in shambler.js on the same cut as the stump (`offSide()`); `shambler.gd`'s `dismember()` throws
+  them when `pieces_scene` is set. Next on the model side, when asked: faces; build types. Still to build as
+  effects: blood and bits as particles, and a cap on how many pieces stay.
 
 ## Testing Godot assets in a cloud session
 

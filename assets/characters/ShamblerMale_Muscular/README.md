@@ -11,6 +11,7 @@ Status: **approved**, 15 Nov 2026. The decay shader and scripts have been compil
 | `ShamblerMale_Muscular.glb` | Close-up master: all 19 part meshes |
 | `ShamblerMale_Muscular_mid.glb` | Medium distance |
 | `ShamblerMale_Muscular_low.glb` | Far away and crowds |
+| `ShamblerMale_Muscular_Pieces.glb`, `_Pieces_mid.glb`, `_Pieces_low.glb` | The cut-off pieces (forearm and hand, lower leg and foot, head) that fly off when a part comes off in play, at the same three detail levels. See "Cut-off pieces" |
 | `zombie_decay.gdshader` | **Use this one.** Colors the body by how long he's been dead (five decay stages), starting from who he was: any of the 15 living skin tones and five looks |
 | `source/skin_tones.js` | The skin tones, looks and hair colors shared with the living skin shader; `gen_decay_shader.js` builds from it |
 | `freshness.gd` | The Freshness status: how far something has gone off. Shared with food later |
@@ -18,6 +19,7 @@ Status: **approved**, 15 Nov 2026. The decay shader and scripts have been compil
 | `zombie_skin.gdshader` | The first skin shader, with three fixed skin tones. Kept for comparison |
 | `anatomy_map.gd` | The torso's anatomy painted into a map, as a script (class `AnatomyMap`). The shader paints the inside of torso wounds from it. `shambler.gd` hands it to the shader |
 | `source/gen_anatomy_map.js` | Makes `anatomy_map.gd` (the torso's and the head's maps) from the anatomy in `anatomy.js`, and `anatomy_consts.json`, which tells `gen_decay_shader.js` where the maps sit, where the limb bones run and where the neck is cut |
+| `source/pieces_preview.gd`, `source/pieces_preview_compose.py` | What made the piece previews: the Godot test scene (every piece, and a shambler losing three parts) and the sheet layout |
 | `source/shambler.js`, `source/anatomy.js`, `source/export_shambler.js` | The recipe: `shambler.js` builds the parts, cuts the wounds and lays the inner surfaces; `anatomy.js` holds the anatomy the painting is made from (ribcage, shoulder blades, spine, pelvis, organs), which is not put into the game models; `export_shambler.js` writes the GLBs. It needs MaleBody_Muscular's `male_body_muscular.js` and `rig.js` beside it |
 
 ## How it is put together
@@ -36,6 +38,42 @@ Status: **approved**, 15 Nov 2026. The decay shader and scripts have been compil
 | Leg | The shin torn open down to the tibia, with the fibula beside it, a thigh tear, a bite out of the calf, the little toe gone | Gone below the knee, with the shin bone and fibula showing. **A destroyed leg makes a crawler.** |
 
 **Head_Decapitated** is a fourth head state for after the head comes off. It's a short, ragged neck stump with what's in a neck showing in the cut: a cervical vertebra with the spinal cord behind it, the windpipe as an open tube of cartilage at the front, the gullet behind that, and the big vessels either side. Blood runs down the neck, and down over the shoulders, chest and back (see Blood). A spawn never rolls it; call `dismember("Head")` to switch to it in play. Anything that followed the Head bone is moved onto the Neck bone, so the stump holds still if an animation moves the head.
+
+## Cut-off pieces
+
+When a hit takes a forearm, a lower leg or the head off in play, the part that came away flies off as a loose
+piece. `ShamblerMale_Muscular_Pieces.glb` (and `_mid`, `_low`) holds one mesh for each:
+
+| Piece | What it is | Made from | Triangles (full / mid / low) | Mass |
+| --- | --- | --- | --- | --- |
+| `ArmL_*`, `ArmR_*` | The lower two thirds of the forearm and the whole hand | Intact or Rotted | about 5,900 / 2,100 / 1,100 | 1.2 kg |
+| `LegL_*`, `LegR_*` | The lower two thirds of the shin and the whole foot | Intact or Rotted | 8,200 to 10,100 / 2,800 to 3,400 / 1,100 to 1,300 | 3.5 kg |
+| `Head_*` | The head, ears and the top of the neck | Intact, Rotted or Destroyed | 2,800 to 5,100 / 1,000 to 1,900 / 270 to 410 | 5.0 kg |
+
+Mesh names are the slot and the state the part was in before it came off, e.g. `ArmL_Rotted`, so a piece looks
+exactly like the part it replaces: the same wounds, rot, blood, and the same skin, freckles and hair once the shader
+is on it. The piece is cut on exactly the same line as its stump (Destroyed arm or leg, or Head_Decapitated), so the
+two fit. The cut face is closed:
+
+- **Arm and leg:** raw flesh with the two bones' broken ends a little proud of it, bone round the edge and red
+  marrow in the middle. The skin round the cut is torn, and blood has soaked into it, further in streaks.
+- **Head:** the neck's cut seen from below, painted by the shader like the stump's: the vertebra hanging a little
+  below the cut with the spinal cord, and the windpipe, gullet and big vessels as open tubes you look up into.
+
+**Pieces are rigid:** no skeleton, so the fingers, wrist and ankle stay as they were at rest. Each mesh is modelled
+in the frame of the bone it hangs from (`ForearmRollL/R` for an arm, `CalfL/R` for a leg, `Head` for the head), so
+placed at that bone's pose it lands exactly where the part was, however the body was posed. The file also keeps
+each vertex's rest position on the body, so the shader paints the piece exactly as it painted the part. In the
+file each piece sits where it belongs on the body (Rotted ones moved 0.8 m to his left and Destroyed ones 1.6 m, so
+they can be looked at side by side); the game only uses the meshes.
+
+**In play:** set `pieces_scene` on the shambler to one of the pieces files (the low one is plenty for most
+distances). Then `dismember(slot, impulse)` does the swap and throws the piece: a `RigidBody3D` with the right
+mesh, mass, a convex collision shape and this shambler's look, added to the shambler's parent (or `pieces_parent`),
+pushed by `impulse`. It returns the piece and also sends `piece_spawned(slot, piece)`. A part that's already gone
+gives no piece. `spawn_piece(slot, from_state)` makes one without changing the body. Pieces don't age with the
+shambler's Freshness afterward, and there's no limit on how many stay: clearing old ones is up to the game.
+If the shambler node is scaled, the piece comes out at full size.
 
 ## What's inside
 
@@ -153,7 +191,9 @@ Each will get its own visual effect when finished:
 4. To force a look, call `roll({"LegL": "Destroyed"})`, or call `show_parts({...}, tone)` for an exact one.
 5. `shambler.gd` gives the shader the anatomy map by itself. If you set up a material by hand, call
    `material.set_shader_parameter("anatomy_map", AnatomyMap.texture())`, or the torso's wounds show plain muscle.
-6. When a hit takes a part off in play, call `dismember("Head")`, `dismember("ArmL")` and so on. It swaps the part and emits `dismembered(slot, crawler)`. `is_decapitated` and `is_crawler` stay up to date.
+6. To throw the cut-off parts as physics pieces, set `pieces_scene` to `ShamblerMale_Muscular_Pieces_low.glb` (or
+   `_mid` or the full one). See "Cut-off pieces".
+7. When a hit takes a part off in play, call `dismember("Head")`, `dismember("ArmL")` and so on. It swaps the part, throws the piece if `pieces_scene` is set (pass an impulse as the second argument; the piece is returned), and emits `dismembered(slot, crawler)`. `is_decapitated` and `is_crawler` stay up to date.
 
 You can change these settings on the script in the Inspector:
 
@@ -164,6 +204,8 @@ You can change these settings on the script in the Inspector:
 | `max_lost_legs` | 1 | Most legs one shambler can lose |
 | `groups`, `variant_weights` | all five groups; 1 each | Who he was: which skin tone groups to roll from and an extra weight per look, the same as on a living body (see MaleBody_Muscular living skins) |
 | `roll_seed` | -1 | Any number other than -1 gives the same shambler every time |
+| `pieces_scene` | none | The cut-off pieces file. When set, `dismember()` throws the part that came off as a physics piece |
+| `pieces_parent` | empty | Where pieces are added; empty uses the shambler's parent |
 
 ## Decay and Freshness
 
@@ -268,18 +310,16 @@ come off, fly and pile up on the ground. That's doable in Godot 4:
 
 - **Blood and bits:** `GPUParticles3D` with small pixel-sized quads or chunks, set off at the wound when
   `dismembered` fires or a hit lands. Particles can collide with the ground and stay as decals or small meshes.
-- **Limbs:** a severed limb is a loose piece (a `RigidBody3D` with the cut-off part's mesh), thrown from the
-  stump. The models don't have the cut-off pieces as separate meshes yet (the forearm and hand, the lower leg and
-  foot, the head); the recipe can export them.
+- **Limbs and heads:** done: the cut-off pieces and `dismember()` throwing them. See "Cut-off pieces".
 - **Piles:** loose pieces and stains need a cap on how many stay, with the oldest fading out.
 
-None of this is built or tested yet.
+The blood and bits, and the cap on piles, are not built yet.
 
 ## Not done yet
 
 - **Faces:** the head has no face, the same as the body. Destroyed faces come after the faces are made.
 - **Pierced brain:** not made yet. See the three head deaths above.
 - **Animations:** shambling, crawling and attack animations are still to be made in Godot. `rigor()` is there for them to read. The painted details now follow posed limbs (`preview/decay_pose.png`, bones turned by hand in Godot); they haven't been run with a real animation yet.
-- **Gore effects and severed pieces:** see "Effects in the game". The cut-off limb and head meshes are not exported yet.
+- **Gore effects:** blood and bits as particles, and a cap on how many pieces stay. See "Effects in the game".
 - **Late-stage zombies:** the anatomy the painting is made from could also be exported as real models for a few late-stage variants, if they're wanted later.
 - **Tested so far:** `zombie_decay.gdshader`, `freshness.gd` and `shambler.gd` compile and run in Godot 4.5. The previews were rendered in Godot using the close-up master GLB. That machine used Godot's Compatibility renderer without a GPU, which ignores per-instance values, so the previews set them per material instead. The shader code is otherwise unchanged. Still to check in your project: the shambler scene under Forward+ on Godot 4.7.

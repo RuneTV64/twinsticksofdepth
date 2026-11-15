@@ -205,6 +205,24 @@ function armFrames(B,s){const S=B.S,sh=[s*S.shoulder[0],S.shoulder[1],-.008],ao=
 const INNER={limb:15,torso:14,skull:13,neck:12};
 const NECK_CUT={y:1.59,slope:.18};   // the cut of a severed neck: its height at z = 0, and how much it drops toward the front
 const BREAKS={'4L':[.80,1],'5L':[.70,1],'6L':[.76,1],'5R':[.86,.97]};   // the ribs snapped in the Destroyed torso: [from, to] along the bone
+// ---------- where a part comes off ----------
+// The cut is shared by the stump (makeVariant) and the piece that comes off (buildPiece), so the two fit. offSide()
+// says which side of the cut a point is on: above 0 is the part that comes off, and the value is roughly how far
+// from the cut it is.
+const OFF_SEED={Head:11,ArmL:137,ArmR:141,LegL:153,LegR:167};   // the seeds the stumps are built with
+function offSide(B,slot){const s=slot.slice(-1)==='L'?1:-1,seed=OFF_SEED[slot];
+  if(slot==='Head'){const cutY=NECK_CUT.y;return(x,y,z)=>{const a=Math.atan2(z,x);return y-(cutY-NECK_CUT.slope*z+.022*(fbm(Math.cos(a)*2.6+7,Math.sin(a)*2.6+7,3,seed)-.5)*2+.008*(hash(Math.round(a*9),4,seed,1)-.5));};}
+  if(slot.indexOf('Arm')===0){const F=armFrames(B,s),cutY=-.09;return(x,y,z)=>{const q=F.toFore(x,y,z),a=Math.atan2(q[2],q[0]*s);return cutY+.35*q[2]+.032*(fbm(Math.cos(a)*2.4+3,Math.sin(a)*2.4+3,1,seed)-.5)*2+.012*(hash(Math.round(a*7),2,seed,1)-.5)-q[1];};}
+  const kx=s*.101,cutY=.385;return(x,y,z)=>{const a=Math.atan2(z,(x-kx)*s);return cutY-.55*z+.045*(fbm(Math.cos(a)*2.4+5,Math.sin(a)*2.4+5,2,seed)-.5)*2+.015*(hash(Math.round(a*8),3,seed,1)-.5)-y;};}
+// the long bones of a forearm or shin, where they run at rest: [{name, A, B, r, joint}]
+function limbBones(B,slot){const sd=slot.slice(-1),s=sd==='L'?1:-1,b=sd==='L'?B.BL:B.BR;
+  if(slot.indexOf('Arm')===0){const F=armFrames(B,s);return[
+    {name:'radius'+sd,A:F.fo([.012*s,-.006,.007]),B:F.fo([.011*s,-.243,.010]),r:.0070,joint:b+5},
+    {name:'ulna'+sd,A:F.fo([-.012*s,.002,-.006]),B:F.fo([-.012*s,-.243,-.008]),r:.0064,joint:b+5}];}
+  const kx=s*.101;return[
+    {name:'tibia'+sd,A:[kx+.004*s,.495,.011],B:[kx+.006*s,.130,.014],r:.0112,joint:b+1},
+    {name:'fibula'+sd,A:[kx+.024*s,.485,-.006],B:[kx+.024*s,.135,-.004],r:.0056,joint:b+1}];}
+
 function makeVariant(B,slot,state){
   let torsoTears=[];   // where the Destroyed torso's inner wall is torn through (the anatomy map records it)
   const headBreaks=[]; // where the Destroyed head's skull is broken open (the same)
@@ -253,7 +271,7 @@ function makeVariant(B,slot,state){
     // head taken off: a short ragged neck stump with what's in a neck showing in the cut, and blood run down the neck
     drop.add('head');drop.add('earL');drop.add('earR');
     const nk=get('neck'),cutY=1.59,HD=B.HD;
-    cut(nk,(x,y,z)=>{const a=Math.atan2(z,x);return y>cutY-.18*z+.022*(fbm(Math.cos(a)*2.6+7,Math.sin(a)*2.6+7,3,seed)-.5)*2+.008*(hash(Math.round(a*9),4,seed,1)-.5);},.7,-.004,INNER.neck);
+    {const off=offSide(B,'Head');cut(nk,(x,y,z)=>off(x,y,z)>0,.7,-.004,INNER.neck);}
     for(let i=0;i<nk.P.length/3;i++){const x=nk.P[i*3],y=nk.P[i*3+1],z=nk.P[i*3+2],top=cutY-.18*z;
       // whatever followed the head bone now follows the neck, so the stump holds still if the head bone moves
       for(let k=0;k<4;k++)if(nk.J[i*4+k]===HD)nk.J[i*4+k]=2;
@@ -292,9 +310,7 @@ function makeVariant(B,slot,state){
     if(state==='Rotted'){
       W('upperArm'+sd,.5,side([.9,0,.4]),{r:.04,depth:.012,kind:'flesh',seed:3,elong:2});
       // a long tear down the forearm to the two forearm bones
-      toTheBone(B,get('forearm'+sd),.45,side([.3,0,1]),{r:.04,seed:5,elong:2.6},[
-        {name:'radius'+sd,A:F.fo([.012*s,-.006,.007]),B:F.fo([.011*s,-.243,.010]),r:.0070,joint:b+5},
-        {name:'ulna'+sd,A:F.fo([-.012*s,.002,-.006]),B:F.fo([-.012*s,-.243,-.008]),r:.0064,joint:b+5}],extra);
+      toTheBone(B,get('forearm'+sd),.45,side([.3,0,1]),{r:.04,seed:5,elong:2.6},limbBones(B,slot),extra);
       W('upperArm'+sd,.2,side([.1,0,-1]),{r:.032,depth:.008,kind:'flesh',seed:7});
       W('forearm'+sd,.15,side([.2,0,-1]),{r:.03,depth:.008,kind:'flesh',seed:8});
       W('hand'+sd,.4,side([0,0,1]),{r:.018,depth:.003,kind:'bone',seed:9});
@@ -306,7 +322,7 @@ function makeVariant(B,slot,state){
       // gone below the elbow, a third of the forearm left, the two forearm bones sticking out
       const cutY=-.09;['hand','index','middle','ring','pinky','thumb'].forEach(n=>{for(const p of parts)if(p.name.indexOf(n+sd)===0)drop.add(p.name);});
       const fa=get('forearm'+sd);
-      cut(fa,(x,y,z)=>{const q=F.toFore(x,y,z),a=Math.atan2(q[2],q[0]*s);return q[1]<cutY+.35*q[2]+.032*(fbm(Math.cos(a)*2.4+3,Math.sin(a)*2.4+3,1,seed)-.5)*2+.012*(hash(Math.round(a*7),2,seed,1)-.5);},.68,-.006);
+      {const off=offSide(B,slot);cut(fa,(x,y,z)=>off(x,y,z)>0,.68,-.006);}
       for(let i=0;i<fa.P.length/3;i++){const q=F.toFore(fa.P[i*3],fa.P[i*3+1],fa.P[i*3+2]),t=ss(q[1]-.35*q[2],cutY+.045,cutY+.005);if(fa.rot[i]<.6&&t>0){fa.rot[i]=Math.max(fa.rot[i],.3+.36*t);fa.touch[i]=1;}}
       extra.push(boneStub('radius'+sd,F.fo([.012*s,cutY+.03,.008]),F.fo([.014*s,cutY-.05,.012]),.0075,b+5,seed,B.DK));
       extra.push(boneStub('ulna'+sd,F.fo([-.012*s,cutY+.03,-.006]),F.fo([-.016*s,cutY-.03,-.009]),.0068,b+5,seed+1,B.DK));
@@ -316,9 +332,7 @@ function makeVariant(B,slot,state){
   if(slot.indexOf('Leg')===0){
     if(state==='Rotted'){
       // the shin torn open down the bone: tibia in front, the thin fibula beside it
-      {const kx=s*.101;toTheBone(B,get('calf'+sd),.42,[0,0,1],{r:.03,seed:3,elong:3.2},[
-        {name:'tibia'+sd,A:[kx+.004*s,.495,.011],B:[kx+.006*s,.130,.014],r:.0112,joint:b+1},
-        {name:'fibula'+sd,A:[kx+.024*s,.485,-.006],B:[kx+.024*s,.135,-.004],r:.0056,joint:b+1}],extra);}
+      toTheBone(B,get('calf'+sd),.42,[0,0,1],{r:.03,seed:3,elong:3.2},limbBones(B,slot),extra);
       W('thigh'+sd,.45,side([.8,0,.6]),{r:.05,depth:.014,kind:'flesh',seed:5,elong:1.8});
       W('calf'+sd,.3,side([-.4,0,-1]),{r:.04,depth:.018,kind:'flesh',seed:7,elong:1.4});
       W('thigh'+sd,.85,[0,0,1],{r:.035,depth:.008,kind:'flesh',seed:8});
@@ -329,7 +343,7 @@ function makeVariant(B,slot,state){
       // gone below the knee: a short ragged calf, shin bone and fibula showing. This leg makes a crawler.
       const kx=s*.101,cutY=.385;['foot','toe'].forEach(n=>{for(const p of parts)if(p.name.indexOf(n)===0)drop.add(p.name);});
       const ca=get('calf'+sd);
-      cut(ca,(x,y,z)=>{const a=Math.atan2(z,(x-kx)*s);return y<cutY-.55*z+.045*(fbm(Math.cos(a)*2.4+5,Math.sin(a)*2.4+5,2,seed)-.5)*2+.015*(hash(Math.round(a*8),3,seed,1)-.5);},.68,-.008);
+      {const off=offSide(B,slot);cut(ca,(x,y,z)=>off(x,y,z)>0,.68,-.008);}
       for(let i=0;i<ca.P.length/3;i++){const t=ss(ca.P[i*3+1]+.55*ca.P[i*3+2],cutY+.07,cutY+.01);if(ca.rot[i]<.6&&t>0){ca.rot[i]=Math.max(ca.rot[i],.3+.36*t);ca.touch[i]=1;}}
       extra.push(boneStub('tibia'+sd,[kx+.004*s,cutY+.03,.016],[kx+.006*s,cutY-.075,.022],.011,b+1,seed,B.DK));
       extra.push(boneStub('fibula'+sd,[kx+.028*s,cutY+.03,-.004],[kx+.031*s,cutY-.04,-.002],.006,b+1,seed+1,B.DK));
@@ -342,6 +356,45 @@ function makeVariant(B,slot,state){
     const l=Math.hypot(NN[i*3],NN[i*3+1],NN[i*3+2]);if(l>.5)for(let k=0;k<3;k++)p.N[i*3+k]=NN[i*3+k];else{p.N[i*3]=0;p.N[i*3+1]=1;p.N[i*3+2]=0;}}});
   return{slot,state,name:slot+'_'+state,parts:all,crawler:slot.indexOf('Leg')===0&&state==='Destroyed',tears:torsoTears,breaks:headBreaks};
 }
+
+// ---------- the pieces that come off ----------
+// When a forearm, lower leg or head comes off in play, the part that came away flies off as a loose piece. Each piece
+// is built from that part as it looked before (Intact or Rotted; a head also from Destroyed), cut on the same line as
+// the stump so the two fit, with the cut face closed: flesh with the bones' broken ends and their red marrow for a
+// limb, and for the head the neck's cut, which zombie_decay.gdshader paints like the stump's but seen from below.
+// The skin round the cut is torn and bloody. Pieces are rigid: no skeleton.
+const PIECES=[['ArmL','Intact'],['ArmL','Rotted'],['ArmR','Intact'],['ArmR','Rotted'],['LegL','Intact'],['LegL','Rotted'],
+  ['LegR','Intact'],['LegR','Rotted'],['Head','Intact'],['Head','Rotted'],['Head','Destroyed']];
+// the bone each piece hangs from: the game places the piece at that bone's pose, so it starts exactly where the part was
+const PIECE_BONE={Head:'Head',ArmL:'ForearmRollL',ArmR:'ForearmRollR',LegL:'CalfL',LegR:'CalfR'};
+const PIECE_MASS={Head:5.0,Arm:1.2,Leg:3.5};   // kg: head and neck; two thirds of a forearm and the hand; two thirds of a shin and the foot
+function buildPiece(B,slot,from){const v=makeVariant(B,slot,from),off=offSide(B,slot),out=[],head=slot==='Head',seed=OFF_SEED[slot]+7;
+  for(const p of v.parts){const n=p.P.length/3;let on=0;for(let i=0;i<n;i++)if(off(p.P[i*3],p.P[i*3+1],p.P[i*3+2])>0)on++;
+    if(!on)continue;                                             // all on the body's side
+    // inner surfaces, and the head itself (its chin dips into the neck), are opened without a cap: the skin's cap closes the cut
+    const inner=p.COL[3]>=12*17||p.name==='head';
+    if(on<n){if(inner){const g=new Uint8Array(n);for(let i=0;i<n;i++)g[i]=off(p.P[i*3],p.P[i*3+1],p.P[i*3+2])>0?0:1;openUp(p,g,null);}
+      else{cut(p,(x,y,z)=>off(x,y,z)<=0,head?.7:.68,head?-.004:-.006,head?INNER.neck:undefined);
+        if(head)for(let i=0;i<p.P.length/3;i++)if(p.COL[i*4+3]===INNER.neck*17)p.COL[i*4+1]=255;}}   // the neck's cut, seen from below
+    if(!inner)for(let i=0;i<p.P.length/3;i++){const x=p.P[i*3],y=p.P[i*3+1],z=p.P[i*3+2],d=off(x,y,z);
+      // torn skin round the cut, the way the stump has it
+      const t=1-ss(d,.005,.045);if(p.rot[i]<.6&&t>0){p.rot[i]=Math.max(p.rot[i],.3+.36*t);p.touch[i]=1;}
+      // and blood soaked in from it, further in streaks
+      const streak=noise3(x*45,y*6,z*45,seed),reach=.012+.055*Math.max(0,streak-.4)/.6;p.UV2[i*2+1]=Math.max(p.UV2[i*2+1],1-ss(d,.004,reach));}
+    out.push(p);}
+  // a limb's bones end in the cut face: broken short, a little proud of it, with the red marrow showing
+  if(!head)limbBones(B,slot).forEach((b,k)=>{let lo=0,hi=1;const at=t=>[b.A[0]+(b.B[0]-b.A[0])*t,b.A[1]+(b.B[1]-b.A[1])*t,b.A[2]+(b.B[2]-b.A[2])*t];
+    if(!(off(...at(0))<=0&&off(...at(1))>0))return;
+    for(let j=0;j<40;j++){const m=(lo+hi)/2;if(off(...at(m))>0)hi=m;else lo=m;}
+    const X=at(hi),dir=unit(sub(b.B,b.A)),stub=boneStub(b.name+'End',[X[0]+dir[0]*.022,X[1]+dir[1]*.022,X[2]+dir[2]*.022],
+      [X[0]-dir[0]*(.003+.005*hash(k,1,seed,2)),X[1]-dir[1]*(.003+.005*hash(k,1,seed,2)),X[2]-dir[2]*(.003+.005*hash(k,1,seed,2))],b.r,0,seed+k,B.DK);
+    const seg=stub.P.length/3-2,ring=Math.round(seg/7);stub.rot[ring*7]=.7;out.push(stub);});   // (the tip's centre vertex: marrow)
+  out.forEach(p=>{for(let i=0;i<p.P.length/3;i++)p.COL[i*4+2]=Math.round(255*Math.min(1,p.rot[i]));
+    let NN=null;for(let i=0;i<p.N.length/3;i++){if(Math.hypot(p.N[i*3],p.N[i*3+1],p.N[i*3+2])>.5)continue;NN=NN||normals(p.P,p.I);
+      const l=Math.hypot(NN[i*3],NN[i*3+1],NN[i*3+2]);if(l>.5)for(let k=0;k<3;k++)p.N[i*3+k]=NN[i*3+k];else{p.N[i*3]=0;p.N[i*3+1]=1;p.N[i*3+2]=0;}}});
+  const bi=B.names.indexOf(PIECE_BONE[slot]);if(bi<0)throw new Error('no bone '+PIECE_BONE[slot]);
+  return{slot,from,name:slot+'_'+from,parts:out,bone:PIECE_BONE[slot],pivot:B.piv[bi].slice(),mass:PIECE_MASS[head?'Head':slot.slice(0,3)]};}
+function buildPieces(detail){const B=buildBase(detail);return{B,pieces:PIECES.map(([sl,st])=>buildPiece(B,sl,st))};}
 
 // merge a variant's parts into one primitive's arrays
 function merge(v){let nv=0,ni=0;v.parts.forEach(p=>{nv+=p.P.length/3;ni+=p.I.length;});
@@ -387,4 +440,4 @@ function anatomyOnly(B){const K=B.K,o={detail:B.DK,shoulder:B.piv[B.BL+3]},full=
   const organs=[AN.shell('cavityLining',K,AN.LINER_IN,{detail:B.DK,rot:.79,inward:true}),...bones(),...AN.buildOrgans(K,o)];
   const fin=ps=>{ps.forEach(p=>{inShadow(p,K);for(let i=0;i<p.P.length/3;i++)p.COL[i*4+2]=Math.round(255*Math.min(1,p.rot[i]));});return ps;};
   return[{slot:'Torso',state:'Skeleton',name:'Torso_Skeleton',parts:fin(parts),crawler:false},{slot:'Torso',state:'Organs',name:'Torso_Organs',parts:fin(organs),crawler:false}];}
-module.exports={buildBase,makeVariant,merge,buildAll,anatomyOnly,patchAt,SLOTS,STATES,EXTRA,BREAKS,LIMB_BONES,NECK_CUT};
+module.exports={buildBase,makeVariant,merge,buildAll,buildPieces,PIECES,PIECE_BONE,PIECE_MASS,anatomyOnly,patchAt,SLOTS,STATES,EXTRA,BREAKS,LIMB_BONES,NECK_CUT};
