@@ -102,6 +102,14 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var block_arc_dot := 0.5        # attacker must be within this cone of your facing (dot)
 @export var block_stamina_per_damage := 2.5   # stamina spent per point of damage stopped
 @export var block_regen_delay := 1.0    # seconds after a shove before stamina regenerates
+# Held: a zombie with hands can grab you. Held, you're slowed (two hands nearly root you) and it bites until
+# you get loose: shove it off (guard up, facing it) or struggle (wiggle the move stick / keys; hitting it helps).
+@export var held_speed_one := 0.35      # your speed with one hand on you
+@export var held_speed_two := 0.08      # with two hands (or two zombies) on you
+@export var struggle_per_wiggle := 0.12 # struggle gained per full swing of the move input
+@export var struggle_needed := 1.0      # struggle to break a one-handed grip; two hands need 1.8x
+@export var struggle_fade := 0.3        # struggle lost per second
+@export var break_free_cost := 16.0     # stamina to shove a holder off
 # ---------- Vision ----------
 # You see a cone in front of you plus a small circle all around; walls cut both short. Enemies
 # outside it fade out and the fog of war covers what you can't see (see fog.gd).
@@ -175,6 +183,9 @@ var _sprint_t := -1.0
 var _dash_t := 0.0
 var _dash_dir := Vector3.ZERO
 var _stagger := 0.0
+var held_by: Array[Enemy] = []   # zombies that have hold of you
+var _struggle := 0.0
+var _last_mv := Vector2.ZERO
 var _barge_cd := 0.0
 var _bash_cd := 0.0
 var _mouse_idle := 99.0
@@ -438,6 +449,7 @@ func _physics_process(delta: float) -> void:
 	var move_dir := Vector3(mv.x, 0.0, mv.y)
 	if _stagger > 0.0:
 		move_dir = Vector3.ZERO
+	_update_held(delta, mv)
 
 	_update_wheel()
 	_update_stance()
@@ -458,6 +470,7 @@ func _physics_process(delta: float) -> void:
 			spd = run_speed
 		var tired := fatigue()
 		spd *= lerpf(1.0, fatigue_min_speed, tired)
+		spd *= held_speed()
 		var want := move_dir * spd
 		var rate := decel
 		if want.length() > 0.01:
@@ -733,7 +746,7 @@ func _update_sprint(delta: float, move_dir: Vector3) -> void:
 			_sprint_t = -1.0
 
 	var want_run := _sprint_t > sprint_tap_time and not armed and move_dir.length() > 0.1 \
-		and not winded and _stagger <= 0.0
+		and not winded and _stagger <= 0.0 and held_by.is_empty()
 	running = want_run and stamina > 0.0
 	if running:
 		stamina = maxf(stamina - run_drain * delta, 0.0)
@@ -751,6 +764,9 @@ func _update_sprint(delta: float, move_dir: Vector3) -> void:
 
 
 func _try_dash(move_dir: Vector3) -> void:
+	if not held_by.is_empty():
+		show_status("Held! Shove it off or struggle", 0.8)
+		return
 	if winded or _dash_t > 0.0 or _stagger > 0.0 or stamina < dash_cost * 0.5:
 		if winded:
 			show_status("Too winded to dash", 0.8)
@@ -1050,6 +1066,96 @@ func take_attack(amount: float, dir: Vector3, knock: float, attacker: Enemy = nu
 		show_status("Hit! -%d HP" % roundi(amount), 0.8)
 
 
+## A zombie with hands reaches for you. With your guard up and it in front of you, you shove it off before its
+## hands close (like any other attack). Otherwise it has hold of you: returns true.
+func take_grab(e: Enemy, hands: int) -> bool:
+	if dead or hands <= 0:
+		return false
+	var dir := global_position - e.global_position
+	dir.y = 0.0
+	dir = dir.normalized()
+	if is_guarding() and facing.dot(-dir) >= block_arc_dot:
+		_block_t = 0.25
+		e.shove(-dir, shove_force)
+		show_status("Shoved it off", 0.5)
+		_spend_guard(shove_cost)
+		return false
+	if not held_by.has(e):
+		held_by.append(e)
+	show_status("Grabbed! Shove it off or struggle free", 1.6)
+	return true
+
+
+func release_grab(e: Enemy) -> void:
+	held_by.erase(e)
+	if held_by.is_empty():
+		_struggle = 0.0
+
+
+func is_held_by(e: Enemy) -> bool:
+	return held_by.has(e)
+
+
+## A bite from a zombie that has hold of you. Your guard can't stop it: you have to get loose first.
+func take_bite(amount: float, dir: Vector3, _e: Enemy) -> void:
+	take_damage(amount, dir, 1.0)
+	if not dead:
+		show_status("Bitten! -%d HP" % roundi(amount), 0.9)
+
+
+## Something that helps you get loose (hitting the one holding you).
+func loosen_grip(amount: float) -> void:
+	if not held_by.is_empty():
+		_struggle += amount
+
+
+## How much the hands on you slow you: one hand, or two hands (or two zombies).
+func held_speed() -> float:
+	var hands := 0
+	for e in held_by:
+		hands += e.body.hands() if e.body != null else 1
+	if hands <= 0:
+		return 1.0
+	return held_speed_one if hands == 1 else held_speed_two
+
+
+## While held: shove off whoever holds you from the front (guard up), or struggle until the grip breaks.
+func _update_held(delta: float, mv: Vector2) -> void:
+	for e: Enemy in held_by.duplicate():
+		if not is_instance_valid(e) or e.dead:
+			held_by.erase(e)
+	if held_by.is_empty():
+		_struggle = 0.0
+		_last_mv = mv
+		return
+	_struggle += (mv - _last_mv).length() * 0.5 * struggle_per_wiggle
+	_last_mv = mv
+	_struggle = maxf(_struggle - struggle_fade * delta, 0.0)
+	if is_guarding() and _shove_cd <= 0.0:
+		for e: Enemy in held_by.duplicate():
+			var to := e.global_position - global_position
+			to.y = 0.0
+			if to.normalized().dot(facing) > shove_arc_dot:
+				held_by.erase(e)
+				e.shove(to.normalized(), shove_force)
+				_shove_cd = shove_interval
+				_block_t = 0.25
+				show_status("Shoved it off", 0.6)
+				_spend_guard(break_free_cost)
+				break
+	var hands := 0
+	for e in held_by:
+		hands += e.body.hands() if e.body != null else 1
+	if not held_by.is_empty() and _struggle >= struggle_needed * (1.8 if hands >= 2 else 1.0):
+		for e: Enemy in held_by.duplicate():
+			var away := e.global_position - global_position
+			away.y = 0.0
+			e.shove(away.normalized(), shove_force * 0.4)
+		held_by.clear()
+		_struggle = 0.0
+		show_status("Broke free!", 0.8)
+
+
 func take_damage(amount: float, dir: Vector3, knock: float) -> void:
 	if dead:
 		return
@@ -1063,6 +1169,7 @@ func take_damage(amount: float, dir: Vector3, knock: float) -> void:
 		health = 0.0
 		dead = true
 		armed = false
+		held_by.clear()
 		_respawn_t = 2.5
 		show_status("You went down. Respawning...", 2.5)
 

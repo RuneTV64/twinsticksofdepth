@@ -24,9 +24,19 @@ F1 hides the help text. Esc frees the mouse, and clicking captures it again. Key
 ## What's in the level
 - **Ammo crate** next to spawn. It's the first interaction: put your weapon away, walk up and interact. Crates respawn.
 - **Dummies** to the west. They heal after 3 seconds and respawn fast.
-- **Shamblers** to the east, plus two inside the house. They're slow and walk straight at you. They swipe in melee, and they shove doors open just like you do.
+- **Shamblers** to the east, plus two inside the house. They're slow and walk straight at you, and they shove doors open just like you do. Each one is a different person, dead for a different time, with different parts missing (see Zombies).
 - **House:** the south door is a normal door. The east door is heavy and locked: a run won't open it, but a dash will. Every failed barge weakens it.
 - When your ammo is completely gone, attacking does a short bash.
+
+## Zombies
+Shamblers use the ShamblerMale_Muscular body (`zombie_body.gd`, see below). What one can do depends on what it has left:
+- **Grab:** with a hand left it reaches for you. With your guard up and facing it, you shove it off first. Otherwise it has hold of you: one hand slows you to 35%, two hands (or two zombies) nearly root you, and you can't run or dash. It pulls in and bites (15) after a second, then again every 1.5 s.
+- **Get loose:** hold Ready unarmed, facing it, to shove it off (costs stamina), or wiggle the move keys or stick back and forth to struggle free (about 1.5 s of hard wiggling against one hand, 3 s against two). Hitting it helps.
+- **Lunge:** with no hands it can't grab. It crouches and throws itself at you mouth first; your guard shoves it off.
+- **Crawl:** with a leg gone it always crawls. A hard hit or a shove can knock any of them down; it crawls at you for a while, then gets back up if it has the legs. Crawlers grab at your ankles and bite.
+- **Losing parts:** a hit that doesn't kill can take an arm or a leg off (rotted parts go more easily), and the piece flies off. A headshot kills, and sometimes takes the head off. The head is still alive on the floor and, very rarely, bites if you step right next to it.
+- **Rot:** the longer dead, the slower, with more dragging, lurching and stumbling. In rigor they're stiff and jerky. The most rotted fall apart on their own now and then.
+- A dead zombie lies where it fell for 30 s, then fades (a stand-in until the clean-up lore is designed), and comes back at its spot after 90 s as a new zombie.
 
 ## Stats to movement (`recompute_stats()` in player.gd)
 There is no speed stat. Speed comes from Strength, Endurance and Weight.
@@ -48,13 +58,18 @@ All the feel settings are exported variables at the top of each script:
 - **player.gd:** `base_walk_speed`, `run_mult`, `ready_mult`, accel and decel, `fatigue_start`, `fatigue_min_speed`, `fatigue_min_accel`, turn speeds, `draw_time`, `sprint_tap_time`, `reticle_range` (shared by both stances; `look_range_bonus` and `aim_range_bonus` are set by gear such as binoculars or scopes), `ready_cam_lead`, mouse sensitivity, weapon stats.
 - **camera_rig.gd:** pitch, distance, FOV, `follow_sharpness`.
 - **door.gd:** toughness, locked, max swing angle.
-- **enemy.gd:** speed, aggro range, damage.
+- **enemy.gd:** speed, aggro range, and the zombie abilities: grab range and windup, bite damage and timing, lunge, crawl speed, knockdown chance, limb and head loss, corpse time, falling apart.
+- **player.gd (held):** `held_speed_one`, `held_speed_two`, `struggle_per_wiggle`, `struggle_needed`, `break_free_cost`.
+- **zombie_body.gd:** `pose_sharpness`; the poses themselves are the numbers in `_pose_walk()` and `_pose_crawl()`.
 
 ## Files
-main.gd (level), player.gd, camera_rig.gd, door.gd, enemy.gd, projectile.gd, ammo_pickup.gd, hud.gd, input_setup.gd, player_body.gd (the player model and its animation), body/ (the MaleBody_Muscular models and skin shader)
+main.gd (level), player.gd, camera_rig.gd, door.gd, enemy.gd, projectile.gd, ammo_pickup.gd, hud.gd, input_setup.gd, player_body.gd (the player model and its animation), body/ (the MaleBody_Muscular models and skin shader), zombie_body.gd (a zombie's model and its animation), severed_head.gd (a head that came off, still biting)
 
 ## The player body
 `player_body.gd` loads `body/MaleBody_Muscular_mid.glb`, puts the skin shader on it and poses the skeleton in code every tick from the player state. There are no animation clips: legs step the way you move, the arms are placed on a boxing guard or on the gun in Ready, and punches, shoves, recoil, reload, hits, dashes and death all come from the same timers the controller uses. To change a pose, edit the numbers in `animate()`. To use the close-up or far model, change `MODEL_PATH`.
+
+## The zombie body
+`zombie_body.gd` works like `player_body.gd`: no clips, the bones are posed in code every tick from the Enemy's state. It loads `ShamblerMale_Muscular_mid.glb` with `shambler.gd` on it (which rolls who he was, how long he's been dead and which parts are missing) and the decay shader. One script covers every mix of missing parts and every decay stage: the shamble with a dragging bad leg, reaching arms, the crawl, grab, bite, lunge, flinch, knockdown and getting up, and dying face down. Out of your view a zombie dithers away instead of going transparent. Review sheets are in `assets/characters/ShamblerMale_Muscular/preview/zombie_anim_*.png`; `source/zombie_anim_preview.gd` makes them.
 
 ## Mouse note
 Ready and Attack read the mouse buttons three ways (button events, the held-button mask on every

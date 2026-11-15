@@ -44,6 +44,7 @@ Unarmed + Ready: attack = punch (weak; a bit harder standing still).
 Hold Ready and face a zombie: when it gets within reach you shove it back,
 and any zombies right beside it. Each shove costs stamina;
 out of stamina = no shoves, bites land until you recover.
+Grabbed: Ready and face it to shove it off, or wiggle the move keys to break free.
 Stat test keys: 1/2 STR   3/4 END   5/6 WT   7/8 DEX
 F1 hide help    Esc free mouse"""
 

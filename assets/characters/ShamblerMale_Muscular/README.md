@@ -2,7 +2,10 @@
 
 Zombie version of MaleBody_Muscular, built from swappable parts so every shambler can look different.
 
-Status: **approved**, 15 Nov 2026. The decay shader and scripts have been compiled and test-rendered in Godot 4.5; the shambler scene has not been set up in the game project yet.
+Status: **approved**, 15 Nov 2026. The decay shader and scripts have been compiled and test-rendered in Godot 4.5.
+Since 15 Nov 2026 the game's shamblers use it: `zombie_body.gd` in the game repo loads the mid model with `shambler.gd`
+and animates it (walk by decay stage, crawl, grab, bite, lunge, falls; see `preview/zombie_anim_*.png`, in review).
+Nothing in this asset changed for that.
 
 ## Files
 
@@ -22,6 +25,7 @@ Status: **approved**, 15 Nov 2026. The decay shader and scripts have been compil
 | `anatomy_map.gd` | The torso's anatomy painted into a map, as a script (class `AnatomyMap`). The shader paints the inside of torso wounds from it. `shambler.gd` hands it to the shader |
 | `source/gen_anatomy_map.js` | Makes `anatomy_map.gd` (the torso's and the head's maps) from the anatomy in `anatomy.js`, and `anatomy_consts.json`, which tells `gen_decay_shader.js` where the maps sit, where the limb bones run and where the neck is cut |
 | `source/pieces_preview.gd`, `source/pieces_motion.gd`, `source/pieces_preview_compose.py` | What made the piece previews: the Godot test scenes (every piece; a shambler losing three parts; one piece falling, by decay stage, and rotting away) and the sheet layout |
+| `source/zombie_anim_preview.gd`, `source/zombie_anim_sheet.py` | What made the animation review sheets (`preview/zombie_anim_*.png`): each zombie is driven through the game's own `zombie_body.gd` (in the game repo root), one row of moments per case |
 | `source/shambler.js`, `source/anatomy.js`, `source/export_shambler.js` | The recipe: `shambler.js` builds the parts, cuts the wounds and lays the inner surfaces; `anatomy.js` holds the anatomy the painting is made from (ribcage, shoulder blades, spine, pelvis, organs), which is not put into the game models; `export_shambler.js` writes the GLBs. It needs MaleBody_Muscular's `male_body_muscular.js` and `rig.js` beside it |
 
 ## How it is put together

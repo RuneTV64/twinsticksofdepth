@@ -63,7 +63,7 @@ func _physics_process(delta: float) -> void:
 			return
 	if best_e != null:
 		if best_e == aimed_at and randf() < headshot_chance:
-			best_e.take_hit(best_e.hp + 1.0, dir, knock * 2.0)   # one-hit kill
+			best_e.take_headshot(dir, knock * 2.0)   # one-hit kill; may take the head off
 			_report("HEADSHOT on %s" % best_e.kind)
 			if is_instance_valid(shooter):
 				shooter.show_status("HEADSHOT!", 1.0)
