@@ -26,7 +26,7 @@ func _ready() -> void:
 func sheet() -> void:
 	var inst: Node3D = load(OS.get_environment("GLB")).instantiate()
 	var meshes := {}
-	for m in inst.find_children("*", "MeshInstance3D", true, false): meshes[String(m.name)] = m.mesh
+	for m in inst.find_children("*", "MeshInstance3D", true, false): meshes[String(m.name).trim_suffix("_Mesh")] = m.mesh
 	var order := ["ArmL_Intact", "ArmL_Rotted", "ArmR_Intact", "ArmR_Rotted", "LegL_Intact", "LegL_Rotted", "LegR_Intact", "LegR_Rotted", "Head_Intact", "Head_Rotted", "Head_Destroyed"]
 	var m := mat_with(PARAMS)
 	var holders := []
@@ -57,6 +57,9 @@ func live() -> void:
 	sh.set_script(script)
 	sh.set("roll_on_ready", false)
 	sh.set("skin_shader", patched())
+	var pshader := Shader.new(); pshader.code = FileAccess.get_file_as_string("res://zombie_decay_piece.gdshader").replace("ALBEDO=pow(c,vec3(2.2));", "ALBEDO=c;").replace("instance uniform", "uniform")
+	sh.set("piece_shader", pshader)
+	sh.set("piece_rot_seconds", 0.0)
 	sh.set("pieces_scene", load(OS.get_environment("GLB")))
 	add_child(sh)
 	sh.call("roll", {"Head": "Destroyed", "Torso": "Intact", "ArmL": "Rotted", "ArmR": "Intact", "LegL": "Intact", "LegR": "Intact"}, 0.95)
@@ -75,10 +78,15 @@ func live() -> void:
 		var p: RigidBody3D = sh.call("dismember", s[0], s[1] * 0.0)
 		got.append([s[0], p])
 	for g in got: if g[1]: g[1].freeze = true   # hold them still for the "just after" frame
+	for g in got:
+		if g[1]:
+			var pmat: ShaderMaterial = g[1].mesh.material_override
+			for k in PARAMS: pmat.set_shader_parameter(k, PARAMS[k])
+			pmat.set_shader_parameter("dissolve", 0.0)
 	print("pieces: ", got.map(func(g): return "%s=%s" % [g[0], g[1].name if g[1] else "none"]))
 	for g in got:
 		var p: RigidBody3D = g[1]
-		var mi: MeshInstance3D = p.get_child(0)
+		var mi: MeshInstance3D = g[1].mesh
 		var ab := p.global_transform * mi.mesh.get_aabb()
 		print(g[0], " at ", p.global_position.snapped(Vector3.ONE * 0.001), " world box ", ab.position.snapped(Vector3.ONE * 0.01), " size ", ab.size.snapped(Vector3.ONE * 0.01), " scale ", p.global_transform.basis.get_scale().snapped(Vector3.ONE * 0.01), " mesh surfaces ", mi.mesh.get_surface_count(), " verts ", mi.mesh.surface_get_array_len(0))
 	var hb := sk.find_bone("Head"); print("Head bone ", hb, " pose origin ", sk.get_bone_global_pose(hb).origin.snapped(Vector3.ONE * 0.001), " rest ", sk.get_bone_global_rest(hb).origin.snapped(Vector3.ONE * 0.001), " skeleton xf ", sk.global_transform.origin)

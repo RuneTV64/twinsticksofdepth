@@ -4,7 +4,8 @@
 # A destroyed leg makes a crawler: read is_crawler (or listen to `rolled`) to pick crawler movement and animations.
 # Head_Decapitated is never rolled at spawn. Call dismember("Head") when a hit takes the head off.
 # With pieces_scene set, dismember() also throws off the part that came away (the forearm and hand, the lower leg and
-# foot, or the head) as a physics piece that starts exactly where that part was.
+# foot, or the head) as a physics piece (shambler_piece.gd) that starts exactly where that part was, with the hand or
+# foot in the pose it had. Its joints then move like a dead limb's, and it rots and fades away.
 #
 # Use: make a scene from ShamblerMale_Muscular.glb (New Inherited Scene), attach this script to its root, save it.
 # Each instance of that scene rolls itself when it enters the tree.
@@ -14,7 +15,7 @@ extends Node3D
 
 signal rolled(parts: Dictionary, crawler: bool)
 signal dismembered(slot: String, crawler: bool)
-signal piece_spawned(slot: String, piece: RigidBody3D)
+signal piece_spawned(slot: String, piece: ShamblerPiece)
 
 const SLOTS := ["Head", "Torso", "ArmL", "ArmR", "LegL", "LegR"]
 const STATES := ["Intact", "Rotted", "Destroyed"]   # what a spawn can roll
@@ -51,6 +52,14 @@ const PLAY_STATES := {"Head": ["Decapitated"]}       # only switched to in play
 @export var pieces_scene: PackedScene
 ## Where the pieces are added. Empty: this shambler's parent.
 @export var pieces_parent: NodePath
+## The pieces' shader: zombie_decay.gdshader's twin that can fade them away.
+@export var piece_shader: Shader = preload("zombie_decay_piece.gdshader")
+## Real seconds for a piece to rot from fully fresh to nothing, then fade away. 0: pieces don't rot by themselves.
+@export var piece_rot_seconds := 180.0
+## Seconds a rotted piece takes to fade away.
+@export var piece_fade_seconds := 3.0
+## Pieces fade away and free themselves once rotted. Off: they only send rotted_away, for the game to deal with.
+@export var piece_auto_fade := true
 
 var parts := {}          # slot -> state shown now
 var is_crawler := false
@@ -70,8 +79,9 @@ var _skeleton: Skeleton3D
 static var _material: ShaderMaterial
 const PIECE_BONE := {"Head": "Head", "ArmL": "ForearmRollL", "ArmR": "ForearmRollR", "LegL": "CalfL", "LegR": "CalfR"}
 const PIECE_MASS := {"Head": 5.0, "Arm": 1.2, "Leg": 3.5}   # kg
-static var _piece_meshes := {}   # pieces scene path -> {"ArmL_Intact": Mesh, ...}
-static var _piece_shapes := {}   # Mesh -> its collision shape
+static var _piece_material: ShaderMaterial
+static var _piece_kinds := {}    # pieces scene path -> {"ArmL_Intact": [PackedScene, joints, capsules], ...}
+static var _piece_shapes := {}   # Mesh -> its collision shape (heads)
 
 
 func _ready() -> void:
@@ -183,7 +193,7 @@ func show_parts(picked: Dictionary) -> void:
 ## Take a part off in play: the head becomes the decapitated neck stump, an arm or leg becomes Destroyed.
 ## Losing a leg turns the shambler into a crawler. With pieces_scene set, the part that came away flies off as a
 ## physics piece (also sent with piece_spawned), pushed by `impulse`; the piece is returned, or null.
-func dismember(slot: String, impulse := Vector3.ZERO) -> RigidBody3D:
+func dismember(slot: String, impulse := Vector3.ZERO) -> ShamblerPiece:
 	if not slot in SLOTS or slot == "Torso":
 		push_warning("Shambler: can't dismember %s" % slot)
 		return null
@@ -191,7 +201,7 @@ func dismember(slot: String, impulse := Vector3.ZERO) -> RigidBody3D:
 	var next := parts.duplicate()
 	next[slot] = "Decapitated" if slot == "Head" else "Destroyed"
 	show_parts(next)
-	var piece: RigidBody3D = null
+	var piece: ShamblerPiece = null
 	if before != next[slot]:
 		piece = spawn_piece(slot, before, impulse)
 	dismembered.emit(slot, is_crawler)
@@ -199,27 +209,54 @@ func dismember(slot: String, impulse := Vector3.ZERO) -> RigidBody3D:
 
 
 ## Make the loose piece for a part that came off: `slot`, and the state it was in before (Intact or Rotted, or for the
-## head also Destroyed). It starts exactly where that part was on the body, with this shambler's look, as a
-## RigidBody3D with a convex collision shape. Returns null without pieces_scene, or for a state with no piece.
-func spawn_piece(slot: String, from_state: String, impulse := Vector3.ZERO) -> RigidBody3D:
+## head also Destroyed). It starts exactly where that part was on the body, with the hand or foot in the pose it had and
+## with this shambler's look, as a ShamblerPiece (a RigidBody3D with a convex collision shape). Returns null without
+## pieces_scene, or for a state with no piece.
+func spawn_piece(slot: String, from_state: String, impulse := Vector3.ZERO) -> ShamblerPiece:
 	if pieces_scene == null or _skeleton == null or not PIECE_BONE.has(slot):
 		return null
-	var mesh: Mesh = _pieces().get("%s_%s" % [slot, from_state])
+	var kind: Array = _pieces().get("%s_%s" % [slot, from_state], [])
 	var bone := _skeleton.find_bone(PIECE_BONE[slot])
-	if mesh == null or bone < 0:
+	if kind.is_empty() or bone < 0:
 		return null
-	var body := RigidBody3D.new()
+	var piece_node: Node3D = (kind[0] as PackedScene).instantiate()
+	piece_node.transform = Transform3D.IDENTITY
+	var body := ShamblerPiece.new()
 	body.name = "%s_piece" % slot
+	body.slot = slot
+	body.from_state = from_state
 	body.mass = PIECE_MASS["Head" if slot == "Head" else slot.left(3)]
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.material_override = _material
-	body.add_child(mi)
-	var cs := CollisionShape3D.new()
-	if not _piece_shapes.has(mesh):
-		_piece_shapes[mesh] = mesh.create_convex_shape(true, true)
-	cs.shape = _piece_shapes[mesh]
-	body.add_child(cs)
+	body.rot_seconds = piece_rot_seconds
+	body.fade_seconds = piece_fade_seconds
+	body.auto_fade = piece_auto_fade
+	body.add_child(piece_node)
+	var mi: MeshInstance3D = piece_node.find_children("*", "MeshInstance3D", true, false)[0]
+	if _piece_material == null and piece_shader != null:
+		_piece_material = ShaderMaterial.new()
+		_piece_material.shader = piece_shader
+		_piece_material.set_shader_parameter("anatomy_map", AnatomyMap.texture())
+	mi.material_override = _piece_material
+	# an arm or leg collides as two rounded capsules (along the forearm or shin, and the hand or foot), so it can't
+	# stand on its flat cut; a head as its convex hull
+	var capsules: Array = kind[2]
+	if capsules.is_empty():
+		var cs := CollisionShape3D.new()
+		if not _piece_shapes.has(mi.mesh):
+			_piece_shapes[mi.mesh] = mi.mesh.create_convex_shape(true, true)
+		cs.shape = _piece_shapes[mi.mesh]
+		body.add_child(cs)
+	for c in capsules:
+		var a := Vector3(c["a"][0], c["a"][1], c["a"][2])
+		var b := Vector3(c["b"][0], c["b"][1], c["b"][2])
+		var shape := CapsuleShape3D.new()
+		shape.radius = c["r"]
+		shape.height = a.distance_to(b) + 2.0 * shape.radius
+		var cs := CollisionShape3D.new()
+		cs.shape = shape
+		var up := (b - a).normalized()
+		var side := up.cross(Vector3.FORWARD if absf(up.z) < 0.9 else Vector3.RIGHT).normalized()
+		cs.transform = Transform3D(Basis(side, up, side.cross(up)), (a + b) * 0.5)
+		body.add_child(cs)
 	var host: Node = get_node_or_null(pieces_parent) if not pieces_parent.is_empty() else get_parent()
 	if host == null:
 		host = get_tree().current_scene
@@ -227,23 +264,40 @@ func spawn_piece(slot: String, from_state: String, impulse := Vector3.ZERO) -> R
 	# the piece is modelled in its bone's frame, so the bone's pose puts it exactly where the part was
 	var t := _skeleton.global_transform * _skeleton.get_bone_global_pose(bone)
 	body.global_transform = Transform3D(t.basis.orthonormalized(), t.origin)
+	# and the hand or foot takes the pose it had on the body (the bones have the same names)
+	var psk: Skeleton3D = piece_node.get_node("Skeleton3D")
+	for i in psk.get_bone_count():
+		var src := _skeleton.find_bone(psk.get_bone_name(i))
+		if src >= 0 and psk.get_bone_parent(i) >= 0:
+			psk.set_bone_pose_rotation(i, _skeleton.get_bone_pose_rotation(src))
 	_skin_params(mi)
+	mi.set_instance_shader_parameter("dissolve", 0.0)
+	body.setup(piece_node, kind[1], freshness.value if freshness != null else 1.0)
 	if impulse != Vector3.ZERO:
 		body.apply_central_impulse(impulse)
 	piece_spawned.emit(slot, body)
 	return body
 
 
+# The pieces file, split into one small scene per piece (its skeleton and mesh), with its joint ranges.
 func _pieces() -> Dictionary:
 	var key := pieces_scene.resource_path
-	if not _piece_meshes.has(key):
+	if not _piece_kinds.has(key):
 		var found := {}
 		var inst := pieces_scene.instantiate()
-		for m in inst.find_children("*", "MeshInstance3D", true, false):
-			found[String(m.name)] = m.mesh
+		var kinds := inst.find_children("*", "Node3D", true, false).filter(func(n): return n.has_meta("extras") and n.has_node("Skeleton3D"))
+		for n in kinds:
+			n.get_parent().remove_child(n)
+			for d in n.find_children("*", "", true, false):
+				d.owner = n
+			var ps := PackedScene.new()
+			ps.pack(n)
+			var ex: Dictionary = n.get_meta("extras")
+			found[String(n.name)] = [ps, ex.get("joints", []), ex.get("shapes", [])]
+			n.free()
 		inst.free()
-		_piece_meshes[key] = found
-	return _piece_meshes[key]
+		_piece_kinds[key] = found
+	return _piece_kinds[key]
 
 
 ## Decay stage name: "Fresh", "Rigor", "Bloated", "Putrid" or "Dried".

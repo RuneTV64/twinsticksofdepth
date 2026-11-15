@@ -3,7 +3,9 @@
 // Every zombie was a person, so it starts from that person's living skin tone, freckles, vitiligo, age and hair
 // (the same data as the living skin shader, from skin_tones.js), drained and grey when fresh, waxy in rigor, and
 // evened out by the rot from bloat on.
-// Usage: node gen_decay_shader.js zombie_skin.gdshader zombie_decay.gdshader
+// Usage: node gen_decay_shader.js zombie_skin.gdshader zombie_decay.gdshader [zombie_decay_piece.gdshader]
+// The optional third file is the version for the cut-off pieces: the same shader, plus `dissolve` to fade them away.
+// It's a separate file because a shader that can discard pixels costs more for everything that uses it.
 const fs = require('fs');
 const src = fs.readFileSync(process.argv[2], 'utf8');
 const ST = require('./skin_tones.js');
@@ -579,3 +581,12 @@ void fragment() {${fragHead}	// ---------------- decay
 if (/SKIN[012]\[|DECAY\[|FLESH\[/.test(out)) throw new Error('old palette still referenced');
 fs.writeFileSync(process.argv[3], out);
 console.log('wrote', process.argv[3], out.length, 'chars,', RAMPS.length, 'ramps');
+if (process.argv[4]) {
+  const head = '// The cut-off pieces\' version of zombie_decay.gdshader (made by gen_decay_shader.js with it; don\'t edit either by hand):\n' +
+    '// the same shader, plus `dissolve` (0 whole, 1 gone), which fades a rotted piece away in a dithered dissolve.\n';
+  let piece = out.replace('instance uniform float neck_blood', 'instance uniform float dissolve : hint_range(0.0, 1.0) = 0.0;   // fading away: 0 whole, 1 gone\ninstance uniform float neck_blood');
+  piece = piece.replace('void fragment() {', 'void fragment() {\n\tif(dissolve>0.0&&0.55*b4(floor(FRAGCOORD.xy/pixel_size))+0.45*vno(v_body*70.0+decay_seed)<dissolve*1.2)discard;   // fade away in a dither');
+  if (piece === out || !piece.includes('discard')) throw new Error('piece variant not made');
+  fs.writeFileSync(process.argv[4], head + piece);
+  console.log('wrote', process.argv[4]);
+}

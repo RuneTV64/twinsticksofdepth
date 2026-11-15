@@ -47,8 +47,8 @@ function buildBase(detail){
     return{name:p.name,slot:slotOf(p.name),P:new Float32Array(s.P0),N:new Float32Array(s.N0),I:Uint32Array.from(p.I),J,W,UV,UV2,COL};});
   // bone names, in the same order and spelling as MaleBody_Muscular's exporter
   const names=['Hips','Chest','Neck','ClavicleL','ClavicleR'];for(const sd of['L','R'])for(const n of['Thigh','Calf','Foot','UpperArm','UpperArmRoll','Forearm','ForearmRoll','Hand'])names.push(n+sd);
-  names.push('Head');parts.forEach(p=>{if(p.jp)names.push(p.name[0].toUpperCase()+p.name.slice(1));});if(names.length!==rig.bones)throw new Error('bone names '+names.length);
-  return{detail,parts:out,names,piv:X.piv.map(v=>v.slice()),par:X.par.slice(),BL:X.BL,BR:X.BR,HD:X.HD,NB:rig.bones,S,DK:detail,K:AN.skinTable(out.find(p=>p.name==='torso'))};
+  names.push('Head');const hinge={};parts.forEach(p=>{if(p.jp){const n=p.name[0].toUpperCase()+p.name.slice(1);names.push(n);hinge[n]=unit(p.jh);}});if(names.length!==rig.bones)throw new Error('bone names '+names.length);
+  return{detail,parts:out,names,hinge,piv:X.piv.map(v=>v.slice()),par:X.par.slice(),BL:X.BL,BR:X.BR,HD:X.HD,NB:rig.bones,S,DK:detail,K:AN.skinTable(out.find(p=>p.name==='torso'))};
 }
 
 // ---------- geometry helpers ----------
@@ -393,7 +393,51 @@ function buildPiece(B,slot,from){const v=makeVariant(B,slot,from),off=offSide(B,
     let NN=null;for(let i=0;i<p.N.length/3;i++){if(Math.hypot(p.N[i*3],p.N[i*3+1],p.N[i*3+2])>.5)continue;NN=NN||normals(p.P,p.I);
       const l=Math.hypot(NN[i*3],NN[i*3+1],NN[i*3+2]);if(l>.5)for(let k=0;k<3;k++)p.N[i*3+k]=NN[i*3+k];else{p.N[i*3]=0;p.N[i*3+1]=1;p.N[i*3+2]=0;}}});
   const bi=B.names.indexOf(PIECE_BONE[slot]);if(bi<0)throw new Error('no bone '+PIECE_BONE[slot]);
-  return{slot,from,name:slot+'_'+from,parts:out,bone:PIECE_BONE[slot],pivot:B.piv[bi].slice(),mass:PIECE_MASS[head?'Head':slot.slice(0,3)]};}
+  // A small skeleton of its own, so the piece isn't rigid: the bone it hangs from as the root, and every bone below it
+  // (the hand and fingers, or the foot and toes). Weights on bones above the root (the forearm, the neck) go to the root.
+  const bones=[bi];for(let k=0;k<bones.length;k++)B.par.forEach((pp,c)=>{if(pp===bones[k])bones.push(c);});
+  const map=new Map(bones.map((b,k)=>[b,k]));
+  out.forEach(p=>{for(let i=0;i<p.P.length/3;i++){const w=new Map();for(let k=0;k<4;k++){if(p.W[i*4+k]<=0)continue;const j=map.has(p.J[i*4+k])?map.get(p.J[i*4+k]):0;w.set(j,(w.get(j)||0)+p.W[i*4+k]);}
+    const e=[...w.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4),sum=e.reduce((a,x)=>a+x[1],0)||1;for(let k=0;k<4;k++){p.J[i*4+k]=e[k]?e[k][0]:0;p.W[i*4+k]=e[k]?e[k][1]/sum:0;}if(!e.length)p.W[i*4]=1;}});
+  return{slot,from,name:slot+'_'+from,parts:out,bone:PIECE_BONE[slot],pivot:B.piv[bi].slice(),mass:PIECE_MASS[head?'Head':slot.slice(0,3)],
+    bones:bones.map(b=>B.names[b]),parents:bones.map(b=>b===bi?-1:map.get(B.par[b])),rest:bones.map(b=>sub(B.piv[b],B.piv[bi])),joints:pieceJoints(B,bones,bi),
+    shapes:head?null:pieceShapes(B,slot,out,off,B.piv[bi])};}
+
+// Collision for an arm or leg piece: two capsules, one along the forearm or shin from the cut to the wrist or ankle,
+// one along the hand or foot. Rounded, so a piece can't stand on its flat cut. [{a, b, r}] in the piece's frame.
+function pieceShapes(B,slot,parts,off,P0){const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],mul=(a,k)=>[a[0]*k,a[1]*k,a[2]*k],sd=slot.slice(-1),arm=slot.indexOf('Arm')===0,loc=(x,y,z)=>[x-P0[0],y-P0[1],z-P0[2]];
+  const main=parts.find(p=>p.name===(arm?'forearm':'calf')+sd),dist=parts.filter(p=>arm?/^(hand|index|middle|ring|pinky|thumb)/.test(p.name):/^(foot|toe)/.test(p.name));
+  const jn=arm?'Hand'+sd:'Foot'+sd,J=loc(...B.piv[B.names.indexOf(jn)]);
+  // the middle of the cut: skin just on the piece's side of it
+  let cut=[0,0,0],n=0;for(let i=0;i<main.P.length/3;i++){const x=main.P[i*3],y=main.P[i*3+1],z=main.P[i*3+2],d=off(x,y,z);if(d>0&&d<.008){const q=loc(x,y,z);cut=add(cut,q);n++;}}cut=mul(cut,1/Math.max(1,n));
+  // its radius: how far the skin is from that line, along the middle of the segment
+  const ax=unit(sub(J,cut)),L=len(sub(J,cut)),rs=[];for(let i=0;i<main.P.length/3;i++){const q=loc(main.P[i*3],main.P[i*3+1],main.P[i*3+2]),t=dot(sub(q,cut),ax);if(t>L*.25&&t<L*.75)rs.push(len(sub(sub(q,cut),mul(ax,t))));}
+  rs.sort((a,b)=>a-b);const r1=(rs[rs.length>>1]||.03)*.9;
+  // the hand or foot: from the wrist or ankle (for a foot, from the heel) out to the furthest point, through its middle
+  const pts=[];dist.forEach(p=>{for(let i=0;i<p.P.length/3;i++)pts.push(loc(p.P[i*3],p.P[i*3+1],p.P[i*3+2]));});
+  let far=J,fd=0;pts.forEach(q=>{const d=len(sub(q,J));if(d>fd){fd=d;far=q;}});
+  let a2=J;if(!arm){let back=J,bd=-1;const fwd=unit(sub(far,J));pts.forEach(q=>{const d=-dot(sub(q,J),fwd);if(d>bd){bd=d;back=q;}});a2=back;}
+  const ax2=unit(sub(far,a2)),r2s=[];pts.forEach(q=>{const t=dot(sub(q,a2),ax2);r2s.push(len(sub(sub(q,a2),mul(ax2,t))));});r2s.sort((a,b)=>a-b);
+  const r2=Math.min(arm?.024:.034,(r2s[Math.floor(r2s.length*.6)]||.02)),inset=v=>add(v,mul(ax2,0));
+  const R=v=>v.map(x=>+x.toFixed(4));
+  return[{a:R(cut),b:R(J),r:+r1.toFixed(4)},{a:R(add(a2,mul(ax2,r2*.6))),b:R(sub(far,mul(ax2,r2*.6))),r:+r2.toFixed(4)}];}
+
+// How each joint of a piece may move, for the game's limp-limb motion. Measured on the body at rest, in the piece's
+// own frame (metres from the root bone): `tip` is where the segment ends (its first child, or the fingertip), and a
+// joint is a ball (wrist, ankle: it swings within `cone` radians of rest) or a hinge (finger, thumb, toe: it turns
+// about `hinge`, from `lo` to `hi` radians of flexion counted from rest, where `flex` says which way flexion turns).
+function pieceJoints(B,bones,root){const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],P0=B.piv[root],at=b=>sub(B.piv[b],P0),kids=b=>bones.filter(c=>B.par[c]===b),nm=b=>B.names[b];
+  const tipOf=b=>{const k=kids(b).filter(c=>!/^Thumb/.test(nm(c)));if(k.length){const t=[0,0,0];k.forEach(c=>{const q=at(c);t[0]+=q[0]/k.length;t[1]+=q[1]/k.length;t[2]+=q[2]/k.length;});return t;}
+    const part=B.parts.find(p=>p.name===nm(b)[0].toLowerCase()+nm(b).slice(1));if(!part)return at(b);   // a fingertip: the far end of its own segment
+    let best=null,bd=-1;for(let i=0;i<part.P.length/3;i++){const q=[part.P[i*3]-P0[0],part.P[i*3+1]-P0[1],part.P[i*3+2]-P0[2]],d=len(sub(q,at(b)));if(d>bd){bd=d;best=q;}}return best;};
+  const RANGE={1:[-.3,1.3],2:[-.4,1.2],3:[-.3,1.0]},out=[];
+  bones.forEach((b,k)=>{if(b===root)return;const n=nm(b),tip=tipOf(b),dir=unit(sub(tip,at(b))),j={bone:n,tip:tip.map(v=>+v.toFixed(5))};
+    if(/^(Hand|Foot)/.test(n)){j.kind='ball';j.cone=/^Hand/.test(n)?1.2:.6;}
+    else{const h=B.hinge[n]||[1,0,0],pb=B.par[b],pd=unit(sub(tipOf(pb),at(pb))),cr=cross(pd,dir),sg=dot(cr,h)<-1e-4?-1:1,seg=+n.slice(-1);
+      j.kind='hinge';j.hinge=h.map(v=>+v.toFixed(5));j.flex=sg;
+      [j.lo,j.hi]=/^Toe/.test(n)?[-.5,.6]:/^Thumb/.test(n)?(seg===1?[-.35,.35]:[-.2,1.1]):RANGE[seg];}
+    out.push(j);});
+  return out;}
 function buildPieces(detail){const B=buildBase(detail);return{B,pieces:PIECES.map(([sl,st])=>buildPiece(B,sl,st))};}
 
 // merge a variant's parts into one primitive's arrays
