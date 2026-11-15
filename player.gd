@@ -1063,7 +1063,7 @@ func take_attack(amount: float, dir: Vector3, knock: float, attacker: Enemy = nu
 		_spend_guard(amount * block_stamina_per_damage)
 		return
 	take_damage(amount, dir, knock)
-	if not dead:
+	if not dead and not invulnerable:
 		show_status("Hit! -%d HP" % roundi(amount), 0.8)
 
 
@@ -1100,7 +1100,7 @@ func is_held_by(e: Enemy) -> bool:
 ## A bite from a zombie that has hold of you. Your guard can't stop it: you have to get loose first.
 func take_bite(amount: float, dir: Vector3, _e: Enemy) -> void:
 	take_damage(amount, dir, 1.0)
-	if not dead:
+	if not dead and not invulnerable:
 		show_status("Bitten! -%d HP" % roundi(amount), 0.9)
 
 

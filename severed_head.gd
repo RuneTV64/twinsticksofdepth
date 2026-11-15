@@ -32,5 +32,5 @@ func _physics_process(delta: float) -> void:
 	if randf() < bite_chance * delta:
 		_cd = bite_cooldown
 		player.take_damage(bite_damage, to.normalized(), 0.0)
-		if not player.dead:
+		if not player.dead and not player.invulnerable:
 			player.show_status("A severed head bit you! -%d HP" % roundi(bite_damage), 1.4)

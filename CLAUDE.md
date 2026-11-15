@@ -132,6 +132,10 @@ changes, update both, and keep them the same files.
   and `ZombieBody.new_zombie()` builds a fresh shambler on respawn: about 100 values per zombie. Forward+ has 65,536
   by default (about 650 zombies; raise `rendering/limits/global_shader_variables/buffer_size` for more). A
   dismembered part's old mesh keeps its block until respawn. (Compatibility would only fit about 40; it isn't used.)
+- Physics is Jolt (project setting, 15 Nov 2026). Owner's crowd test (F5/F6/F7, readout top right) on an RTX 5070,
+  126 zombies piled on the player: Godot physics 33 FPS, physics tick 20.3 ms (posing 5.2, zombie AI+movement 7.2);
+  Jolt 66 FPS, 16.4 ms (posing 5.4, AI+movement 4.7). CPU-bound, not GPU. Next candidates: zombies stop colliding
+  with each other (steering apart instead), lower update rates far up the screen, then C++ posing once poses settle.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera (`low_beyond` 21 m,
   `mid_within` 19.5 m; on screen zombies are 15 to 29 m away), at most 2 swaps a frame. Godot's automatic mesh LODs
   are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.
