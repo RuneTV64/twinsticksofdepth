@@ -18,7 +18,11 @@ Godot 4 twin-stick game. Everything in the level is built in code (see README.md
   yellow, olive). Living skin tone groups are named by heritage (European, African, Latin American, Asian,
   Middle Eastern & South Asian) and tones get material or pigment names (European: Porcelain, Cream, Fawn;
   African: Umber, Mahogany, Ebony; Latin American: Golden, Copper, Bronze; Asian: Wheat, Honey, Almond;
-  Middle Eastern & South Asian: Sand, Caramel, Chestnut). Zombie complexions are light, medium, deep.
+  Middle Eastern & South Asian: Sand, Caramel, Chestnut).
+- Zombies use the same skin tones and looks as the living (skin_tones.js feeds both the living skin shader and
+  zombie_decay.gdshader; shambler.gd rolls through LivingBody.roll_look()), so a person keeps who they were when
+  they turn. Build types (skinny, husky, obese) are on hold; the body recipe can make them later without new
+  shaders.
 
 ## Where game design assets live
 
