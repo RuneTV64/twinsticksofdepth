@@ -46,6 +46,11 @@ const PLAY_STATES := {"Head": ["Decapitated"]}       # only switched to in play
 @export var gore_range := Vector2(0.15, 0.85)
 @export var skin_shader: Shader = preload("zombie_decay.gdshader")
 
+## Draw the parts shown as one merged mesh (one draw call, one shadow, one set of per-shambler shader values) instead
+## of 6 or 7 separate ones. Shamblers with the same model and the same parts share the merged mesh; a new mix is
+## built once, the first time it's needed (when a part comes off, too). Off: the part meshes are shown as they are.
+@export var merge_parts := true
+
 @export_group("Pieces")
 ## ShamblerMale_Muscular_Pieces.glb (or _mid or _low). When set, dismember() throws off the part that came away as a
 ## physics piece, made from that part as it looked (Intact or Rotted, or a Destroyed head).
@@ -75,6 +80,8 @@ var grime := 0.5
 var neck_blood := 0.0    # set from the head's state: 1 decapitated, less for a torn neck
 
 var _meshes := {}        # "Slot_State" -> MeshInstance3D
+var _merged: MeshInstance3D   # the parts shown, as one mesh (merge_parts)
+static var _merged_cache := {}   # "model id|Head_Intact|Torso_Rotted|..." -> ArrayMesh, shared by every shambler with that mix
 var _skeleton: Skeleton3D
 static var _material: ShaderMaterial
 const PIECE_BONE := {"Head": "Head", "ArmL": "ForearmRollL", "ArmR": "ForearmRollR", "LegL": "CalfL", "LegR": "CalfR"}
@@ -199,11 +206,16 @@ func show_parts(picked: Dictionary) -> void:
 		parts[slot] = picked.get(slot, "Intact")
 	is_crawler = parts["LegL"] == "Destroyed" or parts["LegR"] == "Destroyed"
 	is_decapitated = parts["Head"] == "Decapitated"
+	var shown_keys: Array[String] = []
 	for key in _meshes:
 		var bits := String(key).split("_")
 		var shown: bool = parts[bits[0]] == bits[1]
-		_meshes[key].visible = shown
-		_meshes[key].material_override = _material if shown else null
+		if shown:
+			shown_keys.append(key)
+		_meshes[key].visible = shown and not merge_parts
+		_meshes[key].material_override = _material if shown and not merge_parts else null
+	if merge_parts:
+		_show_merged(shown_keys)
 	# a head that's off, or a torn neck, bleeds down over the shoulders, chest and back
 	neck_blood = {"Decapitated": 1.0, "Destroyed": 0.5, "Rotted": 0.3}.get(parts["Head"], 0.0)
 	_apply_skin()
@@ -331,9 +343,93 @@ func rigor() -> float:
 
 
 func _apply_skin() -> void:
+	for m in shown_meshes():
+		_skin_params(m)
+
+
+## The mesh instances that carry the skin now: the merged mesh, or with merge_parts off the part meshes shown.
+func shown_meshes() -> Array[MeshInstance3D]:
+	var out: Array[MeshInstance3D] = []
+	if merge_parts:
+		if _merged != null:
+			out.append(_merged)
+		return out
 	for m in _meshes.values():
 		if m.visible and m.material_override != null:   # only the parts shown (see _ready)
-			_skin_params(m)
+			out.append(m)
+	return out
+
+
+# Show the given part meshes as one merged mesh, built (or found in the cache) for exactly that mix.
+func _show_merged(keys: Array[String]) -> void:
+	if keys.is_empty() or _skeleton == null:
+		return
+	keys.sort()
+	var first: MeshInstance3D = _meshes[keys[0]]
+	var id := "%d|%s" % [first.mesh.get_instance_id(), "|".join(keys)]
+	var mesh: ArrayMesh = _merged_cache.get(id)
+	if mesh == null:
+		var parts_list: Array[Mesh] = []
+		for k in keys:
+			parts_list.append((_meshes[k] as MeshInstance3D).mesh)
+		mesh = merge_meshes(parts_list)
+		_merged_cache[id] = mesh
+		if _merged_cache.size() > 160:
+			_prune_merged_cache()
+	if _merged == null:
+		_merged = MeshInstance3D.new()
+		_merged.name = "Merged"
+		_skeleton.add_child(_merged)
+		_merged.skeleton = NodePath("..")
+		_merged.skin = first.skin
+		_merged.extra_cull_margin = first.extra_cull_margin
+		_merged.lod_bias = first.lod_bias
+	_merged.mesh = mesh
+	_merged.material_override = _material
+	_merged.visible = true
+
+
+## One mesh of one surface from several skinned meshes on the same skeleton (same skin, same vertex format).
+static func merge_meshes(meshes: Array[Mesh]) -> ArrayMesh:
+	var out := []
+	out.resize(Mesh.ARRAY_MAX)
+	var fmt := 0
+	var base := 0
+	var idx := PackedInt32Array()
+	for m in meshes:
+		for s in m.get_surface_count():
+			var a := m.surface_get_arrays(s)
+			fmt |= m.surface_get_format(s)
+			var n: int = (a[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+			for k in Mesh.ARRAY_MAX:
+				if k == Mesh.ARRAY_INDEX or a[k] == null:
+					continue
+				if out[k] == null:
+					out[k] = a[k].duplicate()
+				else:
+					out[k].append_array(a[k])
+			var src: PackedInt32Array = a[Mesh.ARRAY_INDEX] if a[Mesh.ARRAY_INDEX] != null else PackedInt32Array(range(n))
+			var at := idx.size()
+			idx.resize(at + src.size())
+			for i in src.size():
+				idx[at + i] = src[i] + base
+			base += n
+	out[Mesh.ARRAY_INDEX] = idx
+	# keep the custom channels' formats (the rest position the shader paints from) and the bone-weight count
+	var keep := Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS
+	for shift in [Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT, Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT, Mesh.ARRAY_FORMAT_CUSTOM2_SHIFT,
+			Mesh.ARRAY_FORMAT_CUSTOM3_SHIFT]:
+		keep |= Mesh.ARRAY_FORMAT_CUSTOM_MASK << shift
+	var am := ArrayMesh.new()
+	am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, out, [], {}, fmt & keep)
+	return am
+
+
+# Drop merged meshes no shambler uses any more (only the cache holds them).
+static func _prune_merged_cache() -> void:
+	for id in _merged_cache.keys():
+		if (_merged_cache[id] as ArrayMesh).get_reference_count() <= 1:
+			_merged_cache.erase(id)
 
 
 func _skin_params(m: GeometryInstance3D) -> void:

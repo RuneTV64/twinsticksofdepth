@@ -394,9 +394,8 @@ func set_fade(alpha: float) -> void:
 	if d == _dissolve:
 		return   # unchanged (nearly always): sending it to every part each tick was a real cost in a crowd
 	_dissolve = d
-	for m in shambler.get("_meshes").values():
-		if (m as MeshInstance3D).visible:
-			(m as GeometryInstance3D).set_instance_shader_parameter("dissolve", d)
+	for m in shambler.call("shown_meshes"):
+		(m as GeometryInstance3D).set_instance_shader_parameter("dissolve", d)
 
 
 func _on_piece(slot: String, piece: Node) -> void:
@@ -696,7 +695,7 @@ func _pose_fingers(k: int, stiff: float) -> void:
 func _aim_light_at_sun() -> void:
 	if shambler == null:
 		return
-	for m in shambler.get("_meshes").values():
+	for m in shambler.call("shown_meshes"):
 		_light_material((m as MeshInstance3D).material_override as ShaderMaterial)
 		break
 

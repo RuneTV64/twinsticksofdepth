@@ -164,7 +164,13 @@ changes, update both, and keep them the same files.
   `full_rate_count` (30) within 6 m pose at 60/s, the rest of the crowd within 14 m at 30/s. Zombies reaching for,
   holding, biting or lunging at the player always pose at 60/s. A 226-pile: 83 -> 30 zombies at 60/s (all 226
   within 6 m would be about 13,600 -> 7,700 poses/s). The cloud machine runs at ~7 FPS, below every posing rate,
-  so it can't show rate limits; count rates (`rate_snapshot`) instead of timing them there.
+  so it can't show rate limits; count rates (`rate_snapshot`) instead of timing them there. Owner's PC with it:
+  226-zombie pile 28 -> 45 FPS; horde walking in 77 -> 98 FPS.
+- Merged meshes: `shambler.gd` (`merge_parts`, on) shows the parts as one merged mesh (one surface, same skin), so a
+  zombie is 1 draw call (+ shadow) and 16 per-object shader values instead of 6-7 meshes. Merged meshes are cached by
+  model and mix of parts and shared; a new mix takes ~1-4 ms to build once (dismembering may build one). 126
+  zombies: draw calls 2,370 -> 558, zombie meshes 756 -> 126; even Compatibility no longer overflows its shader
+  values. Exact: same vertices, triangles and data channels as the parts.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera (`low_beyond` 21 m,
   `mid_within` 19.5 m; on screen zombies are 15 to 29 m away), at most 2 swaps a frame. Godot's automatic mesh LODs
   are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.

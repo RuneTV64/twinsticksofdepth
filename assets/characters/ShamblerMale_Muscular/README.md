@@ -11,6 +11,10 @@ reserves 16 per-object shader values for every mesh that has any set, hidden or 
 of 300); and `copy_look(other)` makes a shambler the same zombie as another, for swapping between detail levels.
 `shambler_piece.gd` changed once more (the owner's call, 15 Nov 2026): a piece rots in steps of `rot_step` (1 s),
 not every frame, so a floor full of pieces costs nothing between steps.
+And `shambler.gd` (owner's call, 15 Nov 2026) shows the parts as one merged mesh (`merge_parts`, on): one draw call,
+one shadow and one set of per-shambler shader values per shambler instead of 6 or 7. The merged mesh has exactly the
+parts' vertices, triangles and data (rest position included); shamblers with the same mix share it, and a new mix is
+built once, the first time it's needed. `shown_meshes()` returns what carries the skin now.
 
 ## Files
 
