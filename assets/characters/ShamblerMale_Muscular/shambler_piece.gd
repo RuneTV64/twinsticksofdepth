@@ -24,6 +24,8 @@ signal rotted_away(piece: ShamblerPiece)
 @export var rot_seconds := 180.0
 ## Seconds to fade away once it has rotted.
 @export var fade_seconds := 3.0
+## Seconds between rotting steps.
+@export var rot_step := 1.0
 ## Fade away and free itself once rotted. Off: it only sends rotted_away and stays, for the game to deal with.
 @export var auto_fade := true
 ## Seconds the freshly cut muscle twitches. Only when the piece came off a Fresh body.
@@ -39,6 +41,8 @@ var _links: Array[Dictionary] = []
 var _rest := {}          # bone index -> rest position (piece space)
 var _twitch := 0.0
 var _fading := -1.0
+var _rot_since := 0.0
+var _rot_wait := randf()   # time to the next rotting step; offset so a pile of pieces doesn't step together
 var _quiet := 0
 var _warm := 2   # physics steps the joints ride along rigidly first, so a throw's velocity has reached the body
 var _rng := RandomNumberGenerator.new()
@@ -96,8 +100,14 @@ func _tip_world(l: Dictionary) -> Vector3:
 func _process(delta: float) -> void:
 	if freshness == null:
 		return
-	if rot_seconds > 0.0 and freshness.value > 0.0:
-		freshness.value -= delta / rot_seconds
+	# It rots in steps of rot_step seconds, not every frame: a piece doesn't change visibly from one frame to the
+	# next, and a field of them shouldn't cost a little every frame each.
+	_rot_wait -= delta
+	_rot_since += delta
+	if rot_seconds > 0.0 and freshness.value > 0.0 and _rot_wait <= 0.0:
+		freshness.value -= _rot_since / rot_seconds   # all the time since the last step
+		_rot_since = 0.0
+		_rot_wait = rot_step
 		if mesh:
 			mesh.set_instance_shader_parameter("freshness", freshness.value)
 		if freshness.value <= 0.0:

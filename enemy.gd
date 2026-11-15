@@ -510,17 +510,17 @@ func _separation(delta: float) -> Array:
 
 ## A shambler's mind: where it wants to go this tick, and what it does when it gets there.
 func _think(delta: float) -> Vector3:
-	var rt := body.rot()
-	var stiff := clampf(body.rigor() + 0.6 * smoothstep(0.75, 1.0, rt), 0.0, 1.0)
-	var speed := move_speed * _pace * lerpf(1.0, 0.65, smoothstep(0.35, 0.9, rt)) * (1.0 - 0.15 * body.rigor())
+	# How decayed he is was worked out once, by the body (ZombieBody.refresh), not here every tick.
+	var stiff := body.stiff
+	var speed := move_speed * _pace * body.walk_mult
 	if crawling:
-		speed = crawl_speed * _pace * lerpf(1.0, 0.6, rt) * (0.6 + 0.2 * body.hands())
+		speed = crawl_speed * _pace * body.crawl_mult * (0.6 + 0.2 * body.hands())
 
 	# Falling apart: the furthest gone shed parts on their own now and then.
 	_apart_t -= delta
 	if _apart_t <= 0.0:
 		_apart_t = fall_apart_every * randf_range(0.5, 1.5)
-		if randf() < 0.6 * smoothstep(0.75, 1.0, rt):
+		if randf() < body.shed_chance:
 			_shed_part()
 
 	if player == null or player.dead:
@@ -588,7 +588,7 @@ func _think(delta: float) -> Vector3:
 				_set_state("lunge")
 			return Vector3.ZERO
 		"lunge":
-			var throw := lunge_speed * (0.45 if crawling else 1.0) * lerpf(1.0, 0.7, rt)
+			var throw := lunge_speed * (0.45 if crawling else 1.0) * lerpf(1.0, 0.7, body.rot_amt)
 			if not _bit and dist < 0.95 and d.dot(facing) > 0.3:
 				_bit = true
 				player.take_attack(bite_damage, d, 4.0, self)   # your guard shoves it off

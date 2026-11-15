@@ -9,6 +9,8 @@ The model and shaders didn't change for that. `shambler.gd` changed in two small
 15 Nov 2026): the skin material and its per-shambler values now go only on the parts being shown, because the renderer
 reserves 16 per-object shader values for every mesh that has any set, hidden or not (about 100 per shambler instead
 of 300); and `copy_look(other)` makes a shambler the same zombie as another, for swapping between detail levels.
+`shambler_piece.gd` changed once more (the owner's call, 15 Nov 2026): a piece rots in steps of `rot_step` (1 s),
+not every frame, so a floor full of pieces costs nothing between steps.
 
 ## Files
 

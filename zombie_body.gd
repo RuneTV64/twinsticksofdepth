@@ -211,14 +211,14 @@ func _make_shambler(path: String, from: Node3D, copy := true) -> bool:
 	shambler = sh
 	_skel = skels[0]
 	_dissolve = -1.0
-	_c_frame = -1
-	sh.connect("rolled", func(_p: Dictionary, _c: bool) -> void: _c_frame = -1)   # parts changed: re-read
+	sh.connect("rolled", func(_p: Dictionary, _c: bool) -> void: refresh())   # parts changed (or rolled anew)
 	sh.connect("piece_spawned", _on_piece)
 	for m in sh.find_children("*", "MeshInstance3D", true, false):
 		var gi := m as GeometryInstance3D
 		gi.extra_cull_margin = 1.5
 		# The shader reads per-vertex data the automatic simplified meshes don't keep; the low model is the far one.
 		gi.lod_bias = 64.0
+	refresh()
 	return true
 
 
@@ -266,70 +266,91 @@ func _bone(bone_name: String) -> int:
 
 
 # ====================================================================== what he has left
-# These are asked dozens of times per pose and per AI tick, so they're read from the shambler at most once a frame
-# (and again at once when its parts change: see _make_shambler).
-var _c_frame := -1
-var _c_parts := {}
-var _c_fresh := 1.0
-var _c_rigor := 0.0
+# His decay and what he has left, worked out once and kept: at spawn, when a part comes off (shambler.gd's `rolled`),
+# and if his Freshness ever changes (its `changed`; nothing ages a live zombie yet). Never per pose or per tick.
+var fresh := 1.0        # Freshness, 1 just turned .. 0 long dead
+var rot_amt := 0.0      # 1 - fresh
+var rigor_amt := 0.0    # rigor mortis, 0 loose .. 1 fully stiff
+var bloat_amt := 0.0    # swollen with gas (the Bloated stage)
+var drag := 0.2         # how badly the bad leg drags
+var frail := 0.0        # dried out, falling apart
+var stiff := 0.0        # rigor or dried stiffness: jerky, short-stepped
+var walk_mult := 1.0    # his walking speed against a fresh zombie's
+var crawl_mult := 1.0   # his crawling speed against a fresh zombie's (before counting hands)
+var shed_chance := 0.0  # chance, each fall_apart_every, that a part just comes off
+var _parts := {}
+var _hand: Array[bool] = [true, true]
+var _hands := 2
+var _legs := 2
+var _has_head := true
+var _fresh_src: Freshness
 
 
-func _cache() -> void:
-	var frame := Engine.get_process_frames()
-	if frame == _c_frame:
-		return
-	_c_frame = frame
+## Work out his decay and parts again. Called on its own when they change; call it after setting a look by hand
+## (shambler.set_skin) outside roll().
+func refresh() -> void:
 	if shambler == null:
-		_c_parts = {}
-		_c_fresh = 1.0
-		_c_rigor = 0.0
 		return
-	_c_parts = shambler.get("parts")
+	_parts = shambler.get("parts")
+	_hand = [_parts.get("ArmL", "Intact") != "Destroyed", _parts.get("ArmR", "Intact") != "Destroyed"]
+	_hands = int(_hand[0]) + int(_hand[1])
+	_legs = int(_parts.get("LegL", "Intact") != "Destroyed") + int(_parts.get("LegR", "Intact") != "Destroyed")
+	_has_head = _parts.get("Head", "Intact") != "Decapitated"
 	var f: Freshness = shambler.get("freshness")
-	_c_fresh = f.value if f != null else 1.0
-	_c_rigor = f.rigor() if f != null else 0.0
+	if f != _fresh_src:
+		if _fresh_src != null and _fresh_src.changed.is_connected(refresh):
+			_fresh_src.changed.disconnect(refresh)
+		_fresh_src = f
+		if f != null:
+			f.changed.connect(refresh)
+	fresh = f.value if f != null else 1.0
+	rigor_amt = f.rigor() if f != null else 0.0
+	rot_amt = 1.0 - fresh
+	bloat_amt = smoothstep(0.7, 0.6, fresh) * smoothstep(0.3, 0.45, fresh)
+	drag = 0.2 + 0.8 * smoothstep(0.35, 0.85, rot_amt)
+	frail = smoothstep(0.75, 1.0, rot_amt)
+	stiff = clampf(rigor_amt + 0.6 * frail, 0.0, 1.0)
+	walk_mult = lerpf(1.0, 0.65, smoothstep(0.35, 0.9, rot_amt)) * (1.0 - 0.15 * rigor_amt)
+	crawl_mult = lerpf(1.0, 0.6, rot_amt)
+	shed_chance = 0.6 * frail
 
 
 func part(slot: String) -> String:
-	_cache()
-	return _c_parts.get(slot, "Intact")
+	return _parts.get(slot, "Intact")
 
 
 func has_hand(k: int) -> bool:
-	return part("ArmL" if k == 0 else "ArmR") != "Destroyed"
+	return _hand[k]
 
 
 func hands() -> int:
-	return int(has_hand(0)) + int(has_hand(1))
+	return _hands
 
 
 func legs() -> int:
-	return int(part("LegL") != "Destroyed") + int(part("LegR") != "Destroyed")
+	return _legs
 
 
 func has_head() -> bool:
-	return part("Head") != "Decapitated"
+	return _has_head
 
 
 func freshness() -> float:
-	_cache()
-	return _c_fresh
+	return fresh
 
 
 func rigor() -> float:
-	_cache()
-	return _c_rigor
+	return rigor_amt
 
 
 ## How far rot slows and breaks his movement: 0 fresh, 1 as far gone as it gets.
 func rot() -> float:
-	return 1.0 - freshness()
+	return rot_amt
 
 
 ## Swollen with gas, in the Bloated stage: heavier on his feet, leaning back over the belly.
 func bloat() -> float:
-	var f := freshness()
-	return smoothstep(0.7, 0.6, f) * smoothstep(0.3, 0.45, f)
+	return bloat_amt
 
 
 ## Take a part off (see shambler.gd); the piece flies off pushed by impulse.
@@ -376,13 +397,8 @@ func animate(e: Enemy, delta: float) -> void:
 		_prone_w = 1.0 if e.crawling else 0.0   # spawned lying down: no fall
 		_dead_w = 0.0
 
-	var f := freshness()
-	var rt := 1.0 - f
-	var rig := rigor()
-	var blo := bloat()
-	var drag := 0.2 + 0.8 * smoothstep(0.35, 0.85, rt)      # how badly the bad leg drags
-	var frail := smoothstep(0.75, 1.0, rt)                  # dried out, falling apart
-	var stiff := clampf(rig + 0.6 * frail, 0.0, 1.0)
+	var rt := rot_amt
+	var blo := bloat_amt
 
 	var fwd := e.facing
 	var left := Vector3.UP.cross(fwd)

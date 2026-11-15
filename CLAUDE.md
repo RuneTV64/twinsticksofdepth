@@ -154,6 +154,12 @@ changes, update both, and keep them the same files.
   `half_rate_beyond` 14 m that are only walking/crawling think and move every other tick covering two (cloud, crowd
   walking in from 21-35 m: zombie AI work -27%, physics keeps 60 ticks/s); close-up posing is capped at 60/s.
   The cloud machine's numbers swing a lot between runs; compare per-second work, and trust the owner's PC.
+- Owner's rule (15 Nov 2026): don't track slow things every tick. A zombie's decay and parts are worked out once
+  (`ZombieBody.refresh()`: at spawn, when a part comes off, if Freshness changes) into fields (`stiff`, `drag`,
+  `walk_mult`...) that posing and AI read; nothing re-derives them per tick. Cut-off pieces rot in `rot_step` 1 s
+  steps, not every frame. Build later time-based systems (world time, seasons, the clean-up lore) the same way:
+  event-driven or on a slow clock. Owner's PC then: horde walking in, 226 zombies 77 FPS; piled on the player, 28 FPS
+  (posing 11.4 ms/frame: everyone is within 6 m, so all pose at 60/s).
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera (`low_beyond` 21 m,
   `mid_within` 19.5 m; on screen zombies are 15 to 29 m away), at most 2 swaps a frame. Godot's automatic mesh LODs
   are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.
