@@ -7,8 +7,10 @@ Godot 4 twin-stick game. Everything in the level is built in code (see README.md
 - **Zombies** is the name for the undead as a whole group.
 - **Shamblers** are one kind of zombie: the most common, slow, and they walk straight at you. Other kinds will get
   their own nicknames, with different AI and some different physical features.
-- Shamblers come in all the same body types as the living, and in every complexion, because they were people.
-  So shaders and scripts made for them are named for shamblers (e.g. `shambler_decay.gdshader`), not "zombie".
+- Every zombie is made from a person, so most use the same base body models as the living, in every body type and
+  complexion. Late-stage zombies will get a couple of variant models of their own.
+- Time passes in the game, with seasons. A zombie's Freshness (see freshness.gd) is meant to move on with it, so
+  zombies age through the decay stages into those late-stage forms.
 - Skin tones: don't use "olive" as a tone name, since it's tied to a particular ethnic group. Use descriptive
   names (the white group is Pale, Light, Tan; shambler complexions are fair, tan, dark).
 
