@@ -49,10 +49,24 @@ extends CharacterBody3D
 @export var corpse_time := 30.0        # s a dead zombie lies there before it fades (stand-in for the clean-up lore)
 @export var fall_apart_every := 20.0   # s: how often the most rotted get a chance to shed a part on their own
 
+@export_group("Crowd")
+## Zombies closer than this (m, centre to centre) push apart; crawlers, lying longer, keep a bit more room.
+@export var personal_space := 0.75
+## How hard they push apart (m/s at full overlap). Higher packs a horde looser; lower lets it bunch.
+@export var separation := 3.0
+## Closer than this (m) two zombies are pushed straight back out to it within a tick: bodies don't overlap.
+@export var min_gap := 0.55
+
 ## Microseconds spent on zombies since the crowd readout last read them (main.gd, F5): posing the bodies, and
 ## everything else a zombie does each tick (thinking, moving, colliding).
 static var anim_usec := 0
 static var zombie_usec := 0
+
+# The crowd grid: every live zombie by 1 m cell, rebuilt once per physics tick by whichever zombie asks first, so
+# each one only checks the few zombies in the cells around it.
+const CELL := 1.0
+static var _grid := {}
+static var _grid_frame := -1
 
 var hp := 100.0
 var dead := false
@@ -85,6 +99,9 @@ var _bit := false
 var _down_t := 0.0
 var _apart_t := 0.0
 var _pace := 1.0                 # this zombie's own speed, rolled with it
+var _soft := Vector3.ZERO        # last push from the crowd around it
+var _hard := Vector3.ZERO
+var _crowd_slot := randi() % 2   # which ticks it looks up its neighbours
 var _mat: StandardMaterial3D
 var _visual: Node3D
 var _label: Label3D
@@ -94,7 +111,9 @@ var _base_color := Color(0.6, 0.55, 0.4)
 func _ready() -> void:
 	add_to_group("enemies")
 	collision_layer = 4
-	collision_mask = 1 | 2 | 4
+	# Zombies don't collide with each other (it's the costliest part of a crowd); they steer apart instead (see
+	# _separation). They still collide with walls, doors and the player. Dummies still block everything.
+	collision_mask = 1 | 2 | 4 if kind == "dummy" else 1 | 2
 	home = global_position
 	if kind == "shambler":
 		max_hp = shambler_hp
@@ -366,6 +385,22 @@ func _tick(delta: float) -> void:
 		hp = max_hp
 
 	_knock = _knock.move_toward(Vector3.ZERO, 18.0 * delta)
+	if kind == "shambler":
+		# Pushed apart by the zombies around it, and held back by those in front: a crowd presses in, it doesn't
+		# pour into one spot.
+		# Neighbours are looked up every other tick, half the crowd each tick; the soft push carries over between.
+		if (Engine.get_physics_frames() + _crowd_slot) % 2 == 0:
+			var sep := _separation(delta)
+			_soft = sep[0]
+			_hard = sep[1]
+		else:
+			_hard = Vector3.ZERO
+		var soft := _soft
+		if want != Vector3.ZERO and soft != Vector3.ZERO:
+			var wd := want.normalized()
+			var blocked := clampf(-soft.dot(wd), 0.0, 1.0)
+			want -= wd * want.length() * blocked
+		want += soft * separation + _hard
 	var horiz := want + _knock
 	velocity.x = horiz.x
 	velocity.z = horiz.z
@@ -392,6 +427,50 @@ func _tick(delta: float) -> void:
 		_mat.albedo_color = col
 	_label.visible = _since_hit < 2.5 and _alpha > 0.5
 	_label.text = "%d" % ceili(hp)
+
+
+## Away from the zombies crowding this one: [soft, hard]. Soft is 0 when no one is within personal space, growing
+## to 1 (and more with several) the closer they are. Hard is the speed that moves it out of any overlap closer than
+## min_gap this tick (half the overlap; the other zombie does the other half).
+func _separation(delta: float) -> Array:
+	var frame := Engine.get_physics_frames()
+	if frame != _grid_frame:
+		_grid_frame = frame
+		_grid.clear()
+		for n in get_tree().get_nodes_in_group("enemies"):
+			var z := n as Enemy
+			if z == null or z.dead or z.kind == "dummy":
+				continue
+			var k := Vector2i(floori(z.global_position.x / CELL), floori(z.global_position.z / CELL))
+			if _grid.has(k):
+				_grid[k].append(z)
+			else:
+				_grid[k] = [z]
+	var p := global_position
+	var cx := floori(p.x / CELL)
+	var cz := floori(p.z / CELL)
+	var push := Vector3.ZERO
+	var hard := Vector3.ZERO
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			var cell: Array = _grid.get(Vector2i(cx + dx, cz + dz), [])
+			for o: Enemy in cell:
+				if o == self:
+					continue
+				var r := personal_space + (0.25 if crawling or o.crawling else 0.0)
+				var d := Vector3(p.x - o.global_position.x, 0.0, p.z - o.global_position.z)
+				var l2 := d.length_squared()
+				if l2 >= r * r:
+					continue
+				if l2 < 0.0001:
+					d = Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))   # right on top: any way out
+					l2 = d.length_squared()
+				var l := sqrt(l2)
+				push += d / l * (1.0 - l / r)
+				var g := min_gap + (0.2 if crawling or o.crawling else 0.0)
+				if l < g:
+					hard += d / l * (g - l) * 0.5 / maxf(delta, 0.001)   # (looked up every other tick: catches up over two)
+	return [push, hard]
 
 
 ## A shambler's mind: where it wants to go this tick, and what it does when it gets there.

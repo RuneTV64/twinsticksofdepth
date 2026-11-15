@@ -104,6 +104,7 @@ var _hold_t := 0.0
 var _was_hurt := 0.0
 var _skip := 0
 var _first := true
+var _dissolve := -1.0           # the dissolve last sent to the parts; -1 = send next time
 var _low := false
 static var _swap_frame := -1
 static var _swaps := 0
@@ -204,6 +205,7 @@ func _make_shambler(path: String, from: Node3D, copy := true) -> bool:
 		return false
 	shambler = sh
 	_skel = skels[0]
+	_dissolve = -1.0
 	sh.connect("piece_spawned", _on_piece)
 	for m in sh.find_children("*", "MeshInstance3D", true, false):
 		var gi := m as GeometryInstance3D
@@ -296,6 +298,9 @@ func set_fade(alpha: float) -> void:
 	if shambler == null:
 		return
 	var d := clampf(1.0 - alpha, 0.0, 1.0)
+	if d == _dissolve:
+		return   # unchanged (nearly always): sending it to every part each tick was a real cost in a crowd
+	_dissolve = d
 	for m in shambler.get("_meshes").values():
 		if (m as MeshInstance3D).visible:
 			(m as GeometryInstance3D).set_instance_shader_parameter("dissolve", d)

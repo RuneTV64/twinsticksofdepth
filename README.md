@@ -58,6 +58,7 @@ All the feel settings are exported variables at the top of each script:
 - **player.gd:** `base_walk_speed`, `run_mult`, `ready_mult`, accel and decel, `fatigue_start`, `fatigue_min_speed`, `fatigue_min_accel`, turn speeds, `draw_time`, `sprint_tap_time`, `reticle_range` (shared by both stances; `look_range_bonus` and `aim_range_bonus` are set by gear such as binoculars or scopes), `ready_cam_lead`, mouse sensitivity, weapon stats.
 - **camera_rig.gd:** pitch, distance, FOV, `follow_sharpness`.
 - **door.gd:** toughness, locked, max swing angle.
+- **enemy.gd (Crowd):** `personal_space`, `separation` and `min_gap`: zombies don't collide with each other, they steer apart, so these set how tightly a horde packs.
 - **enemy.gd:** speed, aggro range, and the zombie abilities: grab range and windup, bite damage and timing, lunge, crawl speed, knockdown chance, limb and head loss, corpse time, falling apart.
 - **player.gd (held):** `held_speed_one`, `held_speed_two`, `struggle_per_wiggle`, `struggle_needed`, `break_free_cost`.
 - **zombie_body.gd:** `pose_sharpness`; the poses themselves are the numbers in `_pose_walk()` and `_pose_crawl()`.

@@ -134,8 +134,13 @@ changes, update both, and keep them the same files.
   dismembered part's old mesh keeps its block until respawn. (Compatibility would only fit about 40; it isn't used.)
 - Physics is Jolt (project setting, 15 Nov 2026). Owner's crowd test (F5/F6/F7, readout top right) on an RTX 5070,
   126 zombies piled on the player: Godot physics 33 FPS, physics tick 20.3 ms (posing 5.2, zombie AI+movement 7.2);
-  Jolt 66 FPS, 16.4 ms (posing 5.4, AI+movement 4.7). CPU-bound, not GPU. Next candidates: zombies stop colliding
-  with each other (steering apart instead), lower update rates far up the screen, then C++ posing once poses settle.
+  Jolt 66 FPS, 16.4 ms (posing 5.4, AI+movement 4.7). CPU-bound, not GPU.
+- Zombies don't collide with each other (mask 1|2): they steer apart (`enemy.gd` `_separation()`, a 1 m grid rebuilt
+  once per tick; soft push inside `personal_space` 0.75 m, hard push out of `min_gap` 0.55 m; neighbours looked up
+  every other tick, half the crowd each tick). The dissolve is only re-sent when it changes. Cloud bench, 226 zombies:
+  zombie AI+movement 20.2 -> 13.6 ms/tick (fade 5.1 -> 1.6, separation 2.5, move_and_slide 5.3, think 3.2); posing
+  ~19 ms/tick is now the biggest cost. Next candidates: lower update rates far up the screen, C++ posing once poses
+  settle.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera (`low_beyond` 21 m,
   `mid_within` 19.5 m; on screen zombies are 15 to 29 m away), at most 2 swaps a frame. Godot's automatic mesh LODs
   are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.
