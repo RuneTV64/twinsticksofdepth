@@ -37,7 +37,10 @@ devices and pulled into any chat. That covers models, shaders, asset scripts, pr
   them is under `source/`, preview renders under `preview/`, plus a README.md. List every file on the page with a
   short "what it is", and keep the asset's status pill (approved / in review) current.
 - When an asset changes, republish to the same artifact URL (read it first) instead of making a new one.
-- Art style: "8-shade 3D-Pixel" (the eight-shade-3d-pixel skill): 8-shade banded ramps, Bayer dither, dark and gritty.
+- Art style: "8-shade 3D-Pixel" (the eight-shade-3d-pixel skill): 8-shade banded ramps, Bayer dither.
+- "Dark and gritty" is the game's setting and themes, not a rule that every asset is dark. The mood comes from
+  places, lighting and story; assets get natural colors (a farmland area can be pretty). Don't darken palettes
+  just to look gritty: dead bodies go pale first and only darken as they rot, for example.
 
 ## Testing Godot assets in a cloud session
 
