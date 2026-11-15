@@ -105,6 +105,7 @@ var _crowd_slot := randi() % 2   # which ticks it looks up its neighbours
 var _mat: StandardMaterial3D
 var _visual: Node3D
 var _label: Label3D
+var _label_hp := -1              # the number the HP label shows now
 var _base_color := Color(0.6, 0.55, 0.4)
 
 
@@ -234,17 +235,23 @@ func hear_noise(pos: Vector3) -> void:
 
 ## You only see an enemy while it's in the player's view; out of it, it fades away (it is
 ## still there, still moving, still dangerous).
+## (Engine properties here are only set when they change: the owner's profiler showed this function as most of the
+## script time in a 226-zombie crowd, with every zombie re-setting them every tick.)
 func _update_fade(delta: float) -> void:
 	var seen := player == null or player.can_see(global_position)
 	_alpha = move_toward(_alpha, 1.0 if seen else 0.0, delta / maxf(fade_time, 0.01))
 	if body != null:
-		_visual.visible = _alpha > 0.02 or _corpse_t > 0.0
+		var show := _alpha > 0.02 or _corpse_t > 0.0
+		if _visual.visible != show:
+			_visual.visible = show
 		if not dead:
 			body.set_fade(_alpha)
 		return
-	_visual.visible = _alpha > 0.02
-	_mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED if _alpha > 0.99 \
-		else BaseMaterial3D.TRANSPARENCY_ALPHA
+	if _visual.visible != (_alpha > 0.02):
+		_visual.visible = _alpha > 0.02
+	var tr := BaseMaterial3D.TRANSPARENCY_DISABLED if _alpha > 0.99 else BaseMaterial3D.TRANSPARENCY_ALPHA
+	if _mat.transparency != tr:
+		_mat.transparency = tr
 
 
 ## Shoved back by the player: thrown along dir, no damage, and it needs a moment before it
@@ -427,8 +434,12 @@ func _tick(delta: float) -> void:
 		var col := Color(1, 1, 1) if _flash > 0.0 else _base_color
 		col.a = _alpha
 		_mat.albedo_color = col
-	_label.visible = _since_hit < 2.5 and _alpha > 0.5
-	_label.text = "%d" % ceili(hp)
+	var show_hp := _since_hit < 2.5 and _alpha > 0.5
+	if _label.visible != show_hp:
+		_label.visible = show_hp
+	if show_hp and _label_hp != ceili(hp):
+		_label_hp = ceili(hp)
+		_label.text = "%d" % _label_hp
 
 
 ## Away from the zombies crowding this one: [soft, hard]. Soft is 0 when no one is within personal space, growing
