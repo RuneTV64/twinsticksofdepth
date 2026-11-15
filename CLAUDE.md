@@ -49,6 +49,9 @@ devices and pulled into any chat. That covers models, shaders, asset scripts, pr
   each bone and organ is, and the shader follows the line of sight through it, so bones stand in front of organs
   and slide across them as the view moves. Check the layout against real anatomy (for example, ribs slope down to
   the front and are evenly spaced there, not bunched).
+- Colors of the insides follow real decay too. Bone is never white in a body (white is sun-bleached bone): ivory
+  and pink when fresh, yellow and greasy, stained dark by the rot, tan-brown when dried. Rib cartilage is
+  off-white, not the blue of anatomy diagrams.
 - Nothing hangs off the zombie model. Spilling guts, blood, bits of brain and intestine, and limbs flying off
   and piling up on the ground are live effects in the game (pixel particle effects and loose pieces), not part
   of the character model.
