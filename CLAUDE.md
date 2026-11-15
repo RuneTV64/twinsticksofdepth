@@ -26,8 +26,11 @@ Godot 4 twin-stick game. Everything in the level is built in code (see README.md
 
 ## Where game design assets live
 
-All game design assets go into our claude.ai **Artifacts**, not just this repo, so they can be shared across
-devices and pulled into any chat. That covers models, shaders, asset scripts, previews, design docs and plans.
+All game design assets go into our claude.ai **Artifacts**, so they can be shared across devices and pulled into
+any chat. That covers models, shaders, asset scripts, previews, design docs and plans. Finished character assets
+also live in this repo under `assets/characters/<AssetName>/`, in the form Godot uses (real `.glb`, `.gd`,
+`.gdshader`; `source/` and `preview/` carry a `.gdignore`). When an asset changes, update both, and keep them the
+same files.
 
 - Character assets: the **Godot Assets** artifact, https://claude.ai/artifact/WRBAYq3aDXi9hMi5zS2wzC
   (MaleBody_Muscular, MaleBody_Muscular_Skins, ShamblerMale_Muscular). Find others with the Artifact tool's
@@ -62,7 +65,7 @@ devices and pulled into any chat. That covers models, shaders, asset scripts, pr
 ## Character shaders: how they are built
 
 The living skin shader and the zombie decay shader are generated, not hand-written. Everything is in the Godot
-Assets artifact; nothing below is in this repo.
+Assets artifact and in `assets/characters/` (the recipe under each asset's `source/`).
 
 - A Godot project needs, for a shambler: the three `ShamblerMale_Muscular*.glb`, `zombie_decay.gdshader`,
   `shambler.gd`, `freshness.gd`, `living_body.gd` and `anatomy_map.gd`. For a living body: the three

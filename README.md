@@ -53,6 +53,8 @@ All the feel settings are exported variables at the top of each script:
 ## Files
 main.gd (level), player.gd, camera_rig.gd, door.gd, enemy.gd, projectile.gd, ammo_pickup.gd, hud.gd, input_setup.gd
 
+Character models and shaders (the base body, living skins, and the shambler) are in `assets/characters/`; see the README there. The level doesn't use them yet.
+
 ## Mouse note
 Ready and Attack read the mouse buttons three ways (button events, the held-button mask on every
 mouse event, and the OS button state), because some setups drop a left-click while the right
