@@ -1,6 +1,7 @@
 # Twin Sticks of Depth
 
-Godot 4 twin-stick zombie game (the owner works in Godot 4.7, Forward+). The level is built in code (see README.md);
+Godot 4 twin-stick zombie game (the owner works in Godot 4.7, Forward+). Targets: PC, maybe consoles later,
+designed for a controller. Forward+ only: no Compatibility renderer, no web or phone builds (owner, 15 Nov 2026). The level is built in code (see README.md);
 the character models, shaders and their scripts are in `assets/characters/` and in our claude.ai Artifacts.
 
 ## Working with the owner
@@ -127,8 +128,8 @@ changes, update both, and keep them the same files.
 - Per-object shader values: the renderer reserves a block of 16 for every mesh that has any instance uniform set,
   hidden or not (measured in 4.7.2). So `shambler.gd` puts the skin and its values only on the 6 or 7 parts shown,
   and `ZombieBody.new_zombie()` builds a fresh shambler on respawn: about 100 values per zombie. Forward+ has 65,536
-  by default (about 650 zombies; raise `rendering/limits/global_shader_variables/buffer_size` for more);
-  Compatibility has 4,096 (about 40). A dismembered part's old mesh keeps its block until respawn.
+  by default (about 650 zombies; raise `rendering/limits/global_shader_variables/buffer_size` for more). A
+  dismembered part's old mesh keeps its block until respawn. (Compatibility would only fit about 40; it isn't used.)
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera (`low_beyond` 21 m,
   `mid_within` 19.5 m; on screen zombies are 15 to 29 m away), at most 2 swaps a frame. Godot's automatic mesh LODs
   are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.
