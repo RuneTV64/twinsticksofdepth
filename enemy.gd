@@ -7,7 +7,7 @@ extends CharacterBody3D
 @export var kind := "dummy"
 @export var max_hp := 100.0            # dummies; shamblers use shambler_hp
 @export var shambler_hp := 50.0        # rotten and fragile: two shots, or a long beating with fists
-@export var move_speed := 2.3
+@export var move_speed := 1.5
 @export var aggro_range := 12.0
 @export var attack_range := 1.45
 @export var attack_damage := 10.0

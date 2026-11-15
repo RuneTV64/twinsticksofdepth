@@ -15,11 +15,11 @@ extends CharacterBody3D
 @export var dexterity := 10.0           # aimed-shot damage and headshot chance
 
 # Derived in recompute_stats()
-var walk_speed := 4.6
-var ready_speed := 3.0
-var run_speed := 6.7
-var dash_speed := 12.0
-var dash_time := 0.18
+var walk_speed := 2.1
+var ready_speed := 1.45
+var run_speed := 5.0
+var dash_speed := 8.0
+var dash_time := 0.3
 var max_stamina := 100.0
 var stamina_regen := 25.0
 var run_drain := 14.0
@@ -27,8 +27,9 @@ var dash_cost := 20.0
 var barge_min_speed := 5.3
 
 # ---------- Feel tuning ----------
-@export var base_walk_speed := 4.6      # walk speed at default stats, before burden/fitness
-@export var run_mult := 1.45            # run = walk x this
+@export var base_walk_speed := 2.1      # walk speed at default stats, before burden/fitness
+@export var run_mult := 2.1             # run = walk x this
+@export var ready_mult := 0.8           # Ready = walk x this
 @export var accel := 26.0               # lower = heavier start-up
 @export var decel := 30.0               # lower = longer slide to a stop
 @export var turn_speed := 14.0          # rad/s, weapon away
@@ -79,7 +80,7 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var punch_still_mult := 1.4     # planted feet hit a little harder than a punch on the move
 @export var punch_still_speed := 0.6    # m/s; slower than this counts as holding still
 @export var punch_miss_chance := 0.2    # chance a punch in range just doesn't connect
-@export var punch_range := 1.5          # meters
+@export var punch_range := 1.75         # meters
 @export var punch_arc_dot := 0.5        # target must be within this cone of your facing (dot)
 @export var punch_knock := 1.5
 @export var punch_windup := 0.1         # fresh: seconds from the punch starting to it landing
@@ -90,11 +91,11 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var melee_look_range := 2.5     # Ready unarmed: how far the (hidden) look point roams
 # Shove: automatic. Hold Ready unarmed, and when a zombie comes within reach in front of you,
 # you throw it back, along with any zombies right beside it. No damage; it buys space.
-@export var shove_interval := 0.7       # seconds before you can shove again
-@export var shove_range := 1.7          # meters; a zombie this close in front of you gets shoved
+@export var shove_interval := 0.75       # seconds before you can shove again
+@export var shove_range := 0.1          # meters; a zombie this close in front of you gets shoved
 @export var shove_arc_dot := 0.4        # "in front" = within this cone of your facing (dot)
 @export var shove_adjacent := 1.4       # meters; zombies this close to a shoved one go with it
-@export var shove_force := 9.0          # m/s the enemy is thrown back (about 2 m of travel)
+@export var shove_force := 9.0          # m/s the enemy is thrown back (about 1.5m of travel)
 @export var shove_cost := 12.0          # stamina per shove
 # Guard: Ready unarmed and facing an attacker stops its hit and costs stamina instead. Against
 # a zombie that is a last-moment shove before the bite. (Proper blocking is for fighting people.)
@@ -188,7 +189,7 @@ var _lmb_event := false
 var _has_mouse := DisplayServer.has_feature(DisplayServer.FEATURE_MOUSE)
 
 var _visual: Node3D
-var _body_mat: StandardMaterial3D
+var _body: PlayerBody          # the model, its skin shader and all its animation (player_body.gd)
 var _weapon: MeshInstance3D
 var _weapon_mesh: BoxMesh
 var _weapon_mat: StandardMaterial3D
@@ -212,25 +213,8 @@ func _ready() -> void:
 
 	_visual = Node3D.new()
 	add_child(_visual)
-	_body_mat = StandardMaterial3D.new()
-	_body_mat.albedo_color = Color(0.25, 0.45, 0.85)
-	var body := MeshInstance3D.new()
-	var cm := CapsuleMesh.new()
-	cm.radius = 0.4
-	cm.height = 1.8
-	body.mesh = cm
-	body.material_override = _body_mat
-	body.position.y = 0.9
-	_visual.add_child(body)
-	var nose := MeshInstance3D.new()
-	var nm := BoxMesh.new()
-	nm.size = Vector3(0.28, 0.14, 0.3)
-	nose.mesh = nm
-	var nose_mat := StandardMaterial3D.new()
-	nose_mat.albedo_color = Color(0.1, 0.12, 0.2)
-	nose.material_override = nose_mat
-	nose.position = Vector3(0, 1.5, -0.38)
-	_visual.add_child(nose)
+	_body = PlayerBody.new()
+	_visual.add_child(_body)
 
 	_weapon = MeshInstance3D.new()
 	_weapon_mesh = BoxMesh.new()
@@ -240,7 +224,7 @@ func _ready() -> void:
 	_weapon_mat.emission = Color(1.0, 0.8, 0.3)
 	_weapon_mat.emission_energy_multiplier = 0.0
 	_weapon.material_override = _weapon_mat
-	_visual.add_child(_weapon)
+	_body.attach_weapon(_weapon)   # the body carries it: in hand when Ready, on the back otherwise
 	_apply_weapon_look()
 
 	_reticle = MeshInstance3D.new()
@@ -264,7 +248,7 @@ func _ready() -> void:
 	_reset_vitals()
 
 
-## Defaults (STR 10 / END 10 / WT 8) give walk 4.6, run 6.7, 100 stamina.
+## Defaults (STR 10 / END 10 / WT 8) give walk 3.2, Ready 2.6, run 6.7, 100 stamina.
 ##  - burden = weight / strength. Carrying more than your frame handles slows you.
 ##  - endurance = stamina pool, regen, and a small bump to top speed.
 ##  - weight makes runs and dashes cost more, and dashes shorter.
@@ -276,7 +260,7 @@ func recompute_stats() -> void:
 	var mobility := clampf(1.0 - 0.4 * (burden - 0.8), 0.55, 1.25)
 	var fitness := 1.0 + 0.02 * (endurance - 10.0)
 	walk_speed = base_walk_speed * mobility * fitness
-	ready_speed = walk_speed * 0.65
+	ready_speed = walk_speed * ready_mult
 	run_speed = walk_speed * (run_mult + 0.01 * (endurance - 10.0))
 	max_stamina = 60.0 + endurance * 4.0
 	stamina_regen = 10.0 + endurance * 1.5
@@ -284,7 +268,7 @@ func recompute_stats() -> void:
 	dash_cost = 20.0 * (0.7 + 0.4 * burden)
 	dash_speed = run_speed * 1.8
 	dash_time = 0.18 * clampf(1.15 - 0.2 * burden, 0.6, 1.1)
-	barge_min_speed = walk_speed * 1.15
+	barge_min_speed = run_speed * 0.79   # a walk never barges; a fresh run does, a tired one doesn't
 	# Aimed shots: dexterity and the weapon's firepower both raise the bonus and the headshot odds.
 	# Defaults (DEX 10, 25 damage) give x1.5 damage and a 13% headshot chance.
 	dexterity = maxf(dexterity, 1.0)
@@ -365,13 +349,9 @@ func _settle_camera(cam_before: Vector3) -> void:
 
 
 func _apply_weapon_look() -> void:
-	if is_melee():
-		# A fist.
-		_weapon_mesh.size = Vector3(0.18, 0.18, 0.18)
-		_weapon_mat.albedo_color = Color(0.85, 0.68, 0.55)
-	else:
-		_weapon_mesh.size = Vector3(0.12, 0.12, 0.85)
-		_weapon_mat.albedo_color = Color(0.35, 0.3, 0.25)
+	# Unarmed uses the body's own fists, so the weapon mesh is only ever the gun.
+	_weapon_mesh.size = Vector3(0.09, 0.12, 0.85)
+	_weapon_mat.albedo_color = Color(0.35, 0.3, 0.25)
 
 
 ## Screen-space angle of a wheel slot (0 = right, PI = left; y is down). Shared with the HUD.
@@ -877,6 +857,7 @@ func _update_combat() -> void:
 	elif attack_tapped and interact_target != null:
 		# Weapon away: the attack button only ever interacts. Punching needs Ready.
 		interact_target.call("interact", self)
+		_body.reach()
 
 
 func _start_reload() -> void:
@@ -1106,42 +1087,11 @@ func _reset_vitals() -> void:
 
 
 # ---------------------------------------------------------------- visuals
-func _update_visuals(_delta: float) -> void:
-	_visual.visible = not dead
+func _update_visuals(delta: float) -> void:
 	_visual.rotation.y = atan2(-facing.x, -facing.z)
-	_weapon.visible = true
-	if is_melee():
-		# A fist: up in front of you when Ready, out of sight otherwise unless it's punching.
-		_weapon.visible = armed or _swing_t > 0.0
-		_weapon.rotation = Vector3.ZERO
-		var reach := 0.5
-		var side := 0.22
-		if _swing_t > 0.0:
-			# Pull back a touch, snap out as it lands, come back during recovery.
-			var elapsed := _swing_total - _swing_t
-			if elapsed < _swing_windup:
-				reach = lerpf(0.5, 0.38, elapsed / _swing_windup)
-			else:
-				reach = lerpf(1.05, 0.5, clampf((elapsed - _swing_windup) / (_swing_total - _swing_windup), 0.0, 1.0))
-		elif _block_t > 0.0:
-			# Shove: straight out from the chest.
-			reach = 0.95
-			side = 0.0
-		_weapon.position = Vector3(side, 1.2, -reach)
-	elif armed:
-		_weapon.position = Vector3(0.28, 1.1, -0.55)
-		_weapon.rotation = Vector3.ZERO
-	else:
-		_weapon.position = Vector3(0.0, 1.25, 0.45)
-		_weapon.rotation = Vector3(deg_to_rad(65.0), 0.0, deg_to_rad(20.0))
-	_weapon_mat.emission_energy_multiplier = 4.0 if _flash_t > 0.0 or _block_t > 0.0 else 0.0
-
-	var base := Color(0.25, 0.45, 0.85)
-	if _hurt_t > 0.0:
-		base = Color(1.0, 0.35, 0.3)
-	elif _dash_t > 0.0:
-		base = Color(0.6, 0.85, 1.0)
-	_body_mat.albedo_color = base
+	# The body poses itself from our state: stance, speed, punches, shoves, reload, hits, death.
+	_body.animate(self, delta)
+	_weapon_mat.emission_energy_multiplier = 4.0 if _flash_t > 0.0 else 0.0
 
 	# Ready with a melee weapon: no reticle. You still turn toward where you're pointing.
 	_reticle.visible = reticle_visible and not dead and not (armed and is_melee())

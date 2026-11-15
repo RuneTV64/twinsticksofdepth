@@ -32,8 +32,8 @@ F1 hides the help text. Esc frees the mouse, and clicking captures it again. Key
 There is no speed stat. Speed comes from Strength, Endurance and Weight.
 - **Burden = weight / strength.** Carrying more than your frame can handle slows walking and running, makes stamina cost more, and shortens your dash.
 - **Endurance** gives you a bigger stamina pool, faster regen and a small boost to top speed.
-- **Ready speed** is 65% of walk speed, and you're slower backing away from your aim. **Run** is about 1.45x walk. **Dash** is 1.8x run for a split second.
-- **Fatigue:** below 50% stamina every kind of movement slows and gets more sluggish, down to 65% speed at empty. A tired run ends up slower than a fresh walk, and too slow to barge a door.
+- **Walk** is 3.2 m/s at the default stats. **Ready speed** is 80% of walk speed, and you're slower backing away from your aim. **Run** is about 2.1x walk. **Dash** is 1.8x run for a split second.
+- **Fatigue:** below 50% stamina every kind of movement slows and gets more sluggish, down to 65% speed at empty. A tired run ends up too slow to barge a door.
 - **Running out of stamina** leaves you winded, with no run or dash, until you're back up to 35%.
 - **Barge power = (STR + WT) x your speed.** A barge always hurts. If the door holds, you bounce off and it hurts more.
 
@@ -45,15 +45,16 @@ In Ready, the reticle turns red over an enemy. A shot fired while it's red is ai
 
 ## Tuning
 All the feel settings are exported variables at the top of each script:
-- **player.gd:** `base_walk_speed`, `run_mult`, accel and decel, `fatigue_start`, `fatigue_min_speed`, `fatigue_min_accel`, turn speeds, `draw_time`, `sprint_tap_time`, `reticle_range` (shared by both stances; `look_range_bonus` and `aim_range_bonus` are set by gear such as binoculars or scopes), `ready_cam_lead`, mouse sensitivity, weapon stats.
+- **player.gd:** `base_walk_speed`, `run_mult`, `ready_mult`, accel and decel, `fatigue_start`, `fatigue_min_speed`, `fatigue_min_accel`, turn speeds, `draw_time`, `sprint_tap_time`, `reticle_range` (shared by both stances; `look_range_bonus` and `aim_range_bonus` are set by gear such as binoculars or scopes), `ready_cam_lead`, mouse sensitivity, weapon stats.
 - **camera_rig.gd:** pitch, distance, FOV, `follow_sharpness`.
 - **door.gd:** toughness, locked, max swing angle.
 - **enemy.gd:** speed, aggro range, damage.
 
 ## Files
-main.gd (level), player.gd, camera_rig.gd, door.gd, enemy.gd, projectile.gd, ammo_pickup.gd, hud.gd, input_setup.gd
+main.gd (level), player.gd, camera_rig.gd, door.gd, enemy.gd, projectile.gd, ammo_pickup.gd, hud.gd, input_setup.gd, player_body.gd (the player model and its animation), body/ (the MaleBody_Muscular models and skin shader)
 
-Character models and shaders (the base body, living skins, and the shambler) are in `assets/characters/`; see the README there. The level doesn't use them yet.
+## The player body
+`player_body.gd` loads `body/MaleBody_Muscular_mid.glb`, puts the skin shader on it and poses the skeleton in code every tick from the player state. There are no animation clips: legs step the way you move, the arms are placed on a boxing guard or on the gun in Ready, and punches, shoves, recoil, reload, hits, dashes and death all come from the same timers the controller uses. To change a pose, edit the numbers in `animate()`. To use the close-up or far model, change `MODEL_PATH`.
 
 ## Mouse note
 Ready and Attack read the mouse buttons three ways (button events, the held-button mask on every
