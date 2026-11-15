@@ -75,8 +75,9 @@ Assets artifact; nothing below is in this repo.
   `anatomy_consts.json`; `node gen_decay_shader.js zombie_skin.gdshader zombie_decay.gdshader` makes the shader
   (it reads `anatomy_consts.json` and `skin_tones.js`); `node export_shambler.js <out>` makes the GLBs. Change the
   anatomy in `anatomy.js`, the wounds in `shambler.js`, the colors in `gen_decay_shader.js`.
-- The owner accepted the shader work on 15 Nov 2026 (artifact Version 31). Still unchecked: Forward+ on Godot
-  4.7, a real animation, and the cost of the depth painting on a real graphics card.
+- The owner approved ShamblerMale_Muscular and the living skins on 15 Nov 2026 (both pills say Approved), so
+  ask before changing them, as with the body. Still unchecked: Forward+ on Godot 4.7, a real animation, and the
+  cost of the depth painting on a real graphics card.
 - Next on the model side, when asked: the cut-off pieces (forearm and hand, lower leg and foot, head) as
   separate meshes for the flying-limb effect; faces; build types.
 
