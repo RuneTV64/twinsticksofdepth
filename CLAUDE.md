@@ -176,16 +176,18 @@ changes, update both, and keep them the same files.
   model files are loaded once (`ZombieBody._scene()`), and a swap is `shambler.use_model()`: same skeleton, bones and
   bind poses at every level (checked), so only the merged mesh changes (~0.02 ms). Never call `load()` per frame or
   per spawn; keep the resource.
-- **Where we stopped (15 Nov 2026):** 226 zombies piled on the player run ~77-80 FPS on the owner's RTX 5070, but
-  drop to ~50-55 FPS while the cursor pans the camera (it was ~44 before detail swaps went mesh-only). Not found yet.
-  Suspect: panning brings more zombies within the mid-model distance (triangles 7.8M -> 10.6M, GPU skinning). The
-  owner pressed L once and saw little change, but L was only on the working branch then, not main, so that test may
-  not have run; redo it once L is on main. Next: Visual Profiler (CPU vs GPU) while panning, then fix whichever side.
+- Panning drop (owner's PC, 226 piled: ~77-80 FPS, ~50-55 while moving the cursor): the look crosshair roams up to
+  10 m and the camera follows it, so panning swept the crowd back and forth across the mid/low line (cloud sim:
+  80 swaps/s), each swap making the graphics card rebuild that zombie's skinning buffers. Now detail is measured
+  from where the camera rests over the player (not the panned camera), checked 4 times a second per zombie, at most
+  2 swaps a frame: panning causes no swaps (cloud sim 80 -> 10/s, the same as with the crosshair still). Needs the
+  owner's PC to confirm the drop is gone; if not, next is the Visual Profiler (CPU vs GPU) while panning.
 - Debug keys: F1 help, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
-- Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera (`low_beyond` 21 m,
-  `mid_within` 19.5 m; on screen zombies are 15 to 29 m away) with `shambler.use_model()`, at most 8 a frame. Godot's automatic mesh LODs
+- Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera's rest point over the player
+  (`low_beyond` 21 m, `mid_within` 19.5 m; on screen zombies are 15 to 29 m away) with `shambler.use_model()`,
+  checked 4 times a second, at most 2 swaps a frame. Godot's automatic mesh LODs
   are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.
 
 ## Character shaders and models: how they are built

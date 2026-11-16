@@ -113,13 +113,14 @@ var _hold_t := 0.0
 var _was_hurt := 0.0
 var _rank := 0                 # this zombie's place in the crowd by distance from the player (see full_rate_count)
 static var _ranked_at := -1000
+var _detail_wait := randf() * 0.25   # time to the next detail check; offset so a crowd doesn't check together
 var _pose_acc := randf() * 0.05   # time since last posed; starts offset so a crowd doesn't pose on the same frame
 var _first := true
 var _dissolve := -1.0           # the dissolve last sent to the parts; -1 = send next time
 var _low := false
 static var _swap_frame := -1
 static var _swaps := 0
-const SWAPS_PER_FRAME := 8      # spread a crowd's model swaps over a few frames (each is just a mesh swap now)
+const SWAPS_PER_FRAME := 2      # spread a crowd's model swaps over a few frames
 
 
 func _ready() -> void:
@@ -278,13 +279,23 @@ static func _rank_crowd(player: Node3D, tree: SceneTree) -> void:
 
 
 ## Mid model near the camera, low model far from it. Swaps are spread out so a whole crowd never swaps at once.
+## Decided 4 times a second (each zombie offset), and measured from where the camera rests over the player, not
+## from where the look crosshair has panned it: panning the view (up to 10 m) swept whole crowds back and forth across
+## the line, dozens of swaps a second, each one making the graphics card rebuild that zombie's skinning buffers.
 func _update_detail(e: Enemy) -> void:
 	if e.dead or e._alpha <= 0.0:
 		return
+	_detail_wait -= get_process_delta_time()
+	if _detail_wait > 0.0 and not force_low:
+		return
+	_detail_wait = 0.25
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
-	var d := cam.global_position.distance_to(e.global_position + Vector3.UP * 0.9)
+	var eye := cam.global_position
+	if e.player != null and cam.get_parent() is Node3D:
+		eye = e.player.global_position + (cam.global_position - (cam.get_parent() as Node3D).global_position)
+	var d := eye.distance_to(e.global_position + Vector3.UP * 0.9)
 	var want_low := force_low or d > (mid_within if _low else low_beyond)
 	if want_low == _low:
 		return
