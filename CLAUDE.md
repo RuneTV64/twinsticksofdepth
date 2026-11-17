@@ -182,7 +182,8 @@ changes, update both, and keep them the same files.
   from where the camera rests over the player (not the panned camera), checked 4 times a second per zombie, at most
   2 swaps a frame: panning causes no swaps (cloud sim 80 -> 10/s, the same as with the crosshair still). Owner's PC
   with it (17 Nov 2026): 226 piled, 92 FPS (was 77-80), posing 3.8 ms/frame, physics 6.3 ms, 927 draw calls, 8.1M
-  triangles. Whether it holds while panning is still to be confirmed; if not, Visual Profiler (CPU vs GPU) next.
+  triangles; while panning it dips only to ~86 and holds. Panning drop solved. Remaining crowd ideas, not needed
+  now: C++ posing once poses settle; the unaccounted engine time (skeleton updates) if hordes grow past ~250.
 - Debug keys: F1 help, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
