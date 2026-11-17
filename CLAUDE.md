@@ -180,8 +180,9 @@ changes, update both, and keep them the same files.
   10 m and the camera follows it, so panning swept the crowd back and forth across the mid/low line (cloud sim:
   80 swaps/s), each swap making the graphics card rebuild that zombie's skinning buffers. Now detail is measured
   from where the camera rests over the player (not the panned camera), checked 4 times a second per zombie, at most
-  2 swaps a frame: panning causes no swaps (cloud sim 80 -> 10/s, the same as with the crosshair still). Needs the
-  owner's PC to confirm the drop is gone; if not, next is the Visual Profiler (CPU vs GPU) while panning.
+  2 swaps a frame: panning causes no swaps (cloud sim 80 -> 10/s, the same as with the crosshair still). Owner's PC
+  with it (17 Nov 2026): 226 piled, 92 FPS (was 77-80), posing 3.8 ms/frame, physics 6.3 ms, 927 draw calls, 8.1M
+  triangles. Whether it holds while panning is still to be confirmed; if not, Visual Profiler (CPU vs GPU) next.
 - Debug keys: F1 help, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
