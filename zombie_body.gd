@@ -46,6 +46,9 @@ const SHADER := preload("res://assets/characters/ShamblerMale_Muscular/zombie_de
 ## crowd around the player poses at 30 (no one can tell the back rows of a mob apart at that). Zombies reaching for,
 ## holding, biting or lunging at the player always get the full rate. The ranking is redone 4 times a second.
 @export var full_rate_count := 30
+## Weight on the upper body and arms (damped springs, footfall jolts, twitches; see _spring). Costs about a third more
+## per posing near the player; off, the bones ease straight to their pose.
+@export var springs := true
 
 ## A part came off and flew away as a piece (passed on from shambler.gd).
 signal piece_spawned(slot: String, piece: Node)
@@ -111,6 +114,21 @@ var _stumble := 0.0
 var _stumble_cd := 3.0
 var _hold_t := 0.0
 var _was_hurt := 0.0
+
+# Weight: the chest, neck, head and arms don't snap to their pose, they ride on damped springs, so they lag, swing
+# and overshoot, and the body's own starts, stops, turns and footfalls throw them about. Per bone: frequency (Hz,
+# 0 = no spring) and damping ratio, set in _ready and loosened or stiffened by decay in _spring_tune().
+var _sf := PackedFloat32Array()
+var _sz := PackedFloat32Array()
+var _av: Array[Vector3] = []      # angular velocity per bone (rad/s, parent space)
+var _prev_vel := Vector3.ZERO     # the body's velocity at the last posing, in model space
+var _prev_yaw := 0.0
+var _twitch_cd := 2.0
+# Steps aren't all alike: each one gets its own length, pace and sideways lurch, and now and then a halting step.
+var _step_idx := 0
+var _step_amp := 1.0
+var _step_rate := 1.0
+var _step_side := 0.0
 var _rank := 0                 # this zombie's place in the crowd by distance from the player (see full_rate_count)
 static var _ranked_at := -1000
 var _detail_wait := randf() * 0.25   # time to the next detail check; offset so a crowd doesn't check together
@@ -155,6 +173,11 @@ func _ready() -> void:
 			for j in 3:
 				_fingers[k].append([_bone("%s%s%d" % [fname, s, j + 1]), h.normalized(), CURL[fname][j]])
 	_ankle_y = _global(_leg[0][2]).origin.y
+	_sf.resize(_n)
+	_sz.resize(_n)
+	for i in _n:
+		_av.append(Vector3.ZERO)
+	_spring_tune()
 	reroll_style()
 
 
@@ -340,6 +363,27 @@ var _has_head := true
 var _fresh_src: Freshness
 
 
+## Spring settings by decay: fresh bodies are loose and heavy; rigor locks the joints (stiff, damped); bloated and
+## putrid tissue lets them flop; dried leather is stiff again.
+func _spring_tune() -> void:
+	if _sf.size() != _n or _n == 0:
+		return
+	var floppy := smoothstep(0.3, 0.75, rot_amt) * (1.0 - frail)
+	var k := (1.0 + 1.6 * stiff) * (1.0 - 0.25 * floppy)       # frequency scale
+	var z := 0.12 * stiff - 0.06 * floppy                     # extra damping
+	for i in _n:
+		_sf[i] = 0.0
+	var set_s := func(i: int, f: float, d: float) -> void:
+		_sf[i] = f * k
+		_sz[i] = clampf(d + z, 0.15, 1.0)
+	set_s.call(_chest, 3.2, 0.42)
+	set_s.call(_neck, 2.6, 0.3)
+	set_s.call(_head, 3.0, 0.28)
+	for side in 2:
+		set_s.call(_arm[side][1], 1.7, 0.2)     # upper arm: a heavy, dead pendulum
+		set_s.call(_arm[side][3], 2.2, 0.26)    # forearm
+
+
 ## Work out his decay and parts again. Called on its own when they change; call it after setting a look by hand
 ## (shambler.set_skin) outside roll().
 func refresh() -> void:
@@ -367,6 +411,7 @@ func refresh() -> void:
 	walk_mult = lerpf(1.0, 0.65, smoothstep(0.35, 0.9, rot_amt)) * (1.0 - 0.15 * rigor_amt)
 	crawl_mult = lerpf(1.0, 0.6, rot_amt)
 	shed_chance = 0.6 * frail
+	_spring_tune()
 
 
 func part(slot: String) -> String:
@@ -540,8 +585,17 @@ func animate(e: Enemy, delta: float) -> void:
 		for i in _n:
 			_hold_q[i] = _tq[i]
 
+	# Springs only where they can be seen: in view and within half_rate_within of the player. Farther off, the
+	# plain easing (they're posed 20 times a second there anyway).
+	var springy := springs and e._alpha > 0.0 and (e.player == null or Vector2(e.global_position.x - e.player.global_position.x,
+		e.global_position.z - e.player.global_position.z).length_squared() < half_rate_within * half_rate_within)
+	if springy:
+		_kick_springs(e, delta, vel)
 	for i in _n:
-		_cq[i] = _cq[i].slerp(_hold_q[i], kk)
+		if springy and _sf[i] > 0.0:
+			_cq[i] = _spring(i, _hold_q[i], delta, _prone_w)
+		else:
+			_cq[i] = _cq[i].slerp(_hold_q[i], kk)
 		_skel.set_bone_pose_rotation(i, _cq[i])
 	_cur_off = _cur_off.lerp(_hips_off, kk)
 	_skel.set_bone_pose_position(_hips, _rest_o[_hips] + _cur_off)
@@ -569,7 +623,23 @@ func animate(e: Enemy, delta: float) -> void:
 func _pose_walk(e: Enemy, delta: float, speed: float, rt: float, blo: float, stum: float, tgt: Vector3,
 		near: float, reaching: bool) -> void:
 	var stride := lerpf(1.15, 0.75, drag) * (1.0 - 0.15 * blo)
-	_phase = fposmod(_phase + TAU * speed / stride * delta, TAU)
+	_phase = fposmod(_phase + TAU * speed / stride * delta * _step_rate, TAU)
+	# A new step: its own length and pace, a sideways lurch, sometimes a halting one; the foot lands with a jolt.
+	var idx := int(_phase / PI)
+	if idx != _step_idx:
+		_step_idx = idx
+		_step_amp = _rng.randf_range(0.8, 1.15)
+		_step_rate = _rng.randf_range(0.85, 1.15)
+		if _rng.randf() < 0.08 + 0.25 * drag:
+			_step_rate *= 0.45                       # a halting, dragged step
+			_step_amp *= 0.7
+		_step_side = _rng.randf_range(-1.0, 1.0) * (0.03 + 0.07 * drag)
+		var thud := _move_w * (0.8 + 0.6 * bloat_amt + 0.4 * drag) * (1.0 - 0.6 * stiff)
+		_av[_chest] += Vector3(0.9, 0.0, _rng.randf_range(-0.4, 0.4)) * thud
+		_av[_neck] += Vector3(1.4, 0.0, _rng.randf_range(-0.6, 0.6)) * thud
+		_av[_head] += Vector3(0.8, _rng.randf_range(-0.5, 0.5), 0.0) * thud
+		for k in 2:
+			_av[_arm[k][1]] += Vector3(_rng.randf_range(-0.6, 0.6), 0.0, _rng.randf_range(-0.4, 0.4)) * thud
 	var m := _move_w
 	var nz := _noise(0.6)
 	var th: Array[float] = [0.0, 0.0]
@@ -580,7 +650,7 @@ func _pose_walk(e: Enemy, delta: float, speed: float, rt: float, blo: float, stu
 		var ph := _phase + k * PI
 		# The bad leg swings late and short: it's hauled through, not stepped.
 		var sph := ph - 0.6 * bad * drag * maxf(0.0, sin(ph))
-		var amp := 0.34 * (1.0 - 0.45 * stiff) * (1.0 - 0.5 * bad * drag) * m
+		var amp := 0.34 * (1.0 - 0.45 * stiff) * (1.0 - 0.5 * bad * drag) * m * _step_amp
 		th[k] = amp * sin(sph)
 		var lift := 0.55 * (1.0 - 0.7 * stiff) * (1.0 - 0.85 * bad * drag) * m
 		var kn := 0.1 * (1.0 - 0.5 * stiff) + lift * pow(maxf(0.0, cos(sph + 0.2)), 2.0) + 0.5 * _crouch_w + 0.25 * stum * bad
@@ -599,13 +669,17 @@ func _pose_walk(e: Enemy, delta: float, speed: float, rt: float, blo: float, stu
 	var pelvis := 0.1 + 0.05 * _grip_w
 	var bend := 0.3 + _hunch + 0.14 * rt - 0.2 * blo + 0.22 * stum + 0.1 * near * (1.0 - stiff) \
 		- 0.25 * _crouch_w + 0.55 * _lunge_w - 0.1 * _grip_w + 0.08 * _bite_w
-	_tq[_hips] = _ry(-0.08 * sn * m) * _rz(-sway - badsgn * hike) * _rx(pelvis)
-	_tq[_chest] = _rx(bend) * _rz(sway * 1.4 + badsgn * 0.08 * drag + 0.05 * nz) * _ry(0.12 * sn * m + 0.08 * nz)
+	_tq[_hips] = _ry(-0.08 * sn * m) * _rz(-sway - badsgn * hike - _step_side * m) * _rx(pelvis)
+	_tq[_chest] = _rx(bend) * _rz(sway * 1.4 + badsgn * 0.08 * drag + 0.05 * nz + 1.5 * _step_side * m) \
+		* _ry(0.12 * sn * m + 0.08 * nz)
 	var loll := 0.06 + 0.3 * rt * (1.0 - stiff)
 	# The head juts forward on the neck and tips back to look where he's going.
 	_tq[_neck] = _rx(0.35 + 0.15 * rt - 0.15 * near - 0.3 * _crouch_w + 0.2 * _lunge_w + 0.4 * _bite_w) \
 		* _rz(_tilt + loll * _noise(0.35)) * _ry(0.15 * loll * _noise(0.27))
-	_tq[_head] = _rx(-0.5 - 0.15 * near - 0.15 * _bite_w + 0.25 * frail * (1.0 - near)) * _rz(0.5 * _tilt + 0.3 * _bite_w)
+	var look := clampf(atan2(tgt.x, tgt.z), -0.7, 0.7) * near
+	_tq[_neck] = _ry(0.45 * look) * _tq[_neck]
+	_tq[_head] = _ry(0.35 * look) * _rx(-0.5 - 0.15 * near - 0.15 * _bite_w + 0.25 * frail * (1.0 - near)) \
+		* _rz(0.5 * _tilt + 0.3 * _bite_w)
 	# Shoulders rolled forward and slumped.
 	for k in 2:
 		var ks := 1.0 if k == 0 else -1.0
@@ -642,7 +716,10 @@ func _pose_walk(e: Enemy, delta: float, speed: float, rt: float, blo: float, stu
 				want = 0.0
 		_reach_w[k] = _ease(_reach_w[k], want, 5.0 if want > _reach_w[k] else 3.0, delta)
 		if _reach_w[k] > 0.001:
-			var aim := cg * Vector3(sgn * 0.22, 0.25, 0.75)                # out in front, at shoulder height
+			# Out in front, but not held out like a sleepwalker's: each arm paws in its own slow, uneven arc, elbows
+			# soft, hands drooping at the wrist.
+			var paw := _t * (0.9 + 0.35 * k) + _noise_o + k * 2.1
+			var aim := cg * Vector3(sgn * 0.22 + 0.07 * sin(paw * 1.3), 0.16 + 0.11 * sin(paw), 0.58 + 0.1 * sin(paw * 0.7 + 1.0))
 			if reaching:
 				var to := Vector3(tgt.x, clampf(tgt.y, cg.origin.y + 0.05, cg.origin.y + 0.45), tgt.z)
 				var sh := cg * Vector3(sgn * 0.2, 0.3, 0.0)
@@ -651,7 +728,7 @@ func _pose_walk(e: Enemy, delta: float, speed: float, rt: float, blo: float, stu
 			aim += Vector3(0.03 * _noise(1.7 + k), 0.04 * _noise(2.3 + k), 0.0) * (1.0 - _grip_w)
 			if not hand:
 				aim = aim.lerp(cg * Vector3(sgn * 0.2, 0.3, 0.0), 0.15)
-			var rpose := _solve_arm(k, aim, cg.basis * Vector3(sgn * 0.8, -0.6, -0.4), _rx(0.25))
+			var rpose := _solve_arm(k, aim, cg.basis * Vector3(sgn * 0.8, -0.6, -0.4), _rx(0.55 + 0.2 * _noise(1.1 + k)))
 			pose = _blend_arm(pose, rpose, _reach_w[k])
 		if _lunge_w > 0.001:
 			# Lunging: the arms fly back.
@@ -660,7 +737,7 @@ func _pose_walk(e: Enemy, delta: float, speed: float, rt: float, blo: float, stu
 			pose = _blend_arm(pose, lp, _lunge_w)
 		for j in 5:
 			_tq[_arm[k][j + 1]] = pose[j]
-		_pose_fingers(k, stiff)
+		_pose_fingers(k)
 
 
 # ---------------------------------------------------------------------- face down: the crawl
@@ -704,14 +781,72 @@ func _pose_crawl(e: Enemy, delta: float, speed: float, rt: float, tgt: Vector3, 
 		var pose := _solve_arm(k, aim, Vector3(sgn * 0.9, 0.0, -0.6), _rx(-0.6))
 		for j in 5:
 			_tq[_arm[k][j + 1]] = pose[j]
-		_pose_fingers(k, stiff)
+		_pose_fingers(k)
 
 
-func _pose_fingers(k: int, stiff: float) -> void:
-	# Clawed and twitching; clenched in rigor; closed tight on a grip.
+## Kick the springs with what the body does: speeding up, slowing down and turning throw the upper body and arms the
+## other way; now and then a twitch.
+func _kick_springs(e: Enemy, delta: float, vel: Vector3) -> void:
+	var to_model := _skel.global_transform.basis.inverse()
+	var v: Vector3 = to_model * vel
+	var dv := (v - _prev_vel).limit_length(4.0)
+	_prev_vel = v
+	var yaw := atan2(e.facing.x, e.facing.z)
+	var dyaw := wrapf(yaw - _prev_yaw, -PI, PI)
+	_prev_yaw = yaw
+	if e.dead or _first:
+		return
+	var throw := 1.0 - 0.6 * stiff
+	# forward speed change (model +Z) pitches the chest and head back, swings hanging arms back; sideways rolls them
+	_av[_chest] += Vector3(-dv.z * 0.9, 0.0, dv.x * 0.6) * throw
+	_av[_neck] += Vector3(-dv.z * 1.3, 0.0, dv.x * 0.9) * throw
+	_av[_head] += Vector3(-dv.z * 0.8, -dyaw * 2.0, dv.x * 0.6) * throw
+	for k in 2:
+		_av[_arm[k][1]] += Vector3(dv.z * 1.6, 0.0, -dv.x * 1.0) * throw * (1.0 - _reach_w[k] * 0.6)
+		_av[_arm[k][3]] += Vector3(dv.z * 1.0, 0.0, 0.0) * throw
+	_av[_chest] += Vector3(0.0, -dyaw * 3.0, 0.0) * throw
+	# twitches: a jerk of the head, a shoulder or an arm, a few seconds apart
+	_twitch_cd -= delta
+	if _twitch_cd <= 0.0:
+		_twitch_cd = _rng.randf_range(1.5, 5.0) * (1.0 + stiff)
+		var bones := [_neck, _head, _arm[0][0], _arm[1][0], _arm[0][1], _arm[1][1], _chest]
+		var b: int = bones[_rng.randi() % bones.size()]
+		_av[b] += Vector3(_rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0)).normalized() \
+			* _rng.randf_range(2.5, 5.0) * (1.0 - 0.5 * stiff)
+
+
+## One bone on its damped spring toward its pose, in steps of at most 1/30 s (one step for anything posed 30 times a
+## second or more), so a zombie posed 20 times a second swings much as one posed every frame. The steps are implicit:
+## stable however stiff the spring or long the step (the plain kind blew up on stiff springs). Lying down, the arms firm up so hands don't swing through the floor.
+func _spring(i: int, target: Quaternion, delta: float, prone: float) -> Quaternion:
+	var q := _cq[i]
+	var f := _sf[i] * (1.0 + 2.0 * prone)
+	var z := lerpf(_sz[i], 0.9, prone)
+	var w := TAU * f
+	var steps := maxi(1, ceili(delta * 30.0))
+	var dt := delta / steps
+	var k1 := w * w * dt
+	var den := 1.0 + 2.0 * z * w * dt + w * w * dt * dt
+	var v := _av[i]
+	for s in steps:
+		# the turn still to go, as an angle-axis vector (2 x the vector part of the shortest error quaternion is
+		# close enough for a spring; exact angles don't matter here)
+		var dq := target * Quaternion(-q.x, -q.y, -q.z, q.w)
+		var err := Vector3(dq.x, dq.y, dq.z) * (2.0 if dq.w >= 0.0 else -2.0)
+		# implicit (backward Euler) step: stable however stiff the spring or long the step
+		v = (v + err * k1) / den
+		var h := v * (0.5 * dt)
+		q = (Quaternion(h.x, h.y, h.z, 1.0) * q).normalized()
+	_av[i] = v
+	return q
+
+
+func _pose_fingers(k: int) -> void:
+	# Clawed and twitching; clenched in rigor; closed tight on a grip; grasping open and shut while reaching.
 	var curl := 0.55 + 0.12 * _noise(3.1 + k) + 0.35 * stiff
 	curl = lerpf(curl, 1.05, _grip_w)
-	curl = lerpf(curl, 0.25, _reach_w[k] * (1.0 - _grip_w) * 0.6)
+	var grasp := 0.45 + 0.4 * sin(_t * (2.2 + 0.4 * k) + _noise_o * 3.0 + k)
+	curl = lerpf(curl, grasp, _reach_w[k] * (1.0 - _grip_w) * (1.0 - 0.6 * stiff))
 	for fg in _fingers[k]:
 		_tq[fg[0]] = Quaternion(fg[1], fg[2] * curl)
 
