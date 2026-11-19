@@ -6,7 +6,7 @@ extends SceneTree
 ## Run from the game project root (Godot 4.x, software OpenGL under xvfb):
 ##   CLIP=walk OUT=/tmp/clip xvfb-run -a -s "-screen 0 2400x1600x24" godot --rendering-driver opengl3 \
 ##       --resolution 1500x380 -s res://zombie_anim_clip.gd
-## Clips: walk (fresh, putrid, rigor reaching, stop-and-go), crawl (crawlers by stage).
+## Clips: walk (fresh, putrid, rigor reaching, stop-and-go), reach (clawing and grabbing), crawl (crawlers by stage).
 ## Test-only patches for the software renderer, as in zombie_anim_preview.gd.
 
 const DT := 1.0 / 60.0
@@ -66,6 +66,11 @@ func _cases_for(clip: String) -> Array:
 				["Putrid, closing in", INTACT, 0.3, _walk.bind(1.5, 1.6)],
 				["Rigor, reaching", INTACT, 0.78, _walk.bind(1.5, 1.4)],
 				["Bloated, stop and go", INTACT, 0.56, _stop_go]]
+		"reach":
+			return [["Fresh, clawing", INTACT, 0.95, _walk.bind(0.6, 1.3)],
+				["Fresh, grabbing", INTACT, 0.95, _grab],
+				["Bloated, clawing", INTACT, 0.56, _walk.bind(0.8, 1.4)],
+				["Rigor, clawing", INTACT, 0.78, _walk.bind(0.8, 1.4)]]
 		"crawl":
 			return [["Fresh crawler", p1, 0.95, _crawl.bind(0.45)],
 				["Rigor crawler", p1, 0.78, _crawl.bind(0.4)],
@@ -145,6 +150,14 @@ func _walk(e: Enemy, _t: float, speed: float, target_dist: float) -> void:
 	e.chasing = true
 	e.velocity = e.facing * speed * e.body.walk_mult
 	e.target = e.global_position + e.facing * target_dist + Vector3.UP * 1.25
+
+
+func _grab(e: Enemy, _t: float) -> void:
+	e.facing = FACE.normalized()
+	e.chasing = true
+	e.velocity = Vector3.ZERO
+	e.state = "reach"
+	e.target = e.global_position + e.facing * 0.8 + Vector3.UP * 1.25
 
 
 func _stop_go(e: Enemy, t: float) -> void:

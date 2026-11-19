@@ -189,7 +189,11 @@ changes, update both, and keep them the same files.
   and damped, bloated/putrid floppy), kicked by the body's own speeding up, slowing, turning and footfalls
   (`_kick_springs()`), plus a twitch every few seconds. Each step gets its own length, pace and sideways lurch, with
   halting steps more often the more he drags. Reaching arms paw in uneven arcs with soft elbows, limp wrists and
-  grasping fingers; the head turns toward its target. Springs run only in view within 14 m (`springs` to switch
+  grasping fingers; the head turns toward its target. Still stiff when reaching (owner, 19 Nov 2026), so reaching is
+  now a claw cycle per arm (`_claw()`): thrown out fast, a grab, dragged back and down toward the chest, the arms in
+  turn with their own pace and reach each swipe; the shoulder rolls into each swipe, the chest twists after it, the
+  head jabs, hands open going out and clench coming back. Grabbing aims the swipes at the player. Idle springs
+  (far zombies) drop their velocity instead of banking kicks. Springs run only in view within 14 m (`springs` to switch
   off): about +38% per posing there. Motion clips: `source/zombie_anim_clip.gd` + `zombie_anim_gif.py`
   (before/after GIFs in `preview/zombie_motion_*.gif`); stills can't show motion.
 - Debug keys: F1 help, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the

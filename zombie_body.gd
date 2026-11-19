@@ -103,6 +103,13 @@ var _crawl_phase := 0.0
 var _move_w := 0.0
 var _prone_w := 0.0
 var _reach_w := [0.0, 0.0]
+# Clawing while reaching: each arm runs its own swipe cycle (throw out, grab, drag back), offset from the other,
+# with its own pace and reach rolled each swipe.
+var _claw_ph: Array[float] = [0.0, 0.5]
+var _claw_rate: Array[float] = [1.0, 1.0]
+var _claw_amp: Array[float] = [1.0, 1.0]
+var _claw_e: Array[float] = [0.0, 0.0]       # how far out the hand is, 0..1
+var _claw_close: Array[float] = [0.0, 0.0]   # how shut the hand is, 0..1
 var _grip_w := 0.0
 var _bite_w := 0.0
 var _lunge_w := 0.0
@@ -189,6 +196,8 @@ func reroll_style() -> void:
 	_both_arms = _rng.randf() < 0.55
 	_hunch = _rng.randf_range(-0.05, 0.12)
 	_tilt = _rng.randf_range(-0.22, 0.22)
+	_claw_ph = [_rng.randf(), 0.0]
+	_claw_ph[1] = fmod(_claw_ph[0] + _rng.randf_range(0.35, 0.65), 1.0)   # the arms swipe in turn, not together
 	_noise_o = _rng.randf_range(0.0, 100.0)
 	# Lying dead, face down: each arm flung up by the head, out to the side or down along the body (all flat on the
 	# floor, so nothing bends down through it), head turned, legs apart.
@@ -595,6 +604,8 @@ func animate(e: Enemy, delta: float) -> void:
 		if springy and _sf[i] > 0.0:
 			_cq[i] = _spring(i, _hold_q[i], delta, _prone_w)
 		else:
+			if _sf[i] > 0.0:
+				_av[i] = Vector3.ZERO   # springs idle (far or out of view): don't bank up kicks to release later
 			_cq[i] = _cq[i].slerp(_hold_q[i], kk)
 		_skel.set_bone_pose_rotation(i, _cq[i])
 	_cur_off = _cur_off.lerp(_hips_off, kk)
@@ -685,6 +696,19 @@ func _pose_walk(e: Enemy, delta: float, speed: float, rt: float, blo: float, stu
 		var ks := 1.0 if k == 0 else -1.0
 		_tq[_arm[k][0]] = _ry(-ks * (0.18 + 0.1 * rt)) * _rz(-ks * 0.08)
 
+	# Clawing: swipe by swipe, the reaching shoulder rolls forward into it, the chest twists after it and the head
+	# jabs forward.
+	var into := 0.0
+	for k in 2:
+		_claw(k, delta)
+		var ks := 1.0 if k == 0 else -1.0
+		var w: float = _reach_w[k] * _claw_e[k]
+		_tq[_arm[k][0]] = _tq[_arm[k][0]] * _ry(-ks * 0.3 * w) * _rz(ks * 0.12 * w)
+		into += ks * w
+	var lean_in := maxf(_reach_w[0] * _claw_e[0], _reach_w[1] * _claw_e[1])
+	_tq[_chest] = _tq[_chest] * _ry(-0.22 * into) * _rx(0.1 * lean_in)
+	_tq[_neck] = _tq[_neck] * _rx(0.12 * lean_in)
+
 	_hips_off = Vector3(0.0, 0.0, 0.0)
 	_hips_off.y = _ankle_y - minf(_global(_leg[0][2]).origin.y, _global(_leg[1][2]).origin.y)
 	_hips_off.z = 0.1 * _lunge_w + 0.08 * _bite_w
@@ -716,19 +740,24 @@ func _pose_walk(e: Enemy, delta: float, speed: float, rt: float, blo: float, stu
 				want = 0.0
 		_reach_w[k] = _ease(_reach_w[k], want, 5.0 if want > _reach_w[k] else 3.0, delta)
 		if _reach_w[k] > 0.001:
-			# Out in front, but not held out like a sleepwalker's: each arm paws in its own slow, uneven arc, elbows
-			# soft, hands drooping at the wrist.
-			var paw := _t * (0.9 + 0.35 * k) + _noise_o + k * 2.1
-			var aim := cg * Vector3(sgn * 0.22 + 0.07 * sin(paw * 1.3), 0.16 + 0.11 * sin(paw), 0.58 + 0.1 * sin(paw * 0.7 + 1.0))
+			# Clawing at him: the hand is thrown out and up, grabs, then drags back and down toward the chest, in
+			# toward the middle as it goes out. Elbows out and soft, the wrist straightening as it reaches.
+			var ex: float = _claw_e[k]
+			var ph: float = _claw_ph[k]
+			var drag_down := sin(PI * clampf((ph - 0.45) / 0.55, 0.0, 1.0))
+			var aim := cg * Vector3(sgn * (0.25 - 0.1 * ex), 0.1 + 0.22 * ex - 0.1 * drag_down, 0.3 + 0.36 * ex * _claw_amp[k])
 			if reaching:
+				# going for you: the swipes land on you, not just out in front
 				var to := Vector3(tgt.x, clampf(tgt.y, cg.origin.y + 0.05, cg.origin.y + 0.45), tgt.z)
 				var sh := cg * Vector3(sgn * 0.2, 0.3, 0.0)
 				var d := to - sh
-				aim = sh + d.normalized() * minf(d.length(), 0.62) + Vector3(sgn * 0.12, 0.0, 0.0)
-			aim += Vector3(0.03 * _noise(1.7 + k), 0.04 * _noise(2.3 + k), 0.0) * (1.0 - _grip_w)
+				var at := sh + d.normalized() * minf(d.length(), 0.62) + Vector3(sgn * 0.1, 0.0, 0.0)
+				aim = aim.lerp(at, 0.35 + 0.65 * _grip_w)   # clawing on the way in; locked on once it has you
+			aim += Vector3(0.03 * _noise(1.7 + k), 0.03 * _noise(2.3 + k), 0.0) * (1.0 - _grip_w)
 			if not hand:
 				aim = aim.lerp(cg * Vector3(sgn * 0.2, 0.3, 0.0), 0.15)
-			var rpose := _solve_arm(k, aim, cg.basis * Vector3(sgn * 0.8, -0.6, -0.4), _rx(0.55 + 0.2 * _noise(1.1 + k)))
+			var pole := cg.basis * Vector3(sgn * 0.85, -0.7 + 0.4 * ex, -0.3)
+			var rpose := _solve_arm(k, aim, pole, _rx(0.65 - 0.45 * ex + 0.15 * _noise(1.1 + k)))
 			pose = _blend_arm(pose, rpose, _reach_w[k])
 		if _lunge_w > 0.001:
 			# Lunging: the arms fly back.
@@ -782,6 +811,31 @@ func _pose_crawl(e: Enemy, delta: float, speed: float, rt: float, tgt: Vector3, 
 		for j in 5:
 			_tq[_arm[k][j + 1]] = pose[j]
 		_pose_fingers(k)
+
+
+## One arm's clawing cycle: phase 0..1 per swipe, thrown out fast (0-0.3), held grabbing (to 0.45), dragged back
+## (to 1). Each new swipe rolls its own pace and reach; now and then one hangs back for a moment. Rigor makes the
+## swipes slower and shorter; the further gone, the weaker.
+func _claw(k: int, delta: float) -> void:
+	if _reach_w[k] < 0.01:
+		_claw_e[k] = 0.0
+		_claw_close[k] = 0.0
+		return
+	var hz := 1.0 * (1.0 - 0.45 * stiff) * (1.0 - 0.3 * drag) * _claw_rate[k]
+	var ph: float = _claw_ph[k] + hz * delta
+	if ph >= 1.0:
+		ph = fmod(ph, 1.0)
+		_claw_rate[k] = _rng.randf_range(0.75, 1.3)
+		_claw_amp[k] = _rng.randf_range(0.7, 1.15) * (1.0 - 0.35 * stiff) * (1.0 - 0.25 * frail)
+		if _rng.randf() < 0.15:
+			_claw_rate[k] *= 0.4                   # hangs back a moment
+		# the swipe starts with a jerk of the arm
+		_av[_arm[k][1]] += Vector3(-1.5, 0.0, 0.0) * (1.0 - 0.5 * stiff)
+	_claw_ph[k] = ph
+	var out := smoothstep(0.0, 0.3, ph)
+	var back := smoothstep(0.45, 1.0, ph)
+	_claw_e[k] = out * (1.0 - back)
+	_claw_close[k] = smoothstep(0.32, 0.5, ph) * (1.0 - smoothstep(0.9, 1.0, ph))
 
 
 ## Kick the springs with what the body does: speeding up, slowing down and turning throw the upper body and arms the
@@ -845,7 +899,7 @@ func _pose_fingers(k: int) -> void:
 	# Clawed and twitching; clenched in rigor; closed tight on a grip; grasping open and shut while reaching.
 	var curl := 0.55 + 0.12 * _noise(3.1 + k) + 0.35 * stiff
 	curl = lerpf(curl, 1.05, _grip_w)
-	var grasp := 0.45 + 0.4 * sin(_t * (2.2 + 0.4 * k) + _noise_o * 3.0 + k)
+	var grasp := lerpf(0.15, 1.0, _claw_close[k])   # open as the hand goes out, clenched as it drags back
 	curl = lerpf(curl, grasp, _reach_w[k] * (1.0 - _grip_w) * (1.0 - 0.6 * stiff))
 	for fg in _fingers[k]:
 		_tq[fg[0]] = Quaternion(fg[1], fg[2] * curl)
