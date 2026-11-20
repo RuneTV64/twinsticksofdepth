@@ -33,6 +33,10 @@ anti_aliasing/quality/msaa_3d=2
 
 [shader_globals]
 
+ground_season={
+"type": "vec4",
+"value": Vector4(1, 0, 0, 0)
+}
 cutaway_focus={
 "type": "vec3",
 "value": Vector3(0, -1000, 0)

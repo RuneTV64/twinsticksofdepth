@@ -29,6 +29,8 @@ Camera in and out  Mouse wheel
 Throw  Pick up rocks and bottles, choose Throw on the Tab wheel, hold Ready, left-click: it lands at the crosshair
   and the noise draws zombies and raiders. From behind cover a click throws without showing yourself.
 Take-down  Weapon raised, right behind a raider who hasn't noticed you, crosshair on him: left-click.
+Seasons  M steps the season (spring, summer, autumn, winter); K turns the rain on and off. The ground follows.
+  B swaps the new ground for the old plain one.
 Light and dark  N steps the time of day (day, dusk, night, dawn). In the dark you are seen from less far and see
   less far; a fire or lamp lights whoever stands in it; a gunshot shows you up for a moment.
 Torch  E switches it on and off (it is in the tool box). A beam where you face: you see by it, and it shows you.

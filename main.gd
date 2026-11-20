@@ -25,6 +25,7 @@ var player: Player
 var rig: CamRig
 var hud: Hud
 var _test_wound := 0
+var _plain_ground: ShaderMaterial
 var fog: Node3D
 var cutaway: Cutaway
 var horde: Horde
@@ -140,6 +141,14 @@ func _unhandled_input(event: InputEvent) -> void:
 						at = player.global_position + player.facing * 10.0
 					_raiders.append(_raider(Vector3(at.x, 0.05, at.z)))
 					player.show_status("Raider added (Shift+T removes them)", 1.5)
+			KEY_M:   # the season, by hand until there is a clock
+				player.show_status("%s." % Seasons.it.next_season(), 1.5)
+			KEY_K:   # rain on and off
+				Seasons.it.set_rain(not Seasons.it.raining)
+				player.show_status("It is raining." if Seasons.it.raining else "The rain stops.", 1.5)
+			KEY_B:   # the new ground / the old plain one
+				var gm := Ground.it.mesh
+				gm.material_override = _plain_ground if gm.material_override == Ground.it.material else Ground.it.material
 			KEY_N:   # the time of day, by hand until there is a clock: day, dusk, night, dawn
 				player.show_status("%s." % Daylight.next_time(), 1.5)
 			KEY_Z:   # the horde readout: zombies out of play / in play / warmth, area by area
@@ -308,18 +317,18 @@ func _build_environment() -> void:
 	we.environment = env
 	add_child(we)
 
-	# Ground with a world-space checker so you can feel your speed.
-	var ground := StaticBody3D.new()
-	ground.collision_layer = 1
-	var gs := CollisionShape3D.new()
-	var gb := BoxShape3D.new()
-	gb.size = Vector3(WORLD_X1 - WORLD_X0 + 10.0, 1, WORLD_Z1 - WORLD_Z0 + 10.0)
-	gs.shape = gb
-	ground.add_child(gs)
-	var gm := MeshInstance3D.new()
-	var gbm := BoxMesh.new()
-	gbm.size = gb.size
-	gm.mesh = gbm
+	# The ground: soil, with a dirt road up the yard to the street, a ploughed field, and a patch each of clay and
+	# mud (assets/ground: ground.gd paints it, ground.gdshader draws it, seasons.gd turns the year).
+	add_child(Seasons.new())
+	var ground := Ground.new()
+	add_child(ground)
+	ground.setup(Rect2(WORLD_X0, WORLD_Z0, WORLD_X1 - WORLD_X0, WORLD_Z1 - WORLD_Z0), "soil")
+	ground.road([Vector2(-1, 40), Vector2(1.5, 26), Vector2(-1, 12), Vector2(0.5, -4), Vector2(0, -20), Vector2(0, -36)])
+	ground.rect("farm", Rect2(18, 16, 18, 17), 14.0)
+	ground.blob("clay", Vector2(10, 31), 4.0)
+	ground.blob("mud", Vector2(-10, 24), 3.5)
+	ground.apply()
+	# The old plain ground, kept to fall back on (B) if the new shader misbehaves on some machine.
 	var sh := Shader.new()
 	sh.code = """
 shader_type spatial;
@@ -332,12 +341,8 @@ void fragment() {
 	ROUGHNESS = 0.95;
 }
 """
-	var smat := ShaderMaterial.new()
-	smat.shader = sh
-	gm.material_override = smat
-	ground.add_child(gm)
-	ground.position = Vector3((WORLD_X0 + WORLD_X1) * 0.5, -0.5, (WORLD_Z0 + WORLD_Z1) * 0.5)
-	add_child(ground)
+	_plain_ground = ShaderMaterial.new()
+	_plain_ground.shader = sh
 
 
 func _build_level() -> void:
