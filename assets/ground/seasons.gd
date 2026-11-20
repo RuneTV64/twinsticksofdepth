@@ -54,6 +54,8 @@ func set_season(i: int, at_once := false) -> void:
 	i = posmod(i, 4)
 	# Always forward through the year: winter to spring goes 3 -> 4, then wraps.
 	year = float(i) if at_once or float(i) >= now.x else float(i) + 4.0
+	if USUAL[i].y > snow and Ground.it != null:
+		Ground.it.clear_tracks()        # fresh snow covers them
 	snow = USUAL[i].y
 	frost = USUAL[i].z
 	if at_once:
@@ -68,6 +70,8 @@ func next_season() -> String:
 
 
 func set_rain(on: bool) -> void:
+	if on and not raining and Ground.it != null:
+		Ground.it.clear_tracks()        # rain washes the tracks out
 	raining = on
 	set_process(true)
 

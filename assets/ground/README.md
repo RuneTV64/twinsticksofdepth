@@ -75,6 +75,18 @@ add_child(GrassBlades.in_rect("tall", Rect2(6, 8, 9, 7)))   # or a patch of stan
 One kind on its own (a patch, an earth floor): a `ShaderMaterial` with `dirt.gdshader` and its `kind`.
 `Ground.it.kind_at(pos)` says what the ground is made of at a place, for footsteps, mud and tracks later.
 
+## Soft ground: mud that slows, and tracks
+
+- `Ground.softness(pos)` says how soft the ground is as the season has it: mud is soft unless a drought has
+  baked it or a frost has frozen it; a ploughed field is a little soft; bare ground is when it is soaked.
+- Mud slows whoever walks in it (`slow_at()`): to about 0.6 of walking speed in spring, 0.5 in rain
+  (`mud_slow`), not at all when dried out or frozen. The player, zombies and raiders alike.
+- Feet leave prints in soft ground and in lying snow (`stamp()`): a print a stride for anyone walking, a
+  swathe for anyone crawling. They are kept in a second map (a texel to 0.125 m) and drawn by `ground.gdshader`:
+  pressed dark in earth, holding a little water when it is wet, packed blue-grey in snow. Rain washes them out
+  and fresh snow covers them (`clear_tracks()`); otherwise they stay. Prints are drawn bigger than a real boot
+  so they read from the camera's height.
+
 ## Files
 
 | File | What it is |
@@ -101,6 +113,8 @@ One kind on its own (a patch, an earth floor): a `ShaderMaterial` with `dirt.gds
 - Zoomed right out a texel is about a screen pixel, so fine detail may shimmer.
 - Standing grass: no shadows cast, nothing but the player parts it (zombies and raiders walk through it
   unmoved), and its cost with tens of thousands of tufts is unmeasured.
-- Nothing in the game reads the kind of ground yet (no mud slowing you, no tracks, no footstep sounds).
+- Nobody follows tracks yet (raiders don't read yours), tracks don't fade with time, grass takes none, and the
+  ground makes no difference to footstep noise.
+- Prints sit on a plain world grid, not the ground's turned one, so close up they look like small diamonds.
 - The texel grid is turned to the camera's fixed 45 degrees (`GROUND_TURN` in `ground_lib`); if the camera's
   angle ever changes, change it to match.

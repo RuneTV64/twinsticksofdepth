@@ -357,6 +357,10 @@ var _torch_light: SpotLight3D
 @export var torch_angle_deg := 24.0      # half its width
 @export var torch_seen := 1.5            # carrying a light in the dark, you are seen from this much further than by day
 var _grass_push := Vector4.ZERO
+var _ground_slow := 1.0          # what the ground underfoot does to your speed (mud); looked up on the slow clock
+var _step_from := Vector3.ZERO   # where the last footprint went down
+var _step_side := 1
+@export var stride := 0.7        # m between footprints (crawling leaves a swathe every 0.2 m)
 var _lit_t := 0.0                # your own muzzle flash is still showing you up
 var prone_w := 0.0               # for the body: 1 = lying flat
 ## Prone, you lie along prone_dir (head that way) and crawl on your front. With a gun raised you stay put:
@@ -806,7 +810,7 @@ func _physics_process(delta: float) -> void:
 			spd = run_speed
 		var tired := fatigue()
 		spd *= lerpf(1.0, fatigue_min_speed, tired)
-		spd *= held_speed() * sheet.speed_mult * [1.0, crouch_speed, prone_speed][posture]
+		spd *= held_speed() * sheet.speed_mult * [1.0, crouch_speed, prone_speed][posture] * _ground_slow
 		if posture == 2 and ((armed and not is_melee()) or prone_back > 0.0):
 			spd = 0.0           # aiming from the ground, on your back, or rolling over: you aren't going anywhere
 		if perch > 0.25:
@@ -840,12 +844,26 @@ func _physics_process(delta: float) -> void:
 	perch = move_toward(perch, Enemy.heap_height(global_position) if heaps else 0.0, 3.0 * delta)
 	_visual.position.y = perch
 
+	_update_ground()
 	_update_facing(delta, move_dir)
 	_update_sight(delta)
 	_update_line_of_fire()
 	_update_combat()
 	_update_interact()
 	_update_visuals(delta)
+
+
+## Footprints in soft ground and snow, and the mud's drag, from the ground underfoot (ground.gd).
+func _update_ground() -> void:
+	if Ground.it == null or dead:
+		return
+	var moved := global_position - _step_from
+	moved.y = 0.0
+	var crawl := posture == 2
+	if moved.length() >= (0.2 if crawl else stride) and perch < 0.25:
+		_step_from = global_position
+		_step_side = -_step_side
+		Ground.it.stamp(global_position, moved, _step_side, crawl)
 
 
 func _tick_timers(delta: float) -> void:
@@ -887,6 +905,10 @@ func _tick_timers(delta: float) -> void:
 			_die("You turned.")
 		if not dead and sheet.body.dead_from_blood() and not invulnerable:
 			_die("You bled out.")
+		var slow := Ground.it.slow_at(global_position) if Ground.it != null else 1.0
+		if slow < 0.95 and _ground_slow >= 0.95 and not dead:
+			show_status("Mud: it drags at your feet.", 1.2)
+		_ground_slow = slow
 		if not dead:
 			sheet.tick(_sheet_t, _threat(), not held_by.is_empty(), in_cover and cover_mode == "hunker",
 				health / max_health, winded, weight / strength)

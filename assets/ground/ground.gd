@@ -15,6 +15,7 @@ extends StaticBody3D
 ## The season and the weather come from Seasons (seasons.gd); nothing here changes with them.
 
 const CELL := 0.25      # metres to a map texel
+const TRACK_CELL := 0.125   # metres to a texel of the tracks map: a footprint is two of them long
 ## Dirt is 0 to 7, grass from 8 (dirt_types.gdshaderinc, grass_types.gdshaderinc).
 const KINDS := {"soil": 0, "farm": 1, "road": 2, "clay": 3, "mud": 4, "lawn": 8, "meadow": 9, "rough": 10}
 
@@ -22,6 +23,7 @@ static var it: Ground
 
 var area := Rect2()
 var road_width := 4.0
+@export var mud_slow := 0.5         # walking speed in the deepest, wettest mud, as a share of normal
 var material: ShaderMaterial
 var mesh: MeshInstance3D
 
@@ -29,6 +31,13 @@ var _img: Image
 var _tex: ImageTexture
 var _w := 0
 var _h := 0
+# Tracks: where feet have pressed into soft ground. One byte a texel (how deep), drawn by the shader.
+var _tracks: Image
+var _tracks_tex: ImageTexture
+var _tw := 0
+var _th := 0
+var _tracks_dirty := false
+var _tracks_t := 0.0
 var _road_d := PackedFloat32Array()     # how far each texel is from the middle of the nearest road painted so far
 
 
@@ -51,6 +60,10 @@ func setup(rect: Rect2, base := "soil") -> void:
 	_road_d.resize(_w * _h)
 	_road_d.fill(INF)
 	fill(base)
+	_tw = ceili(rect.size.x / TRACK_CELL)
+	_th = ceili(rect.size.y / TRACK_CELL)
+	_tracks = Image.create(_tw, _th, false, Image.FORMAT_R8)
+	_tracks_tex = ImageTexture.create_from_image(_tracks)
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = Vector3(rect.size.x + 10.0, 1.0, rect.size.y + 10.0)
@@ -144,6 +157,93 @@ func apply() -> void:
 	material.set_shader_parameter("aim_map", _tex)
 	material.set_shader_parameter("map_rect", Vector4(area.position.x, area.position.y, _w * CELL, _h * CELL))
 	material.set_shader_parameter("road_width", road_width)
+	material.set_shader_parameter("track_map", _tracks_tex)
+	material.set_shader_parameter("track_rect", Vector4(area.position.x, area.position.y, _tw * TRACK_CELL, _th * TRACK_CELL))
+
+
+# ---------------------------------------------------------------- soft ground: slowing and tracks
+## How soft the ground is at a place, 0 firm .. 1 deep mud, as the season has it (seasons.gd): mud is soft unless
+## a drought has baked it or a frost has frozen it; a ploughed field is soft; anything is when it is soaked;
+## and lying snow takes a print whatever is under it.
+func softness(pos: Vector3) -> float:
+	var s := Seasons.it.now if Seasons.it != null else Vector4(1, 0, 0, 0)
+	var kind := kind_at(pos)
+	var frozen := s.w > 0.5
+	var soft := 0.0
+	if kind == "mud":
+		var year := fposmod(s.x, 4.0)
+		var summer := clampf(1.0 - absf(year - 1.0), 0.0, 1.0)
+		soft = 0.0 if frozen else clampf(0.65 + 0.35 * s.y - 0.8 * summer * (1.0 - s.y), 0.0, 1.0)
+	elif not frozen:
+		if kind == "farm":
+			soft = 0.3 + 0.3 * s.y
+		elif kind != "lawn" and kind != "meadow":
+			soft = 0.45 * smoothstep(0.55, 1.0, s.y)
+	return soft
+
+
+## How much the ground here slows whoever walks on it: 1 not at all. Only mud does, more the wetter it is (down
+## to `mud_slow` in the worst of it).
+func slow_at(pos: Vector3) -> float:
+	if kind_at(pos) != "mud":
+		return 1.0
+	return lerpf(1.0, mud_slow, softness(pos))
+
+
+## Does the ground here take a print? In soft ground, or in lying snow.
+func takes_tracks(pos: Vector3) -> bool:
+	return softness(pos) > 0.25 or (Seasons.it != null and Seasons.it.now.z > 0.15)
+
+
+## A foot comes down here: `dir` the way they are going, `side` -1 left foot, 1 right. `drag` is someone
+## crawling or being dragged: a swathe, not a print. Nothing happens on firm ground.
+func stamp(pos: Vector3, dir: Vector3, side: int, drag := false) -> void:
+	if _tracks == null or not takes_tracks(pos):
+		return
+	var d := Vector2(dir.x, dir.z)
+	if d.length() < 0.01:
+		return
+	d = d.normalized()
+	var across := Vector2(-d.y, d.x)
+	var at := Vector2(pos.x, pos.z) + across * (0.16 * side)
+	if drag:
+		for i in range(-2, 3):
+			_press(at + across * (i * TRACK_CELL), 0.75)
+	else:
+		# A print: bigger than a real boot, so it reads from the camera's height. Heel, sole and toe, two wide.
+		for i in 3:
+			_press(at + d * (i * TRACK_CELL), 1.0 if i < 2 else 0.8)
+			_press(at + d * (i * TRACK_CELL) + across * (TRACK_CELL * side), 0.9 if i < 2 else 0.7)
+	_tracks_dirty = true
+	set_process(true)
+
+
+func _press(p: Vector2, depth: float) -> void:
+	var x := floori((p.x - area.position.x) / TRACK_CELL)
+	var y := floori((p.y - area.position.y) / TRACK_CELL)
+	if x >= 0 and y >= 0 and x < _tw and y < _th:
+		_tracks.set_pixel(x, y, Color(maxf(_tracks.get_pixel(x, y).r, depth), 0, 0))
+
+
+## Wipe every track (rain washes them out; fresh snow covers them).
+func clear_tracks() -> void:
+	if _tracks != null:
+		_tracks.fill(Color(0, 0, 0))
+		_tracks_dirty = true
+		set_process(true)
+
+
+# New prints go to the graphics card a few times a second at most, and not at all when nobody is making any.
+func _process(delta: float) -> void:
+	_tracks_t -= delta
+	if _tracks_t > 0.0:
+		return
+	if _tracks_dirty:
+		_tracks_tex.update(_tracks)
+		_tracks_dirty = false
+		_tracks_t = 0.2
+	else:
+		set_process(false)
 
 
 ## Standing grass wherever the ground is painted as grass: long blades on meadow, tussocks on rough ground. (Lawn

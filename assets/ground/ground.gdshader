@@ -13,6 +13,9 @@ uniform sampler2D kind_map : filter_nearest, repeat_disable;
 uniform sampler2D aim_map : filter_linear, repeat_disable;
 uniform vec4 map_rect = vec4(0.0, 0.0, 1.0, 1.0);     // what the map covers on the ground: x, z, width, depth
 uniform float road_width = 4.0;
+// Tracks: where feet have pressed into soft ground or snow (ground.gd stamps them). r = how deep.
+uniform sampler2D track_map : filter_nearest, repeat_disable;
+uniform vec4 track_rect = vec4(0.0, 0.0, 1.0, 1.0);
 uniform float border = 0.5;                            // m the borders between kinds wander
 
 varying vec3 wp;
@@ -38,6 +41,20 @@ void fragment() {
 		g = grass_pick(kind, p, texel, e);
 	} else {
 		g = dirt_pick(kind, p, texel, dir, lat, road_width * 0.5, e);
+	}
+	// A print: pressed down, so darker; in wet mud it holds a little water.
+	float track = texture(track_map, (wp.xz - track_rect.xy) / track_rect.zw).r;
+	if (track > 0.01) {
+		if (g.ramp == R_SNOW) {
+			g.ramp = R_ICE;                            // trodden snow: packed, blue-grey, plain against the white
+			g.v = 0.42 - 0.22 * track;
+		} else if (g.ramp != R_WATER && g.ramp != R_ICE) {
+			g.v -= 0.36 * track;
+			if (e.wet > 0.6 && track > 0.9 && gh1(texel * 0.47 + 3.3) > 0.55) {
+				g.ramp = R_WATER;
+				g.v = 0.5;
+			}
+		}
 	}
 	vec3 c = ground_color(g, texel);
 	ALBEDO=pow(c,vec3(2.2));

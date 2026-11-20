@@ -777,12 +777,24 @@ then grasses, as a second batch. Everything is in `assets/ground/` (its README h
 - The test level uses it: soil, a dirt road up the yard, a field, clay and mud patches, a lawn by the spawn, a
   meadow down the west side, rough ground; about 7,900 tufts. B swaps back to the old plain ground, in case
   the shader misbehaves on the owner's machine.
+- Soft ground (owner, 20 Nov 2026: "make mud slow you and leave tracks"; untested on the owner's PC).
+  `Ground.softness(pos)` goes by the kind and the season: mud is soft unless baked by drought or frozen, a
+  field a little, bare ground when soaked. Mud slows (`slow_at()`, `mud_slow` 0.5): walking speed about 0.6 in
+  spring and 0.5 in rain, unchanged in a dry summer or a frost (cloud run: 2.1 m/s on firm ground, 1.29 in
+  spring mud, 1.05 in rain). The player looks it up on the sheet's slow clock; zombies and raiders at each
+  footfall, and are slowed the same. Tracks: `Ground.stamp(pos, dir, side, drag)` presses a print (or a
+  crawler's swathe) into a second map, a texel to 0.125 m, in soft ground or lying snow only; the player
+  stamps every 0.7 m (`Player._update_ground()`), enemies every 0.75 m (`Enemy._leave_tracks()`). The shader
+  draws them dark in earth, with a little water in them when wet, and packed blue-grey in snow. Rain and fresh
+  snow wipe them (`Seasons` calls `clear_tracks()`); nothing else does. The map goes to the graphics card at
+  most 5 times a second and only when someone has made a print. Sheet: `assets/ground/preview/tracks.png`.
+  Not built: anyone following tracks, tracks fading with time, tracks in grass, footstep noise by ground.
 - Review sheets (software renderer, made by `tools/ground_preview.gd`, SHEET=dirt, grass or scene):
   `assets/ground/preview/dirt_seasons.png`, `dirt_scene_seasons.png`, `grass_seasons.png`,
   `grass_scene_seasons.png`.
 - Unchecked: everything on Forward+ (colours, the stepped light, shadows on the ground: the cloud renderer drew
-  none, cost). Zoomed right out a texel is about a pixel and may shimmer. Nothing reads the kind of ground yet
-  (mud doesn't slow, no tracks or footstep sounds); zombies and raiders don't part the grass.
+  none, cost). Zoomed right out a texel is about a pixel and may shimmer. Zombies and raiders don't part the
+  grass.
 - Also in the Ground Assets artifact (see Where game design assets live).
 
 ## Character sheet (built 20 Nov 2026, in review; untested on the owner's PC)

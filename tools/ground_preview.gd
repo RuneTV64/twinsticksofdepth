@@ -82,6 +82,17 @@ func _scene(world: Node3D, sun: DirectionalLight3D) -> void:
 		g.blob("lawn", Vector2(0, 12), 4.0)
 		g.blob("rough", Vector2(15, 4), 3.5)
 	g.apply()
+	if OS.get_environment("TRACKS") != "":
+		# Someone walked across the mud and on over the soil and the road; someone else crawled through the mud.
+		world.add_child(Seasons.new())
+		Seasons.it.now = w[1]
+		var side := 1
+		for i in 46:
+			side = -side
+			g.stamp(Vector3(-15.0 + i * 0.7, 0, 14.0 - i * 0.42), Vector3(0.7, 0, -0.42), side)
+		for i in 60:
+			g.stamp(Vector3(-12.0 + i * 0.12, 0, 7.5 + i * 0.1), Vector3(0.12, 0, 0.1), 1, true)
+		g._tracks_tex.update(g._tracks)
 	if OS.get_environment("GRASS") != "":
 		for c in g.get_children():
 			pass
@@ -112,6 +123,9 @@ func _scene(world: Node3D, sun: DirectionalLight3D) -> void:
 	var rig := Node3D.new()
 	world.add_child(rig)
 	rig.rotation.y = deg_to_rad(45.0)
+	if OS.get_environment("AT") != "":       # what the camera looks at: "x,z"
+		var at := OS.get_environment("AT").split_floats(",")
+		rig.position = Vector3(at[0], 0.0, at[1])
 	var pitch := deg_to_rad(56.0)
 	var dist := float(OS.get_environment("DIST")) if OS.get_environment("DIST") != "" else 30.0
 	cam.reparent(rig)

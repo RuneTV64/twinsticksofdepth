@@ -376,10 +376,11 @@ func _physics_process(delta: float) -> void:
 		want = _detour_dir * want.length()
 	var going := want.normalized() if want.length() > 0.3 else Vector3.ZERO
 	_knock = _knock.move_toward(Vector3.ZERO, 18.0 * delta)
-	velocity.x = want.x + _knock.x
-	velocity.z = want.z + _knock.z
+	velocity.x = want.x * _ground_slow + _knock.x
+	velocity.z = want.z * _ground_slow + _knock.z
 	velocity.y = 0.0 if is_on_floor() else velocity.y - 25.0 * delta
 	move_and_slide()
+	_leave_tracks()
 	for i in get_slide_collision_count():
 		var col := get_slide_collision(i).get_collider()
 		if col == null:

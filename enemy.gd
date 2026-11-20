@@ -180,6 +180,9 @@ var hurt_t := 0.0
 var hit_dir := Vector3.ZERO
 var body: ZombieBody
 ## Things it has on it (item Dictionaries): they fall where it dies.
+var _step_from := Vector3.ZERO     # where its last footprint went down (soft ground and snow take tracks)
+var _step_side := 1
+var _ground_slow := 1.0            # what the ground underfoot does to its speed (mud); looked up at each footfall
 var carried: Array[Dictionary] = []
 var was_player := false      # this was your last character
 
@@ -385,6 +388,20 @@ func shove(dir: Vector3, force: float) -> void:
 		_set_state("walk")
 	if randf() < knockdown_chance * 0.5 * lerpf(topple_by_rot.x, topple_by_rot.y, body.rot()):
 		_knock_down()
+
+
+## Its feet leave prints in soft ground and snow, like anyone's; crawling, a swathe.
+func _leave_tracks() -> void:
+	if Ground.it == null:
+		return
+	var moved := global_position - _step_from
+	moved.y = 0.0
+	if moved.length() >= (0.25 if crawling else 0.75):
+		_step_from = global_position
+		_step_side = -_step_side
+		_ground_slow = Ground.it.slow_at(global_position)
+		if perch < 0.25:
+			Ground.it.stamp(global_position, moved, _step_side, crawling)
 
 
 ## Just turned: it starts on the ground and gets up.
@@ -623,11 +640,13 @@ func _tick(delta: float) -> void:
 		velocity.z = _knock.z
 	var pressed := stepped
 	if moving:
-		velocity.x *= _mult
-		velocity.z *= _mult
+		var drag := _mult * _ground_slow       # mud drags at it as it does at anyone
+		velocity.x *= drag
+		velocity.z *= drag
 		move_and_slide()
-		velocity.x /= _mult
-		velocity.z /= _mult
+		velocity.x /= drag
+		velocity.z /= drag
+		_leave_tracks()
 
 		# Shamblers push doors open just like the player does. Anything else solid it is walking into, it presses on.
 		_press_box = null
