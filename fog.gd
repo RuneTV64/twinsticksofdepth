@@ -29,6 +29,9 @@ var _mat: ShaderMaterial
 var _explored: Image
 var _explored_tex: ImageTexture
 var _mark_t := 0.0
+var _lamps_sent := -1
+## How black the dead of night is drawn where no lamp reaches (1 = pitch black).
+@export var dark_max := 0.82
 var _clock := 0.0   # game seconds; what "last seen" times are measured against
 
 const SHADER := """
@@ -53,6 +56,11 @@ uniform float stale_delay;
 uniform float stale_time;
 uniform float edge_soft;
 uniform float see_past;
+// Light and dark (daylight.gd): how dark the open is, how far the dark lets you see, and the lamps.
+uniform float dark;              // 0 day .. 1 the dead of night
+uniform float dark_max;          // how black full dark is drawn
+uniform float night_sight;       // share of your sight the daylight leaves you
+uniform vec4 lamps[LAMP_COUNT];  // xyz = where, w = radius (0 = unused)
 
 void vertex() {
 	// Cover the whole screen whatever the camera is doing.
@@ -62,6 +70,7 @@ void vertex() {
 void fragment() {
 	float depth = texture(depth_tex, SCREEN_UV).r;
 	float fog = unexplored_dim;
+	float night = dark;
 	if (depth > 0.000001) {
 		// Rebuild the world position of whatever is drawn at this pixel.
 		vec4 view = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, depth, 1.0);
@@ -76,7 +85,17 @@ void fragment() {
 		int i1 = (i0 + 1) % RAY_COUNT;
 		float wall = mix(rays[i0], rays[i1], fract(f)) + see_past;
 		float off = abs(mod(ang - face_angle + PI, TAU) - PI);
-		float cone = mix(sight_range, sight_near, smoothstep(half_fov, half_fov + taper, off));
+		// How lit this spot is by a lamp or a fire: a lit place shows from as far as ever, and isn't darkened.
+		float lit = 0.0;
+		for (int li = 0; li < LAMP_COUNT; li++) {
+			float lr = lamps[li].w;
+			if (lr > 0.0) {
+				lit = max(lit, 1.0 - smoothstep(lr * 0.35, lr, length(world.xz - lamps[li].xz)));
+			}
+		}
+		night = dark * (1.0 - lit);
+		float far = sight_range * mix(night_sight, 1.0, lit);
+		float cone = mix(far, min(sight_near, far), smoothstep(half_fov, half_fov + taper, off));
 		float reach = min(wall, cone);
 		float in_view = 1.0 - smoothstep(reach - edge_soft, reach, dist);
 
@@ -91,7 +110,9 @@ void fragment() {
 	ALBEDO = vec3(0.0);
 	// Blending happens in linear light, where 6% left still reads as fairly bright.
 	// Convert so the dim values mean what they look like on screen.
-	ALPHA = 1.0 - pow(1.0 - fog, 2.2);
+	// The dark lies over everything, seen or not; the fog of war goes on top of it.
+	float seen_alpha = 1.0 - pow(1.0 - fog, 2.2);
+	ALPHA = 1.0 - (1.0 - seen_alpha) * (1.0 - night * dark_max);
 }
 """
 
@@ -105,7 +126,7 @@ func _ready() -> void:
 	_explored_tex = ImageTexture.create_from_image(_explored)
 
 	var sh := Shader.new()
-	sh.code = SHADER.replace("RAY_COUNT", str(Player.SIGHT_RAYS))
+	sh.code = SHADER.replace("RAY_COUNT", str(Player.SIGHT_RAYS)).replace("LAMP_COUNT", str(Daylight.LAMP_MAX))
 	_mat = ShaderMaterial.new()
 	_mat.shader = sh
 	_mat.render_priority = 5   # over the world and faded enemies, under the reticle (10)
@@ -142,6 +163,18 @@ func _process(delta: float) -> void:
 	_mat.set_shader_parameter("unexplored_dim", unexplored_dim)
 	_mat.set_shader_parameter("edge_soft", edge_soft)
 	_mat.set_shader_parameter("see_past", see_past)
+	_mat.set_shader_parameter("dark", 1.0 - Daylight.level)
+	_mat.set_shader_parameter("dark_max", dark_max)
+	_mat.set_shader_parameter("night_sight", Daylight.sight_share())
+	if _lamps_sent != Daylight.lamps.size():
+		# (Lamps don't move: sent when one is added.)
+		_lamps_sent = Daylight.lamps.size()
+		var arr := PackedVector4Array()
+		arr.resize(Daylight.LAMP_MAX)
+		for i in mini(_lamps_sent, Daylight.LAMP_MAX):
+			var lp: Vector3 = Daylight.lamps[i]["pos"]
+			arr[i] = Vector4(lp.x, lp.y, lp.z, float(Daylight.lamps[i]["radius"]))
+		_mat.set_shader_parameter("lamps", arr)
 	_mark_t -= delta
 	if _mark_t <= 0.0:
 		_mark_t = 0.1

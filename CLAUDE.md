@@ -675,8 +675,31 @@ with crouching and going prone.
     fighting learn where it saw you and come looking; zombies come to the shout.
   - Raiders out searching go in a crouch (the look only: it doesn't yet make them harder to see or quieter).
     They don't go prone.
-  - Light and dark: not built. It needs a time of day and the level's lighting, which can't be checked in a
-    cloud session.
+  - Light and dark: see below.
+- Light and dark (owner, 20 Nov 2026: "build light and dark for stealth"; untested on the owner's PC, and its
+  look could not be rendered in the cloud at all). `daylight.gd` (`Daylight`, one node in the level):
+  - How light a spot is (`Daylight.at(pos)`, 0 to 1) is the daylight or a lamp near by, whichever is brighter.
+    Daylight is `level`: day 1, dusk and dawn 0.45, night 0 (open ground at night is 0.08, starlight). There is
+    no clock, so N steps the time of day by hand and the light eases over 4 s; the clock is to drive
+    `Daylight.want`. Lamps (`Daylight.add_lamp(pos, radius)`, `main.gd` `_lamp()`): full light near, fading to
+    nothing at the radius. Two in the test level: the raider camp's fire (9 m) and a lamp by the spawn (6 m).
+  - Being seen: `Player.seen_mult()` is also times 0.3 in pitch dark up to 1 in full light (`dark_seen`), by
+    the light where you stand (`light_on_you()`). So at night in the open a raider sees you from 6.4 m instead
+    of 18 and a zombie notices from 4.3 m instead of 12; in a lamp's light, from as far as by day. It stacks with
+    crouching, lying flat and tall grass. A raider also takes up to about twice as long to be sure of you in the
+    dark. Firing a gun lights you fully for 0.6 s (`shot_lights_you`).
+  - Seeing: your own sight shrinks to 0.35 by night (40 m to 14 m), but anything standing in lamp light shows
+    from as far as by day (`Player.can_see()`, and the same in the fog shader). So a lit camp stands out at
+    night and you don't.
+  - On screen: the fog of war's screen quad (`fog.gd`) lays the dark over everything, up to `dark_max` 0.82
+    black at night, except where a lamp lights the ground. It is done there because the character shaders do
+    their own lighting and are approved assets: scene lights alone would not darken them. Lamps also have a
+    real warm `OmniLight3D` for the look. The level's sun and sky are not dimmed.
+  - Cloud run at night: standing in the dark, a raider on watch first saw the player at 5 m; standing in the
+    lamp's light, at 12 m (the furthest tried).
+  - Not built: a torch or anything the player carries that gives light, raiders carrying lights, light from
+    windows or indoors versus outdoors, moonlight by phase, shadows cast by walls counting as dark, at most 8
+    lamps drawn (`LAMP_MAX`), zombies and raiders being hard for you to see for any reason but distance.
 
 ## Throwing (built 20 Nov 2026, in review; untested on the owner's PC)
 

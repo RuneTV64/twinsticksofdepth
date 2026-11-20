@@ -286,6 +286,7 @@ func _physics_process(delta: float) -> void:
 				var t: float = lerpf(notice_time.x, notice_time.y, clampf(d_p / sight, 0.0, 1.0)) * [1.0, 1.8, 2.5][player.posture]
 				if player.running:
 					t *= 0.6
+				t /= lerpf(0.45, 1.0, player.light_on_you())      # in the dark it takes longer to be sure
 				notice = minf(notice + 0.2 / t, 1.0)
 				if notice >= 0.25 and notice < 1.0:
 					var to_p := player.global_position - global_position

@@ -47,6 +47,8 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	Cover.clear()
 	TallGrass.clear()
+	Daylight.reset()
+	add_child(Daylight.new())
 	Cover.bounds = Rect2(WORLD_X0, WORLD_Z0, WORLD_X1 - WORLD_X0, WORLD_Z1 - WORLD_Z0)
 	_build_environment()
 	_build_level()
@@ -138,6 +140,8 @@ func _unhandled_input(event: InputEvent) -> void:
 						at = player.global_position + player.facing * 10.0
 					_raiders.append(_raider(Vector3(at.x, 0.05, at.z)))
 					player.show_status("Raider added (Shift+T removes them)", 1.5)
+			KEY_N:   # the time of day, by hand until there is a clock: day, dusk, night, dawn
+				player.show_status("%s." % Daylight.next_time(), 1.5)
 			KEY_Z:   # the horde readout: zombies out of play / in play / warmth, area by area
 				if _zone_label == null:
 					_zone_label = Label.new()
@@ -654,7 +658,33 @@ func _box(pos: Vector3, size: Vector3, col: Color) -> StaticBody3D:
 
 
 ## Raiders' camp, in the south-west corner of the yard: three raiders on watch among things to hide behind.
+## A fire or a lamp: it lights the ground round it at night (who stands in it can be seen), with a real light
+## for the look of it.
+func _lamp(pos: Vector3, radius: float) -> void:
+	Daylight.add_lamp(pos, radius)
+	var l := OmniLight3D.new()
+	l.position = pos + Vector3(0.0, 1.2, 0.0)
+	l.omni_range = radius
+	l.light_color = Color(1.0, 0.72, 0.4)
+	l.light_energy = 1.6
+	add_child(l)
+	var m := MeshInstance3D.new()
+	var b := BoxMesh.new()
+	b.size = Vector3(0.5, 0.3, 0.5)
+	m.mesh = b
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.9, 0.5, 0.2)
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.55, 0.2)
+	mat.emission_energy_multiplier = 2.0
+	m.material_override = mat
+	m.position = pos + Vector3(0.0, 0.15, 0.0)
+	add_child(m)
+
+
 func _build_raider_camp() -> void:
+	_lamp(Vector3(-26, 0, 25), 9.0)      # the camp's fire: at night they stand in its light and you don't
+	_lamp(Vector3(2, 0, 9), 6.0)         # a lamp by the spawn
 	var crate := Color(0.45, 0.36, 0.25)
 	var wall_col := Color(0.5, 0.48, 0.44)
 	_box(Vector3(-26, 0.55, 20), Vector3(4.0, 1.1, 0.5), wall_col)     # a low wall facing the yard

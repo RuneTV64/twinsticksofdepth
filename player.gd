@@ -350,6 +350,7 @@ var held_by: Array[Enemy] = []   # zombies that have hold of you
 ## How you are standing: 0 on your feet, 1 crouched, 2 flat on the ground. Lower is slower, quieter and harder
 ## to see, and your own eyes are lower too.
 var posture := 0
+var _lit_t := 0.0                # your own muzzle flash is still showing you up
 var prone_w := 0.0               # for the body: 1 = lying flat
 ## Prone, you lie along prone_dir (head that way) and crawl on your front. With a gun raised you stay put:
 ## aiming ahead of you, you stay on your stomach; aiming behind you, you roll onto your back, head where it was,
@@ -373,6 +374,8 @@ var _on_back := false
 @export var prone_speed := 0.25
 @export var crouch_seen := 0.65          # crouched, you are seen from this much of the usual distance
 @export var prone_seen := 0.4
+@export var dark_seen := 0.3              # in pitch dark you are seen from this much of the usual distance
+@export var shot_lights_you := 0.6        # s a gunshot shows you up, however dark it is
 @export var grass_crouch_seen := 0.7      # crouched in tall grass: this much again
 @export var grass_prone_seen := 0.35      # flat in tall grass: you have to be nearly trodden on (about 2.5 m for a raider)
 @export var crouch_hide_reach := 1.3     # m: crouched this close behind low cover, it hides you from the far side
@@ -838,6 +841,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _tick_timers(delta: float) -> void:
+	_lit_t -= delta
 	_draw_t -= delta
 	_fire_cd -= delta
 	_dash_t -= delta
@@ -1401,6 +1405,7 @@ func _start_finisher() -> void:
 		# Ready with the gun: a round through the head. Certain, and loud.
 		mag -= 1
 		_flash_t = 0.06
+		_lit_t = shot_lights_you
 		_fire_cd = fire_interval
 		shots_fired += 1
 		Earshot.make(global_position, shot_noise_range, get_tree())
@@ -1556,7 +1561,9 @@ func can_see(pos: Vector3, radius := 0.4) -> bool:
 	if dead:
 		return false
 	var d := Vector2(pos.x - global_position.x, pos.z - global_position.z).length()
-	return d <= sight_reach_toward(pos) + radius
+	# By night the dark closes in; what stands in lamp light still shows from as far as ever.
+	var dark := lerpf(Daylight.sight_share(), 1.0, Daylight.lamp_light(pos))
+	return d <= sight_reach_toward(pos) * dark + radius
 
 
 ## The reticle is red only when a shot fired right now would really hit an enemy. This traces
@@ -1965,6 +1972,7 @@ func _blind_fire() -> void:
 func _shoot(dir: Vector3, from: Vector3, aimed: bool) -> void:
 	mag -= 1
 	_flash_t = 0.06
+	_lit_t = shot_lights_you
 	var shot := Projectile.new()
 	shot.dir = dir
 	shot.speed = shot_speed
@@ -2381,7 +2389,12 @@ func seen_mult() -> float:
 	var m: float = [1.0, crouch_seen, prone_seen][posture]
 	if posture > 0 and TallGrass.at(global_position):
 		m *= grass_crouch_seen if posture == 1 else grass_prone_seen      # down in tall grass
-	return m
+	return m * lerpf(dark_seen, 1.0, light_on_you())
+
+
+## How lit you are, 0 to 1: the daylight or a lamp where you stand, or your own gun going off.
+func light_on_you() -> float:
+	return 1.0 if _lit_t > 0.0 else Daylight.at(global_position)
 
 
 ## How far your footsteps carry right now (0 = silent: standing still).

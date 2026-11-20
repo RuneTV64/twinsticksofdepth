@@ -29,6 +29,8 @@ Camera in and out  Mouse wheel
 Throw  Pick up rocks and bottles, choose Throw on the Tab wheel, hold Ready, left-click: it lands at the crosshair
   and the noise draws zombies and raiders. From behind cover a click throws without showing yourself.
 Take-down  Weapon raised, right behind a raider who hasn't noticed you, crosshair on him: left-click.
+Light and dark  N steps the time of day (day, dusk, night, dawn). In the dark you are seen from less far and see
+  less far; a fire or lamp lights whoever stands in it; a gunshot shows you up for a moment.
 Crouch  Ctrl (again to stand)      Prone  X (again to get up)
   Prone with a gun raised: you stay put and the crosshair reaches further. Aim behind you and you roll onto your back.
 Free look (HOLD)  F or middle mouse button: the camera leaves you and follows the crosshair further out
@@ -394,6 +396,9 @@ func _process(delta: float) -> void:
 		stance += "  - CROUCHED" if player.posture == 1 else ("  - PRONE" if player.prone_back < 0.5 else "  - ON YOUR BACK")
 		if TallGrass.at(player.global_position):
 			stance += " in tall grass"
+	if Daylight.level < 0.999:
+		var lt := player.light_on_you()
+		stance += "   [%s: %s]" % [Daylight.time_name(), "in the dark" if lt < 0.25 else ("in shadow" if lt < 0.6 else "lit up")]
 	if player.running:
 		stance += "  - running"
 	if player.cover_entering:
