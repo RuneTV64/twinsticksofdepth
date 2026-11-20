@@ -23,8 +23,34 @@ the character models, shaders and their scripts are in `assets/characters/` and 
 
 - The camera never turns (owner, 20 Nov 2026): it stays locked looking north, and only pans. No rotation of any
   kind, snapped or free. Code may go on assuming a fixed view (lighting, mouse-to-world mapping).
-- Not built, and not yet asked for: cutting away or fading buildings that stand between the camera and the player.
-  Tall buildings (the owner plans downtown areas with skyscrapers) will hide the street behind them without it.
+- Cutaway (built 20 Nov 2026, untested on the owner's PC): whatever stands between the camera and the player is cut
+  open, with a dithered edge, so the player is never hidden behind a wall or a tall building. The feet of walls
+  (up to 0.95 m) stay. `cutaway.gdshaderinc` has the test (`cutaway_hidden(world_pos, FRAGCOORD.xy)`); any spatial
+  shader takes part by including it and discarding. `cutaway.gd` (`Cutaway`, one node in the level) sets three
+  project-wide shader globals once a frame (`cutaway_focus`, `cutaway_view`, `cutaway_shape`, declared in
+  `project.godot` under `[shader_globals]`). The test level's walls, crates and doors use `Cutaway.solid(colour)`
+  (`level_solid.gdshader`, one shared material per colour). V switches it off and on. The cut edge isn't capped
+  (you see through the wall, not a filled section), and cut parts stop casting shadows.
+- The buildings themselves are for another day (owner): custom modular building pieces in the 8-shade pixel look.
+  Their shaders must include the cutaway.
+- Render: `tools/preview/cutaway.png` (off and on, behind a one-storey wall and behind a tall block), made by
+  `tools/cutaway_preview.gd`.
+
+## Where the game is going (owner, 20 Nov 2026)
+
+The aim is something like Project Zomboid with its own, better flavour. Two places the owner means to beat it:
+
+- Time. Zomboid is great for about the first six in-game months; after the first winter the years just repeat.
+  This game should keep changing as time passes. (Already planned: seasons, zombies rotting through their stages,
+  the clean-up lore.) Nothing designed yet beyond that.
+- Losing a character. Death stays permanent, but the player shouldn't always start from a blank slate. Idea:
+  special starting builds ("character slates") are unlocked by getting a character's stats or skills a certain
+  way AND finding a particular thing (a hat, a badge) at a particular place in the game. Example, tentative: level
+  the Electrician skill and meet the criteria, and a later character can start as one. So the character is lost
+  but the progress toward a kind of start is kept, and players are more likely to keep going after a death.
+  Not designed yet: skills don't exist, and the unlock criteria, items and places are open. Ask before building.
+- Order of work as the owner sees it: loot is more important than buildings; modular building assets come later;
+  spawning and how the horde moves, and the turning-undead mechanic, are also still to come.
 
 ## Naming: zombies and shamblers
 
@@ -206,7 +232,8 @@ changes, update both, and keep them the same files.
   a crosshair within `lock_on_mouse_radius` 1 m of a living enemy the player can see settles onto it (dead centre
   inside `lock_on_core` 0.5 m, fading to nothing at the radius, so it never sticks) and follows it; moving the
   mouse takes it off. Exports in the Lock-on group. (The stick version went with the controller.)
-- Debug keys: G adds a test gunner at the crosshair (Shift+G removes them); T adds a raider (Shift+T removes those).
+- Debug keys: G adds a test gunner at the crosshair (Shift+G removes them); T adds a raider (Shift+T removes those);
+  V switches the cutaway off and on.
 - Debug keys: F1 help, C character page, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.

@@ -50,9 +50,7 @@ func _ready() -> void:
 	var bm := BoxMesh.new()
 	bm.size = box.size
 	_panel.mesh = bm
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.32, 0.22, 0.14) if locked else Color(0.55, 0.38, 0.22)
-	_panel.material_override = mat
+	_panel.material_override = Cutaway.solid(Color(0.32, 0.22, 0.14) if locked else Color(0.55, 0.38, 0.22))
 	_panel.position = shape.position
 	body.add_child(_panel)
 	if locked:
@@ -61,10 +59,7 @@ func _ready() -> void:
 			var b2 := BoxMesh.new()
 			b2.size = Vector3(width - 0.1, 0.12, 0.2)
 			band.mesh = b2
-			var bmat := StandardMaterial3D.new()
-			bmat.albedo_color = Color(0.25, 0.25, 0.28)
-			bmat.metallic = 0.6
-			band.material_override = bmat
+			band.material_override = Cutaway.solid(Color(0.25, 0.25, 0.28), 0.6)
 			band.position = Vector3(width * 0.5, y, 0.0)
 			body.add_child(band)
 

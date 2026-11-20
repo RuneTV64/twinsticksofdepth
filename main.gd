@@ -25,6 +25,7 @@ var player: Player
 var rig: CamRig
 var hud: Hud
 var fog: Node3D
+var cutaway: Cutaway
 
 # Crowd test (F5 / F6 / F7): extra shamblers to find out how many the game can take, and where the time goes.
 const CROWD_STEP := 50
@@ -66,6 +67,12 @@ func _ready() -> void:
 	fog.map_min = Vector2(WORLD_X0 - 4.0, WORLD_Z0 - 4.0)
 	fog.map_size = Vector2(WORLD_X1 - WORLD_X0 + 8.0, WORLD_Z1 - WORLD_Z0 + 8.0)
 	add_child(fog)
+
+	# Whatever stands between the camera and you is cut open.
+	cutaway = Cutaway.new()
+	cutaway.player = player
+	cutaway.camera = rig.cam
+	add_child(cutaway)
 
 	hud = Hud.new()
 	hud.player = player
@@ -115,6 +122,9 @@ func _unhandled_input(event: InputEvent) -> void:
 						at = player.global_position + player.facing * 10.0
 					_raiders.append(_raider(Vector3(at.x, 0.05, at.z)))
 					player.show_status("Raider added (Shift+T removes them)", 1.5)
+			KEY_V:   # the cutaway on / off, to compare
+				cutaway.enabled = not cutaway.enabled
+				player.show_status("Cutaway: %s" % ("ON" if cutaway.enabled else "OFF"), 1.5)
 			KEY_G:   # cover test: something that shoots at you
 				if event.shift_pressed:
 					for g in get_tree().get_nodes_in_group("gunners"):
@@ -551,9 +561,7 @@ func _box(pos: Vector3, size: Vector3, col: Color) -> StaticBody3D:
 	var bm := BoxMesh.new()
 	bm.size = size
 	m.mesh = bm
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = col
-	m.material_override = mat
+	m.material_override = Cutaway.solid(col)   # opens up when it stands between the camera and you
 	b.add_child(m)
 	add_child(b)
 	Cover.add_box(b, pos, size)   # anything solid standing on the ground is cover (cover.gd)

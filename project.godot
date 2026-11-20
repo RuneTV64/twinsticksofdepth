@@ -30,3 +30,18 @@ window/size/viewport_height=900
 [rendering]
 
 anti_aliasing/quality/msaa_3d=2
+
+[shader_globals]
+
+cutaway_focus={
+"type": "vec3",
+"value": Vector3(0, -1000, 0)
+}
+cutaway_view={
+"type": "vec3",
+"value": Vector3(0, -0.83, -0.56)
+}
+cutaway_shape={
+"type": "vec4",
+"value": Vector4(2.6, 0.9, 0, 0)
+}
