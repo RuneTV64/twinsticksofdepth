@@ -52,6 +52,31 @@ The aim is something like Project Zomboid with its own, better flavour. Two plac
 - Order of work as the owner sees it: loot is more important than buildings; modular building assets come later;
   spawning and how the horde moves, and the turning-undead mechanic, are also still to come.
 
+## Loot (being designed with the owner, 20 Nov 2026; nothing built)
+
+The owner's decisions so far. Sketch of the loot screen: `tools/sketches/loot_screen_sketch.png` (its HTML beside
+it). The owner said to sketch before building anything; wait for their critique of the sketch.
+
+- Carrying: without a bag you have weighted slots (hands, belt, pockets, and so on). Bags and containers are a
+  full grid.
+- Searching drawers is a minigame of its own: the screen shows the actual drawer as a grid and you rummage in it.
+  Half the menu is your storage, the other half the thing you are searching. It should cost you your view, so
+  the player has to keep looking over their shoulder. First search takes time and is exposed; a container you
+  have already searched opens at once.
+- Loot on zombies comes from tables by who they were: gender, ethnicity, where they are, and profession (told by
+  what they wear), and by how decomposed they are: damaged and ruined items turn up more on bloated and putrid ones.
+- Food rots at about Zomboid's pace, but the game is more forgiving: rotten food still gives seeds and makes
+  compost. Farming is to be more accessible. Compost feeds soil quality, which is tracked across seasons.
+- A game day is long: 2 to 4 real hours. It is a slow game; eating and the like must not crowd out the fighting
+  and looting.
+- First items: mostly household things; two guns (one small calibre, one high-powered); some clothing; helmets
+  and the like for head protection; food and water.
+- Ammunition and loading weapons as in Zomboid (magazines, rounds), but smoother and far less menu-driven. The
+  owner wants to design this together: propose, don't just build.
+- Claude's earlier layout, which the owner answered against: items are records (weight, condition, category);
+  container contents are rolled when first opened; time is applied on opening (spoiling, picked over by others);
+  nothing respawns in a cupboard; keepsakes unlock starting builds.
+
 ## Naming: zombies and shamblers
 
 - **Zombies** is the name for the undead as a whole group.
