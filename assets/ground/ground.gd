@@ -36,6 +36,11 @@ var _tracks: Image
 var _tracks_tex: ImageTexture
 var _tw := 0
 var _th := 0
+## The player's own prints, in the order they were made: [{"p": Vector3, "t": seconds}]. What a tracker follows
+## (a raider reads them one after another, toward the newest). Only the last `TRAIL_MAX` are kept.
+var trail: Array[Dictionary] = []
+var trail_first := 0            # the number of trail[0]: prints keep their numbers when old ones are dropped
+const TRAIL_MAX := 400
 var _tracks_dirty := false
 var _tracks_t := 0.0
 var _road_d := PackedFloat32Array()     # how far each texel is from the middle of the nearest road painted so far
@@ -197,9 +202,14 @@ func takes_tracks(pos: Vector3) -> bool:
 
 ## A foot comes down here: `dir` the way they are going, `side` -1 left foot, 1 right. `drag` is someone
 ## crawling or being dragged: a swathe, not a print. Nothing happens on firm ground.
-func stamp(pos: Vector3, dir: Vector3, side: int, drag := false) -> void:
+func stamp(pos: Vector3, dir: Vector3, side: int, drag := false, by_player := false) -> void:
 	if _tracks == null or not takes_tracks(pos):
 		return
+	if by_player and (trail.is_empty() or (trail[-1]["p"] as Vector3).distance_to(pos) > 0.5):
+		trail.append({"p": pos, "t": Time.get_ticks_msec() * 0.001})
+		if trail.size() > TRAIL_MAX:
+			trail.remove_at(0)
+			trail_first += 1
 	var d := Vector2(dir.x, dir.z)
 	if d.length() < 0.01:
 		return
@@ -227,10 +237,35 @@ func _press(p: Vector2, depth: float) -> void:
 
 ## Wipe every track (rain washes them out; fresh snow covers them).
 func clear_tracks() -> void:
+	trail_first += trail.size()
+	trail.clear()
 	if _tracks != null:
 		_tracks.fill(Color(0, 0, 0))
 		_tracks_dirty = true
 		set_process(true)
+
+
+## The player's print nearest to `pos` within `radius`, numbered after `after` and no older than `max_age`
+## seconds: its number, or -1. (For someone reading the ground for tracks.)
+func trail_near(pos: Vector3, radius: float, after: int, max_age: float) -> int:
+	var now := Time.get_ticks_msec() * 0.001
+	var best := -1
+	var best_d := radius
+	for i in range(maxi(after + 1 - trail_first, 0), trail.size()):
+		var e: Dictionary = trail[i]
+		if now - float(e["t"]) > max_age:
+			continue
+		var d := (e["p"] as Vector3).distance_to(pos)
+		if d < best_d:
+			best_d = d
+			best = i + trail_first
+	return best
+
+
+## Where print number `n` is, or null if it has gone.
+func trail_point(n: int):
+	var i := n - trail_first
+	return trail[i]["p"] if i >= 0 and i < trail.size() else null
 
 
 # New prints go to the graphics card a few times a second at most, and not at all when nobody is making any.

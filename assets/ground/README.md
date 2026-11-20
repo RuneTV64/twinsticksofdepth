@@ -113,8 +113,8 @@ One kind on its own (a patch, an earth floor): a `ShaderMaterial` with `dirt.gds
 - Zoomed right out a texel is about a screen pixel, so fine detail may shimmer.
 - Standing grass: no shadows cast, nothing but the player parts it (zombies and raiders walk through it
   unmoved), and its cost with tens of thousands of tufts is unmeasured.
-- Nobody follows tracks yet (raiders don't read yours), tracks don't fade with time, grass takes none, and the
-  ground makes no difference to footstep noise.
+- Raiders follow the player's prints (`Ground.trail`, read by `raider.gd`); zombies don't. Tracks don't fade
+  with time, grass takes none, and the ground makes no difference to footstep noise.
 - Prints sit on a plain world grid, not the ground's turned one, so close up they look like small diamonds.
 - The texel grid is turned to the camera's fixed 45 degrees (`GROUND_TURN` in `ground_lib`); if the camera's
   angle ever changes, change it to match.

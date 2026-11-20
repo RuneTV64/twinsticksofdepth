@@ -121,6 +121,13 @@ var _see_t := 0.0
 @export var torch_angle_deg := 24.0
 var torch_on := false
 var _torch_light: SpotLight3D
+## Reading tracks: a raider who comes on your prints follows them, print by print, toward the newest.
+@export var track_sight := 5.0          # m: how near a print has to be for him to see it (and in front of him, and lit)
+@export var track_age := 240.0          # s: older prints he takes for stale and leaves alone
+@export var track_light := 0.3          # how lit the ground has to be to read it (his torch does it at night)
+var tracking := false
+var _trail_n := -1                 # the print he is walking to
+var _trail_done := -1              # the newest print he has already been to: he doesn't go back over them
 var _mark: Label3D
 var _mark_t := 0.0                 # s the "!" stays up
 @export var shout_range := 14.0    # m: how far its shout carries when it sees you (other raiders, and zombies)
@@ -316,6 +323,7 @@ func _physics_process(delta: float) -> void:
 		elif show_q:
 			_mark.text = "?"
 			_mark.modulate = Color(1.0, 0.85, 0.3, 0.35 + 0.65 * notice)
+		_read_tracks()
 		# Footsteps: it hears what it can't see, and goes to look. It learns where the sound was, no more.
 		_steps_t -= 0.2
 		var nr: float = player.noise_radius()
@@ -501,6 +509,54 @@ func shove(dir: Vector3, force: float) -> void:
 	if mode != "fight":
 		last_seen = player.global_position if player != null else global_position
 		_alert()
+
+
+## Looking at the ground for your prints (a few times a second, with the looking for you). On watch or out
+## searching, a print he can see sets him on the trail; on it, he goes from print to print until he sees you or
+## the prints run out (firm ground, or rain has washed them away), and then searches round where they stopped.
+func _read_tracks() -> void:
+	if Ground.it == null or dead or sees or mode == "fight":
+		tracking = false
+		return
+	var g := Ground.it
+	if tracking:
+		var at = g.trail_point(_trail_n)
+		if at == null:
+			tracking = false       # washed out from under him
+			return
+		notice = maxf(notice, 0.3)     # (the "?" over his head: he is onto something)
+		if _xz(at - global_position).length() < 1.9:      # (his walk stops 1.5 m short of where he is going)
+			_trail_done = _trail_n
+			# The next print on: a little way ahead, newer than this one.
+			var next := g.trail_near(at, 2.6, _trail_n, track_age)
+			if next < 0:
+				tracking = false   # the trail ends here: he looks about
+				return
+			_trail_n = next
+			last_seen = g.trail_point(next)
+			_search_t = search_time
+			_spots_made = false
+		return
+	if mode != "idle" and mode != "search" and mode != "return":
+		return
+	var n := g.trail_near(global_position, track_sight, _trail_done, track_age)
+	if n < 0:
+		return
+	var p: Vector3 = g.trail_point(n)
+	var to := p - global_position
+	to.y = 0.0
+	if to.length() > 0.8 and facing.dot(to.normalized()) < cos(deg_to_rad(sight_fov_deg) * 0.5):
+		return                     # behind him
+	if Daylight.at(p) < track_light:
+		return                     # too dark to read the ground
+	tracking = true
+	_trail_n = n
+	last_seen = p
+	mode = "search"
+	_search_t = search_time
+	_spots_made = false
+	armed = true
+	_mark_t = 0.0
 
 
 func _update_torch() -> void:

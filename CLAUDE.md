@@ -791,7 +791,18 @@ then grasses, as a second batch. Everything is in `assets/ground/` (its README h
   draws them dark in earth, with a little water in them when wet, and packed blue-grey in snow. Rain and fresh
   snow wipe them (`Seasons` calls `clear_tracks()`); nothing else does. The map goes to the graphics card at
   most 5 times a second and only when someone has made a print. Sheet: `assets/ground/preview/tracks.png`.
-  Not built: anyone following tracks, tracks fading with time, tracks in grass, footstep noise by ground.
+  Not built: tracks fading with time, tracks in grass, footstep noise by ground.
+- Raiders follow tracks (owner, 20 Nov 2026; untested on the owner's PC). `Ground.trail` is the player's own
+  prints in the order they were made (the last 400; `trail_near()`, `trail_point()`); zombies' and raiders'
+  prints are drawn but not kept. A raider on watch, searching or going home who has one of your prints
+  within `track_sight` 5 m, in front of him, on ground lit at least `track_light` 0.3 (his torch does that at
+  night) and no older than `track_age` 240 s, takes up the trail (`Raider._read_tracks()`, `tracking`): he
+  walks from print to print toward the newest, with the "?" over his head, until he sees you or the prints
+  run out, and then searches round where they stopped. He never goes back over prints he has followed. Rain
+  and fresh snow wipe the trail from under him. Cloud run in snow: a raider 3 m from the start of a 24 m
+  dog-leg trail took it up at once and found the player lying flat at the end of it in 10 s. He doesn't tell
+  the others, zombies don't follow tracks, and you can't yet hide or false-lay a trail except by walking on
+  firm ground.
 - Review sheets (software renderer, made by `tools/ground_preview.gd`, SHEET=dirt, grass or scene):
   `assets/ground/preview/dirt_seasons.png`, `dirt_scene_seasons.png`, `grass_seasons.png`,
   `grass_scene_seasons.png`.

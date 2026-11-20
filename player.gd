@@ -863,7 +863,7 @@ func _update_ground() -> void:
 	if moved.length() >= (0.2 if crawl else stride) and perch < 0.25:
 		_step_from = global_position
 		_step_side = -_step_side
-		Ground.it.stamp(global_position, moved, _step_side, crawl)
+		Ground.it.stamp(global_position, moved, _step_side, crawl, true)
 
 
 func _tick_timers(delta: float) -> void:
