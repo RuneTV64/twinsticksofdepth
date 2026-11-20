@@ -19,6 +19,13 @@ the character models, shaders and their scripts are in `assets/characters/` and 
   MaleBody_Muscular_Skins and ShamblerMale_Muscular were approved on 15 Nov 2026.
 - The owner reviews by looking at renders. Show before/after sheets, and say plainly what a render can't show.
 
+## Camera
+
+- The camera never turns (owner, 20 Nov 2026): it stays locked looking north, and only pans. No rotation of any
+  kind, snapped or free. Code may go on assuming a fixed view (lighting, mouse-to-world mapping).
+- Not built, and not yet asked for: cutting away or fading buildings that stand between the camera and the player.
+  Tall buildings (the owner plans downtown areas with skyscrapers) will hide the street behind them without it.
+
 ## Naming: zombies and shamblers
 
 - **Zombies** is the name for the undead as a whole group.
