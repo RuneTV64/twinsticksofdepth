@@ -30,6 +30,7 @@ var _explored: Image
 var _explored_tex: ImageTexture
 var _mark_t := 0.0
 var _lamps_sent := -1
+var _beams_sent := 0
 ## How black the dead of night is drawn where no lamp reaches (1 = pitch black).
 @export var dark_max := 0.82
 var _clock := 0.0   # game seconds; what "last seen" times are measured against
@@ -61,8 +62,8 @@ uniform float dark;              // 0 day .. 1 the dead of night
 uniform float dark_max;          // how black full dark is drawn
 uniform float night_sight;       // share of your sight the daylight leaves you
 uniform vec4 lamps[LAMP_COUNT];  // xyz = where, w = radius (0 = unused)
-uniform vec4 beam;               // a carried torch: xy = where (x, z), zw = which way (x, z); see Daylight
-uniform vec3 beam_shape;         // x = range (0 = off), y = cos of half its angle, z = the glow round the holder
+uniform vec4 beams[BEAM_COUNT];        // carried torches: xy = where (x, z), zw = which way (x, z); see Daylight
+uniform vec4 beam_shapes[BEAM_COUNT];  // x = range (0 = unused), y = cos of half its angle, z = the glow round the holder
 
 void vertex() {
 	// Cover the whole screen whatever the camera is doing.
@@ -95,13 +96,16 @@ void fragment() {
 				lit = max(lit, 1.0 - smoothstep(lr * 0.35, lr, length(world.xz - lamps[li].xz)));
 			}
 		}
-		if (beam_shape.x > 0.0) {
-			vec2 brel = world.xz - beam.xy;
-			float bd = length(brel);
-			lit = max(lit, 1.0 - smoothstep(beam_shape.z * 0.5, beam_shape.z, bd));
-			if (bd > 0.01 && bd < beam_shape.x) {
-				float along = dot(brel, beam.zw) / bd;
-				lit = max(lit, smoothstep(beam_shape.y, beam_shape.y + 0.04, along) * (1.0 - smoothstep(beam_shape.x * 0.6, beam_shape.x, bd)));
+		for (int bi = 0; bi < BEAM_COUNT; bi++) {
+			vec4 bs = beam_shapes[bi];
+			if (bs.x > 0.0) {
+				vec2 brel = world.xz - beams[bi].xy;
+				float bd = length(brel);
+				lit = max(lit, 1.0 - smoothstep(bs.z * 0.5, bs.z, bd));
+				if (bd > 0.01 && bd < bs.x) {
+					float along = dot(brel, beams[bi].zw) / bd;
+					lit = max(lit, smoothstep(bs.y, bs.y + 0.04, along) * (1.0 - smoothstep(bs.x * 0.6, bs.x, bd)));
+				}
 			}
 		}
 		night = dark * (1.0 - lit);
@@ -137,7 +141,7 @@ func _ready() -> void:
 	_explored_tex = ImageTexture.create_from_image(_explored)
 
 	var sh := Shader.new()
-	sh.code = SHADER.replace("RAY_COUNT", str(Player.SIGHT_RAYS)).replace("LAMP_COUNT", str(Daylight.LAMP_MAX))
+	sh.code = SHADER.replace("RAY_COUNT", str(Player.SIGHT_RAYS)).replace("LAMP_COUNT", str(Daylight.LAMP_MAX)).replace("BEAM_COUNT", str(Daylight.BEAM_MAX))
 	_mat = ShaderMaterial.new()
 	_mat.shader = sh
 	_mat.render_priority = 5   # over the world and faded enemies, under the reticle (10)
@@ -177,8 +181,25 @@ func _process(delta: float) -> void:
 	_mat.set_shader_parameter("dark", 1.0 - Daylight.level)
 	_mat.set_shader_parameter("dark_max", dark_max)
 	_mat.set_shader_parameter("night_sight", Daylight.sight_share())
-	_mat.set_shader_parameter("beam", Vector4(Daylight.beam_pos.x, Daylight.beam_pos.z, Daylight.beam_dir.x, Daylight.beam_dir.z))
-	_mat.set_shader_parameter("beam_shape", Vector3(Daylight.beam_range if Daylight.beam_on else 0.0, Daylight.beam_cos, Daylight.BEAM_GLOW))
+	if not Daylight.beams.is_empty() or _beams_sent > 0:
+		# The torches that are on, nearest to the player first (only so many can be drawn).
+		var ids: Array = Daylight.beams.keys()
+		if ids.size() > Daylight.BEAM_MAX:
+			var me := player.global_position
+			ids.sort_custom(func(a, b): return (Daylight.beams[a]["pos"] as Vector3).distance_squared_to(me) < (Daylight.beams[b]["pos"] as Vector3).distance_squared_to(me))
+		var bp := PackedVector4Array()
+		var bs := PackedVector4Array()
+		bp.resize(Daylight.BEAM_MAX)
+		bs.resize(Daylight.BEAM_MAX)
+		_beams_sent = mini(ids.size(), Daylight.BEAM_MAX)
+		for i in _beams_sent:
+			var b: Dictionary = Daylight.beams[ids[i]]
+			var p3: Vector3 = b["pos"]
+			var d3: Vector3 = b["dir"]
+			bp[i] = Vector4(p3.x, p3.z, d3.x, d3.z)
+			bs[i] = Vector4(float(b["range"]), float(b["cos"]), Daylight.BEAM_GLOW, 0.0)
+		_mat.set_shader_parameter("beams", bp)
+		_mat.set_shader_parameter("beam_shapes", bs)
 	if _lamps_sent != Daylight.lamps.size():
 		# (Lamps don't move: sent when one is added.)
 		_lamps_sent = Daylight.lamps.size()

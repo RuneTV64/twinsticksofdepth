@@ -2417,12 +2417,10 @@ func _update_torch() -> void:
 			show_status("You have no torch.", 1.0)
 	if torch_on and (dead or not inv.has("torch")):
 		torch_on = false
-	Daylight.beam_on = torch_on
 	if torch_on:
-		Daylight.beam_pos = global_position
-		Daylight.beam_dir = facing
-		Daylight.beam_range = torch_range
-		Daylight.beam_cos = cos(deg_to_rad(torch_angle_deg))
+		Daylight.set_beam(get_instance_id(), global_position, facing, torch_range, cos(deg_to_rad(torch_angle_deg)))
+	else:
+		Daylight.clear_beam(get_instance_id())
 	if _torch_light == null:
 		_torch_light = SpotLight3D.new()
 		_torch_light.light_color = Color(1.0, 0.95, 0.82)

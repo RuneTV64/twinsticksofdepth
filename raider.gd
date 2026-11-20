@@ -113,6 +113,14 @@ var _shot_cd := 0.0
 var _blind_left := 0
 var _unseen_t := 99.0
 var _see_t := 0.0
+## A torch: when it is dark and he is away from his post (searching, fighting, going home), he has it on. It
+## lights what he points it at, you included, and it shows where he is from a long way off.
+@export var carries_torch := true
+@export var torch_below := 0.35         # daylight under which he uses it
+@export var torch_range := 14.0
+@export var torch_angle_deg := 24.0
+var torch_on := false
+var _torch_light: SpotLight3D
 var _mark: Label3D
 var _mark_t := 0.0                 # s the "!" stays up
 @export var shout_range := 14.0    # m: how far its shout carries when it sees you (other raiders, and zombies)
@@ -270,6 +278,7 @@ func _physics_process(delta: float) -> void:
 			mag = mag_size
 
 	# Looking for you is a ray cast, so it happens a few times a second, not every tick.
+	_update_torch()
 	_see_t -= delta
 	_unseen_t += delta
 	if _see_t <= 0.0:
@@ -493,6 +502,32 @@ func shove(dir: Vector3, force: float) -> void:
 		_alert()
 
 
+func _update_torch() -> void:
+	var want := carries_torch and not dead and mode != "idle" and Daylight.level < torch_below
+	if want:
+		Daylight.set_beam(get_instance_id(), global_position, facing, torch_range, cos(deg_to_rad(torch_angle_deg)))
+	elif torch_on:
+		Daylight.clear_beam(get_instance_id())
+	if want == torch_on:
+		return
+	torch_on = want
+	if _torch_light == null:
+		_torch_light = SpotLight3D.new()
+		_torch_light.light_color = Color(1.0, 0.95, 0.82)
+		_torch_light.light_energy = 3.0
+		_torch_light.spot_range = torch_range
+		_torch_light.spot_angle = torch_angle_deg
+		_torch_light.position = Vector3(0.0, 1.2, 0.0)
+		_torch_light.rotation.x = deg_to_rad(-8.0)
+		_visual.add_child(_torch_light)
+	_torch_light.visible = torch_on
+
+
+func _exit_tree() -> void:
+	Daylight.clear_beam(get_instance_id())
+	super._exit_tree()
+
+
 ## A sound. On watch it comes to look; in a fight where it has lost you, a sound you made tells it where you
 ## are. Sounds you didn't make (another raider's shots) bring it over, but don't change where it thinks you are.
 func hear_noise(pos: Vector3, by_player := true) -> void:
@@ -514,6 +549,10 @@ func hear_noise(pos: Vector3, by_player := true) -> void:
 func _die() -> void:
 	dead = true
 	hp = 0.0
+	torch_on = false
+	Daylight.clear_beam(get_instance_id())
+	if _torch_light != null:
+		_torch_light.visible = false
 	collision_layer = 0
 	held_by.clear()
 	_drop_cover()

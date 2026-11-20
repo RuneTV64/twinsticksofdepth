@@ -20,14 +20,21 @@ static var time_i := 0
 ## [{"pos": Vector3, "radius": float}]: fires, lamps. At most LAMP_MAX are drawn (the first ones).
 static var lamps: Array[Dictionary] = []
 
-## A torch somebody is carrying: a beam of light from `beam_pos` along `beam_dir` (flat), `beam_range` long and
-## `beam_cos` wide (the cosine of half its angle), with a small pool of light round whoever holds it.
-static var beam_on := false
-static var beam_pos := Vector3.ZERO
-static var beam_dir := Vector3.FORWARD
-static var beam_range := 16.0
-static var beam_cos := 0.92
+## Torches people are carrying, by who carries them (instance id): each a beam of light from "pos" along "dir"
+## (flat), "range" long and "cos" wide (the cosine of half its angle), with a small pool of light round the
+## holder. The player's and the raiders'. At most BEAM_MAX are drawn (the nearest to the player come first).
+static var beams := {}
+const BEAM_MAX := 6
 const BEAM_GLOW := 2.2            # m of light round the holder
+
+
+## Somebody's torch is on and pointing this way (call it as they move).
+static func set_beam(who: int, pos: Vector3, dir: Vector3, reach: float, half_cos: float) -> void:
+	beams[who] = {"pos": pos, "dir": dir, "range": reach, "cos": half_cos}
+
+
+static func clear_beam(who: int) -> void:
+	beams.erase(who)
 
 @export var change_time := 4.0        # s for the light to change when the time of day is stepped
 @export var night_light := 0.08       # how light open ground is in the dead of night (starlight)
@@ -38,7 +45,7 @@ static func reset() -> void:
 	want = 1.0
 	time_i = 0
 	lamps.clear()
-	beam_on = false
+	beams.clear()
 
 
 func _ready() -> void:
@@ -79,13 +86,18 @@ static func lamp_light(pos: Vector3) -> float:
 		var r: float = l["radius"]
 		if d < r:
 			best = maxf(best, 1.0 - smoothstep(r * 0.35, r, d))
-	if beam_on:
-		var rel := Vector2(pos.x - beam_pos.x, pos.z - beam_pos.z)
+	for who in beams:
+		var b: Dictionary = beams[who]
+		var bp: Vector3 = b["pos"]
+		var rel := Vector2(pos.x - bp.x, pos.z - bp.z)
 		var bd := rel.length()
+		var reach: float = b["range"]
 		best = maxf(best, 1.0 - smoothstep(BEAM_GLOW * 0.5, BEAM_GLOW, bd))
-		if bd > 0.01 and bd < beam_range:
-			var along := rel.dot(Vector2(beam_dir.x, beam_dir.z)) / bd
-			best = maxf(best, smoothstep(beam_cos, beam_cos + 0.04, along) * (1.0 - smoothstep(beam_range * 0.6, beam_range, bd)))
+		if bd > 0.01 and bd < reach:
+			var dir: Vector3 = b["dir"]
+			var c: float = b["cos"]
+			var along := rel.dot(Vector2(dir.x, dir.z)) / bd
+			best = maxf(best, smoothstep(c, c + 0.04, along) * (1.0 - smoothstep(reach * 0.6, reach, bd)))
 	return best
 
 

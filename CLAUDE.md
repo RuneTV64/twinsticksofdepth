@@ -706,7 +706,16 @@ with crouching and going prone.
     zombie from 18 m); by day it makes no difference. A real `SpotLight3D` on the player gives the look. No
     batteries, it doesn't need a free hand, and lying down the beam's drawn light follows the body rather than
     the aim.
-  - Not built: raiders carrying lights, light from
+  - Raiders carry torches (owner, 20 Nov 2026; untested on the owner's PC). `Daylight.beams` now holds any
+    number of carried beams by who carries them (`set_beam()`, `clear_beam()`); the fog shader draws the 6
+    nearest the player (`BEAM_MAX`). A raider (`raider.gd` `_update_torch()`, `carries_torch`) has his on when
+    the daylight is under 0.35 and he is away from his post: searching, fighting or going home. On watch he
+    leaves it off (the camp has its fire). His beam is 14 m, 24 degrees either side. What it falls on is lit,
+    the player included, so a searching raider's sweep can find you from as far as by day; and the pool of
+    light round him shows where he is from a long way off. Cloud run at night: a raider 16 m off couldn't be
+    seen until he heard a noise and switched it on; walking toward the noise his beam fell on the player after
+    4.7 s and he had seen them 1.3 s later, from 6 m.
+  - Not built: light from
     windows or indoors versus outdoors, moonlight by phase, shadows cast by walls counting as dark, at most 8
     lamps drawn (`LAMP_MAX`), zombies and raiders being hard for you to see for any reason but distance.
 
