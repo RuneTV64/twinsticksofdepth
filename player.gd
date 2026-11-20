@@ -104,6 +104,26 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var vault_time := 0.42          # s to vault low cover
 @export var vault_max_depth := 2.2      # m: cover deeper than this can't be vaulted
 @export var vault_cost := 6.0           # stamina
+@export_group("Corpse pile")
+# Heaps of fallen zombies and the crushed pile under them can be walked on (Enemy.heap_height). It is slow, the
+# footing is bad, and the ones still alive in it grab at you. From high enough on it you can get over a wall.
+@export var pile_speed := 0.4           # speed on bodies is your speed times this; no running or dashing
+@export var pile_step := 0.85           # m: the biggest step up you can take onto it
+@export var pile_drain := 6.0           # stamina per second moving on it
+@export var pile_slip := 0.08           # chance per second of losing your footing, walking (more when hurried or shaken)
+@export var pile_reach := 1.6           # m: from the pile, a wall top this far above your feet can be climbed (Cover)
+@export_group("Finisher")
+# A zombie on the ground can be finished: put the crosshair on its head from close by and press attack. What you
+# do depends on what is in your hands. Weapon away: a stomp unarmed, the butt of the gun if you carry one. Ready
+# with the gun: a shot to the head, one round, loud, certain. Blows go by Strength: 14 does it in one, an
+# ordinary 10 takes two, a weak 6 three. Rot softens the skull.
+@export var finisher_reach := 1.7       # m from you to its head
+@export var finisher_aim := 0.55        # m: how close to the head the crosshair has to be
+@export var finisher_windup := 0.35     # s from starting the blow to it landing
+@export var finisher_recover := 0.4     # s after
+@export var finisher_cost := 6.0        # stamina per blow
+@export var finisher_full_strength := 14.0   # Strength that does it in one blow
+@export var butt_bonus := 1.4           # a rifle butt hits this much harder than a boot
 @export_group("")
 @export var interact_range := 1.9
 @export var base_max_health := 100.0    # at Constitution 10
@@ -263,6 +283,17 @@ var _vault_from := Vector3.ZERO
 var _vault_to := Vector3.ZERO
 var _vault_h := 0.0
 var _cover_mark: MeshInstance3D
+var perch := 0.0                   # how far above the ground you stand (on a heap or the corpse pile)
+var _wall_box: Cover.Box = null    # the solid thing you are walking into, if any (for climbing it from the pile)
+var _wall_n := Vector3.ZERO
+var finish_target: Enemy = null    # a downed zombie whose head the crosshair is on
+var finish_pile = null             # ... or where a trapped one in the corpse pile is (Vector3), or null
+var _stomp_t := 0.0                # > 0 while a finishing blow is under way (the body reads these)
+var _stomp_total := 1.0
+var _finish_kind := "stomp"        # stomp, butt
+var _finish_landed := true
+var _finish_on: Enemy = null
+var _finish_at = null
 var aimed_mult := 1.5              # derived: damage multiplier for a shot aimed at its target
 var headshot_chance := 0.13        # derived: chance an aimed hit is a one-shot kill
 var interact_target: Node = null
@@ -607,6 +638,17 @@ func _physics_process(delta: float) -> void:
 		var tired := fatigue()
 		spd *= lerpf(1.0, fatigue_min_speed, tired)
 		spd *= held_speed() * sheet.speed_mult
+		if perch > 0.25:
+			spd *= pile_speed   # wading over bodies
+			if move_dir.length() > 0.1:
+				stamina = maxf(stamina - pile_drain * delta, 0.0)
+				_regen_delay = maxf(_regen_delay, 0.5)
+		if _stomp_t > 0.0:
+			spd *= 0.15         # planted for the blow
+		# A step up onto the bodies that is too high stops you.
+		if (Enemy._heap_n > 0 or CorpsePile.it != null) and move_dir.length() > 0.1 \
+				and Enemy.heap_height(global_position + move_dir.normalized() * 0.5) > perch + pile_step:
+			spd = 0.0
 		var want := move_dir * spd
 		var rate := decel
 		if want.length() > 0.01:
@@ -622,6 +664,10 @@ func _physics_process(delta: float) -> void:
 	var pre_vel := horiz
 	move_and_slide()
 	_handle_collisions(pre_vel)
+	# Standing on bodies raises you (the look of it, and your eyes; the physics body stays on the ground).
+	var heaps := Enemy._heap_n > 0 or CorpsePile.it != null
+	perch = move_toward(perch, Enemy.heap_height(global_position) if heaps else 0.0, 3.0 * delta)
+	_visual.position.y = perch
 
 	_update_facing(delta, move_dir)
 	_update_sight(delta)
@@ -642,6 +688,7 @@ func _tick_timers(delta: float) -> void:
 	_swing_t -= delta
 	_block_t -= delta
 	_blind_t -= delta
+	_stomp_t -= delta
 	_cam_carry = _cam_carry.lerp(Vector3.ZERO, 1.0 - exp(-cam_stance_sharpness * delta))
 	_hurt_t -= delta
 	_flash_t -= delta
@@ -654,6 +701,13 @@ func _tick_timers(delta: float) -> void:
 	# The sheet's slow clock: needs, composure and conditions move a few times a second, not every tick.
 	_sheet_t += delta
 	if _sheet_t >= 0.25:
+		# Footing on the bodies: now and then you lose it, sooner if you hurry or have lost your head.
+		if not dead and perch > 0.25 and _stagger <= 0.0 and Vector2(velocity.x, velocity.z).length() > 0.3:
+			var hurry := 1.0 + clampf(Vector2(velocity.x, velocity.z).length() / maxf(walk_speed * pile_speed, 0.1) - 1.0, 0.0, 2.0)
+			var nerve := 2.5 if sheet.composure < 20.0 else (1.5 if sheet.composure < 50.0 else 1.0)
+			if randf() < pile_slip * hurry * nerve * _sheet_t:
+				_stagger = 0.6
+				show_status("You lose your footing!", 0.9)
 		if not dead:
 			sheet.tick(_sheet_t, _threat(), not held_by.is_empty(), in_cover and cover_mode == "hunker",
 				health / max_health, winded, weight / strength)
@@ -764,7 +818,7 @@ func _lock_pull(point: Vector3, radius: float) -> Vector3:
 		var en := e as Enemy
 		if en == null or en.dead:
 			continue
-		var off := en.global_position - global_position
+		var off := en.aim_point() - global_position   # its middle, or its head when it is on the ground
 		off.y = 0.0
 		var d := off.distance_to(point)
 		var score := d * lock_on_hold if en == prev else d
@@ -838,6 +892,8 @@ func _threat() -> float:
 		var d := Vector2(en.global_position.x - global_position.x, en.global_position.z - global_position.z).length()
 		if d < 6.0:
 			total += 1.0 - d / 6.0
+	if perch > 0.25:
+		total += 1.5   # standing on the dead
 	return total
 
 
@@ -949,6 +1005,10 @@ func _cover_tap(move_dir: Vector3) -> void:
 			_try_vault()
 		else:
 			leave_cover()
+		return
+	# On the pile, pushing at a wall whose top is in reach: over it.
+	if perch > 0.3 and _wall_box != null and move_dir.dot(-_wall_n) > 0.5:
+		_climb_wall_from_pile()
 		return
 	var reach := cover_run_reach if running or _dash_t > 0.0 else cover_reach
 	var want := move_dir if move_dir.length() > 0.2 else facing
@@ -1113,6 +1173,140 @@ func _try_vault() -> void:
 	leave_cover()
 
 
+## From up on the bodies, over the wall you are pushing at and down the far side.
+func _climb_wall_from_pile() -> void:
+	var b := _wall_box
+	if b.top - perch > pile_reach:
+		show_status("Too high to reach from here", 0.8)
+		return
+	var dir := -_wall_n
+	var depth := b.rect.size.x if absf(dir.x) > absf(dir.z) else b.rect.size.y
+	if depth > vault_max_depth:
+		show_status("Too deep to get over", 0.8)
+		return
+	var land := _xz(global_position) + Vector2(dir.x, dir.z) * (depth + 1.0)
+	if not Cover.has_room(land, b) or (Cover.bounds.size != Vector2.ZERO and not Cover.bounds.grow(-1.0).has_point(land)):
+		show_status("No room on the other side", 0.8)
+		return
+	_vault_from = global_position
+	_vault_to = Vector3(land.x, global_position.y, land.y)
+	_vault_h = maxf(b.top - perch - 0.3, 0.3)
+	_vault_t = vault_time * 1.8
+	stamina = maxf(stamina - vault_cost * 2.0, 0.0)
+	_regen_delay = maxf(_regen_delay, 0.8)
+
+
+# ---------------------------------------------------------------- finishers
+## Which downed zombie (or trapped one in the pile) the crosshair is on the head of, close enough to finish.
+func _update_finisher() -> void:
+	finish_target = null
+	finish_pile = null
+	if dead or not reticle_visible or not held_by.is_empty() or in_cover or _vault_t > 0.0:
+		return
+	var aim := global_position + reticle_offset
+	var best := finisher_aim
+	for e in get_tree().get_nodes_in_group("enemies"):
+		var en := e as Enemy
+		if en == null or not en.is_down():
+			continue
+		var head := en.aim_point()
+		if _xz(head - global_position).length() > finisher_reach:
+			continue
+		var d := _xz(head - aim).length()
+		if d < best:
+			best = d
+			finish_target = en
+	if finish_target == null and CorpsePile.it != null:
+		var p = CorpsePile.it.live_near(aim, finisher_aim + 0.1)
+		if p != null and _xz(p - global_position).length() <= finisher_reach:
+			finish_pile = p
+
+
+## How many blows a sound skull takes at your Strength, with what is in your hands.
+func finisher_blows() -> int:
+	return ceili(1.0 / _blow_power() - 0.001)
+
+
+func _blow_power() -> float:
+	return clampf(strength / finisher_full_strength, 0.2, 1.0) * (1.0 if is_melee() else butt_bonus)
+
+
+func _start_finisher() -> void:
+	_finish_on = finish_target
+	_finish_at = finish_pile
+	var at: Vector3 = finish_target.aim_point() if finish_target != null else finish_pile
+	var to := at - global_position
+	to.y = 0.0
+	if to.length() > 0.05:
+		facing = to.normalized()
+	if armed and not is_melee() and mag > 0 and _reload_t <= 0.0:
+		# Ready with the gun: a round through the head. Certain, and loud.
+		mag -= 1
+		_flash_t = 0.06
+		_fire_cd = fire_interval
+		shots_fired += 1
+		for e in get_tree().get_nodes_in_group("enemies"):
+			var en := e as Enemy
+			if en != null and en.global_position.distance_to(global_position) <= shot_noise_range:
+				en.hear_noise(global_position)
+		if _finish_on != null:
+			_finish_on.take_hit(_finish_on.hp + 1.0, Vector3.DOWN, 0.0)
+		elif CorpsePile.it != null:
+			CorpsePile.it.kill_near(_finish_at, 0.4)
+		show_status("Finished it", 0.7)
+		if mag == 0 and reserve > 0:
+			_start_reload()
+		return
+	_finish_kind = "stomp" if is_melee() else "butt"
+	_stomp_total = finisher_windup + finisher_recover
+	_stomp_t = _stomp_total
+	_finish_landed = false
+	_fire_cd = _stomp_total
+	if _finish_kind == "butt":
+		_bash_cd = 0.5
+	stamina = maxf(stamina - finisher_cost, 0.0)
+	_regen_delay = maxf(_regen_delay, _stomp_total + 0.2)
+
+
+func _land_finisher() -> void:
+	_finish_landed = true
+	if _finish_on != null:
+		if not is_instance_valid(_finish_on) or not _finish_on.is_down():
+			return   # it got up, or it's gone
+		if _finish_on.take_stomp(_blow_power(), Vector3.DOWN):
+			show_status("Skull crushed", 0.8)
+		else:
+			show_status("Again!", 0.6)
+	elif _finish_at != null and CorpsePile.it != null:
+		# One trapped in the pile: it can't get away, so a blow or two by the same sum.
+		if randf() < _blow_power():
+			CorpsePile.it.kill_near(_finish_at, 0.4)
+			show_status("That one is done", 0.8)
+		else:
+			show_status("Again!", 0.6)
+
+
+## Something alive in the corpse pile has hold of your leg (corpse_pile.gd). It stops you for a moment; it may bite.
+func pile_grab(dir: Vector3, bite: float) -> void:
+	if dead:
+		return
+	_stagger = maxf(_stagger, 0.7)
+	sheet.startle()
+	if bite > 0.0:
+		take_damage(bite, dir, 0.0)
+		if not dead and not invulnerable:
+			show_status("Bitten by something in the pile! -%d HP" % roundi(bite), 1.2)
+	else:
+		show_status("Something in the pile has your leg!", 1.0)
+
+
+## Caught where the horde is trampling its own: you are in the crush with them.
+func take_crush(amount: float, dir: Vector3) -> void:
+	take_damage(amount, dir, 2.0)
+	if not dead and not invulnerable:
+		show_status("Crushed in the press! -%d HP" % roundi(amount), 0.9)
+
+
 func _vault_step(delta: float) -> void:
 	_vault_t -= delta
 	var u := clampf(1.0 - _vault_t / maxf(vault_time, 0.01), 0.0, 1.0)
@@ -1162,7 +1356,7 @@ func _update_sight(delta := 0.0) -> void:
 	var k := 1.0 - exp(-10.0 * delta) if delta > 0.0 else 1.0
 	view_range = lerpf(view_range, cover_hunker_sight if hunkered else sight_range, k)
 	view_near = lerpf(view_near, cover_hunker_sight if hunkered else sight_near, k)
-	_eye_h = lerpf(_eye_h, 0.6 if low_eyes else sight_eye_height, k)
+	_eye_h = lerpf(_eye_h, (0.6 if low_eyes else sight_eye_height) + perch, k)   # higher up, you see over more
 	if sight_rays.size() != SIGHT_RAYS:
 		sight_rays.resize(SIGHT_RAYS)
 	if _sight_query == null:
@@ -1283,7 +1477,8 @@ func _update_sprint(delta: float, move_dir: Vector3) -> void:
 			_sprint_t = -1.0
 
 	var want_run := _sprint_t > sprint_tap_time and not armed and move_dir.length() > 0.1 \
-		and not winded and _stagger <= 0.0 and held_by.is_empty() and not in_cover and not cover_entering
+		and not winded and _stagger <= 0.0 and held_by.is_empty() and not in_cover and not cover_entering \
+		and perch <= 0.25
 	running = want_run and stamina > 0.0
 	if running:
 		stamina = maxf(stamina - run_drain * sheet.stamina_cost_mult * delta, 0.0)
@@ -1301,6 +1496,9 @@ func _update_sprint(delta: float, move_dir: Vector3) -> void:
 
 
 func _try_dash(move_dir: Vector3) -> void:
+	if perch > 0.25:
+		show_status("No footing to dash on this", 0.8)
+		return
 	if not held_by.is_empty():
 		show_status("Held! Shove it off or struggle", 0.8)
 		return
@@ -1320,9 +1518,13 @@ func _try_dash(move_dir: Vector3) -> void:
 
 # ---------------------------------------------------------------- doors / barging
 func _handle_collisions(pre_vel: Vector3) -> void:
+	_wall_box = null
 	for i in get_slide_collision_count():
 		var c := get_slide_collision(i)
 		var col := c.get_collider()
+		if col != null and col is StaticBody3D and absf(c.get_normal().y) < 0.5 and Cover.box_of(col) != null:
+			_wall_box = Cover.box_of(col)
+			_wall_n = Vector3(c.get_normal().x, 0.0, c.get_normal().z).normalized()
 		if col == null or not col.has_meta("door"):
 			continue
 		var door: Door = col.get_meta("door")
@@ -1389,6 +1591,18 @@ func _update_combat() -> void:
 	if _swing_t > 0.0 and not _swing_landed and _swing_total - _swing_t >= _swing_windup:
 		_land_punch()
 	if wheel_open:
+		return
+	# A finishing blow under way lands when its windup runs out; a new one starts on the attack button when the
+	# crosshair is on a downed zombie's head. It comes before anything else the button does.
+	_update_finisher()
+	if _stomp_t > 0.0:
+		if not _finish_landed and _stomp_total - _stomp_t >= finisher_windup:
+			_land_finisher()
+		cover_blind = false
+		return
+	if attack_tapped and (finish_target != null or finish_pile != null) and _fire_cd <= 0.0 and _stagger <= 0.0:
+		cover_blind = false
+		_start_finisher()
 		return
 	if Input.is_action_just_pressed("reload") and not is_melee():
 		_start_reload()
@@ -1629,6 +1843,13 @@ func _update_interact() -> void:
 
 
 func interact_prompt() -> String:
+	if finish_target != null or finish_pile != null:
+		var btn := "RT" if using_pad else "Left-click"
+		if armed and not is_melee() and mag > 0:
+			return "[%s]  Shoot it in the head (1 round, loud)" % btn
+		var n := finisher_blows()
+		return "[%s]  %s its head (%s at your Strength)" % [btn, "Stomp" if is_melee() else "Rifle-butt",
+			"one blow" if n <= 1 else "%d blows" % n]
 	if interact_target == null:
 		return ""
 	var txt: String = interact_target.call("prompt_text", self)
@@ -1831,7 +2052,9 @@ func _update_visuals(delta: float) -> void:
 		_cover_mark.global_position = Vector3(ms.x, global_position.y + 0.06, ms.y)
 	_reticle.visible = reticle_visible and not dead and not (armed and is_melee())
 	_reticle.global_position = global_position + reticle_offset + Vector3(0.0, 0.08, 0.0)
-	if not armed:
+	if finish_target != null or finish_pile != null:
+		_reticle_mat.albedo_color = Color(1.0, 0.6, 0.1, 0.95)   # on a head you can finish
+	elif not armed:
 		# Weapon away: just a look cursor, so keep it a quiet gray (no enemy highlight).
 		_reticle_mat.albedo_color = Color(0.62, 0.64, 0.66, 0.55)
 	elif reticle_on_enemy:

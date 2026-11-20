@@ -267,6 +267,13 @@ func animate(p, delta: float) -> void:
 		_tq[_leg[k][1]] = _rx(kn + 2.0 * crouch)
 		_tq[_leg[k][2]] = _rx((th[k] * cos(a) - kn) * w - crouch + sgn * split) * _rz(-wide)
 
+	# ---- a finishing stomp: the right knee comes up, then the boot goes down hard
+	if p._stomp_t > 0.0 and melee:
+		var su: float = 1.0 - p._stomp_t / maxf(p._stomp_total, 0.01)
+		var lift: float = smoothstep(0.0, 0.3, su) * (1.0 - smoothstep(0.38, 0.5, su))
+		_tq[_leg[1][0]] = _tq[_leg[1][0]] * _rx(-1.15 * lift)
+		_tq[_leg[1][1]] = _tq[_leg[1][1]] * _rx(1.5 * lift)
+
 	# ---- spine
 	_breath += delta * TAU / 3.8 * (1.0 + 1.6 * tired)
 	var b := 0.5 - 0.5 * cos(_breath)

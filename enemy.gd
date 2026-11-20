@@ -51,19 +51,25 @@ extends CharacterBody3D
 
 @export_group("Climbing")
 # Zombies get over things by accident, not by plan. One that keeps walking into something it can get its arms over
-# drags itself across and tumbles down the far side. A crowd pressing on something taller tramples some of its own
-# underfoot; the fallen (and the dead) make a heap, the rest walk up it, and once the heap is high enough the ones
-# on top can reach the top of the wall and go over. It takes a crowd and some time, so it doesn't always happen.
+# drags itself across and tumbles down the far side. Where they are packed densely against something taller, some
+# go under the feet of the rest; the fallen (and the dead) make a heap, the rest walk up it, and once it is high
+# enough the ones on top can reach the top of the wall and go over. A couple of dozen can clear one storey.
+# With hundreds, the heap fills and the ones at the bottom are crushed flat: they stop being zombies and become
+# the corpse pile (corpse_pile.gd), which keeps growing and stays. It only happens where zombies are dense.
 @export var climb_reach := 1.5         # m: it can drag itself over a top this far above its feet
 @export var crawl_reach := 0.6         # ... and this far when it has no legs to stand on
 @export var climb_delay := Vector2(0.6, 1.6)   # s pushing at it before it starts over (longer when stiff)
 @export var climb_time := 2.2          # s to get over, fresh (longer when stiff, and for a taller climb)
 @export var climb_max_depth := 2.6     # m: nothing deeper than this is climbed
 @export var heap_step := 0.85          # m: how big a step up it can take onto a heap (two bodies)
-@export var heap_pressure := 5         # this many pressing round it, and the one at the front can go under
-@export var heap_chance := 0.1         # ... with this chance every half second, once it has pushed for heap_after
-@export var heap_after := 2.5          # s it has to have been pushing first
-@export var heap_max := 5              # bodies deep, at most, in one spot (0.4 m each)
+@export var heap_density := 12         # this many zombies within 3 m, and one pushing at the front can go under
+@export var heap_chance := 0.2         # ... with this chance every half second, once it has pushed for heap_after
+@export var heap_after := 2.0          # s it has to have been pushing first
+@export var heap_max := 4              # live bodies deep in one spot (0.4 m each); one more and the bottom one is crushed
+@export var mill_after := 3.0          # s stuck before it starts shuffling sideways along what stopped it
+@export var mill_speed := 0.5          # m/s
+@export var crush_hurt := 8.0          # damage to a person right where a zombie goes under or is crushed
+@export var skull := 1.0               # how much stomping its head takes (rot softens it)
 @export var heap_rest := 3.0           # s with no crowd before the one on top drags itself out
 @export var fall_break := 1.8          # m: a drop this far can shake a rotten limb off
 
@@ -113,6 +119,9 @@ var _climb_top := 0.0
 var _climb_h0 := 0.0
 var _climb_len := 2.0
 var _shown_y := 0.0
+var head_dmg := 0.0         # blows its head has taken from finishers
+var _mill := 1.0 if randf() < 0.5 else -1.0
+var _mill_t := 0.0
 var home := Vector3.ZERO
 var player: Player
 ## Who a zombie is after right now: the player or a raider, whichever living person it has noticed nearest.
@@ -343,6 +352,7 @@ func _respawn() -> void:
 	_leave_heap()
 	perch = 0.0
 	_press_t = 0.0
+	head_dmg = 0.0
 	dead = false
 	hp = max_hp
 	visible = true
@@ -486,13 +496,22 @@ func _tick(delta: float) -> void:
 	# Where it means to go, before the crowd pushes it about: what it is "walking into" is judged against this.
 	var going := want.normalized() if want.length() > 0.05 else Vector3.ZERO
 	var stepped := false
-	if _heap_n > 0 and moving and kind == "shambler":
+	if (_heap_n > 0 or CorpsePile.it != null) and moving and kind == "shambler":
 		# A heap ahead that is too big a step up stops it (and it presses there, like at a wall).
 		if going != Vector3.ZERO and heap_height(global_position + going * 0.5) > perch + heap_step:
 			want = Vector3.ZERO
 			stepped = true
 		if perch > 0.05:
 			want *= 0.6   # slow going over bodies
+	# Stuck against something for a while, it mills about along it, this way then that: no plan to it, but it is
+	# how one ends up on the heap its neighbours made.
+	if _press_t > mill_after and moving and going != Vector3.ZERO:
+		_mill_t -= delta
+		if _mill_t <= 0.0:
+			_mill_t = randf_range(1.5, 3.5)
+			_mill = -_mill if randf() < 0.6 else _mill
+		var along := Vector3(-going.z, 0.0, going.x) if _press_box == null else Vector3(-_press_n.z, 0.0, _press_n.x)
+		want += along * _mill * mill_speed
 
 	_knock = _knock.move_toward(Vector3.ZERO, 18.0 * delta)
 	if kind == "shambler":
@@ -543,7 +562,8 @@ func _tick(delta: float) -> void:
 	if kind == "shambler" and moving:
 		_press(delta, pressed)
 		# Standing on a heap, its feet are on the bodies.
-		perch = move_toward(perch, heap_height(global_position) if _heap_n > 0 else 0.0, (2.0 if _heap_n > 0 else 4.0) * delta)
+		var heaps := _heap_n > 0 or CorpsePile.it != null
+		perch = move_toward(perch, heap_height(global_position) if heaps else 0.0, (2.0 if heaps else 4.0) * delta)
 	if absf(perch - _shown_y) > 0.004:
 		_shown_y = perch
 		_visual.position.y = perch
@@ -613,18 +633,84 @@ func _separation(delta: float) -> Array:
 
 
 # ---------------------------------------------------------------- over things, and over each other
-## How high the heap of bodies stands at this spot.
+## How high the bodies stand at this spot: the crushed pile, and the live heap on top of it. Zombies and people
+## both stand on it.
 static func heap_height(p: Vector3) -> float:
 	var arr: Array = _heap.get(Vector2i(floori(p.x / HEAP_CELL), floori(p.z / HEAP_CELL)), [])
-	return arr.size() * HEAP_LAYER
+	return CorpsePile.height_at(p) + arr.size() * HEAP_LAYER
 
 
-## Lie down in the heap where it stands (fallen, or dead). False if that spot is already as deep as heaps get.
+## Where to aim at it: its middle, or its head when it is on the ground (for finishers).
+func aim_point() -> Vector3:
+	if body != null and not dead and (crawling or state == "down" or state == "heap"):
+		return global_position + facing * 0.7
+	return global_position
+
+
+## Is it on the ground, where its head can be stomped?
+func is_down() -> bool:
+	return body != null and not dead and (crawling or state == "down" or state == "heap") and state != "climb"
+
+
+## A blow to the head while it is down (a stomp, a rifle butt). `power` 1 is enough for a sound skull; rot softens
+## it. Returns true if that finished it.
+func take_stomp(power: float, dir: Vector3) -> bool:
+	if dead:
+		return false
+	head_dmg += power * (1.0 + 0.5 * body.rot() if body != null else 1.0)
+	_flash = 0.1
+	hurt_t = 0.18
+	_since_hit = 0.0
+	if head_dmg >= skull:
+		take_hit(hp + 1.0, dir, 0.0)
+		return true
+	return false
+
+
+## How many zombies are on their feet within about 3 m: what "densely packed" is measured by. The fallen don't
+## count, so a small crowd stops going under once enough of it has.
+func _density() -> int:
+	var n := 0
+	var cx := floori(global_position.x / CELL)
+	var cz := floori(global_position.z / CELL)
+	for dx in range(-3, 4):
+		for dz in range(-3, 4):
+			for o: Enemy in _grid.get(Vector2i(cx + dx, cz + dz), []):
+				if o.state != "heap":
+					n += 1
+	return n
+
+
+## Crushed flat under the rest: no longer a zombie, part of the corpse pile, gone for good.
+func _crushed() -> void:
+	var key := _heap_key
+	_leave_heap()
+	_let_go()
+	if CorpsePile.crush(key, get_parent()):
+		_gone()
+
+
+## Out of the game for good. It is taken out of the crowd grid first, so nothing this tick trips over it.
+func _gone() -> void:
+	var cell: Array = _grid.get(Vector2i(floori(global_position.x / CELL), floori(global_position.z / CELL)), [])
+	cell.erase(self)
+	dead = true
+	queue_free()
+
+
+## Lie down in the heap where it stands (fallen, or dead). A full heap crushes the one at its bottom to make
+## room. False if nothing more fits there (the pile is as high as it gets).
 func _join_heap() -> bool:
 	var key := Vector2i(floori(global_position.x / HEAP_CELL), floori(global_position.z / HEAP_CELL))
 	var arr: Array = _heap.get(key, [])
 	if arr.size() >= heap_max:
-		return false
+		var under: Enemy = arr[0]
+		if not CorpsePile.crush(key, get_parent()):
+			return false
+		under._leave_heap()
+		under._let_go()
+		under._gone()
+		arr = _heap.get(key, [])
 	arr.append(self)
 	_heap[key] = arr
 	_heap_key = key
@@ -657,7 +743,7 @@ func _exit_tree() -> void:
 ## A body in the heap lies at its place in the stack, and sinks when one under it goes.
 func _settle(delta: float) -> void:
 	var arr: Array = _heap.get(_heap_key, [])
-	perch = move_toward(perch, maxi(arr.find(self), 0) * HEAP_LAYER, 2.5 * delta)
+	perch = move_toward(perch, CorpsePile.height_at(global_position) + maxi(arr.find(self), 0) * HEAP_LAYER, 2.5 * delta)
 	if absf(perch - _shown_y) > 0.004:
 		_shown_y = perch
 		_visual.position.y = perch
@@ -680,12 +766,17 @@ func _press(delta: float, pressed: bool) -> void:
 	_heap_t -= delta
 	if _press_t > heap_after and _heap_t <= 0.0:
 		_heap_t = 0.5
-		if _crowd_n >= heap_pressure and randf() < heap_chance and _join_heap():
-			# Down it goes, under the feet of the rest.
+		if _crowd_n >= 2 and _density() >= heap_density and randf() < heap_chance and _join_heap():
+			# Down it goes, under the feet of the rest. Anyone it was reaching for is in the crush too.
 			_let_go()
 			crawling = true
 			_quiet_t = 0.0
 			_set_state("heap")
+			if prey != null and is_instance_valid(prey) and not prey.dead \
+					and global_position.distance_to(prey.global_position) < 1.6:
+				var push: Vector3 = prey.global_position - global_position
+				push.y = 0.0
+				prey.take_crush(crush_hurt, push.normalized())
 
 
 ## Start over the thing it is pushing at: across it and down the far side, if there is room to land there.

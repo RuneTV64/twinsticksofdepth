@@ -4,8 +4,9 @@ extends SceneTree
 ## stand: who is in the heap, who is standing on it, who is going over.
 ##
 ## Run from a scratch copy of the game project (copy this file to its root), software OpenGL under xvfb:
-##   N=40 SECONDS=30 OUT=/tmp/heap.png xvfb-run -a -s "-screen 0 2400x1600x24" godot --rendering-driver opengl3 \
+##   N=40 SECONDS=30 H=2.6 OUT=/tmp/heap.png xvfb-run -a -s "-screen 0 2400x1600x24" godot --rendering-driver opengl3 \
 ##       --resolution 1800x900 -s res://zombie_heap_preview.gd
+## H is the wall's height (2.6 = one storey; make it tall to see a horde crush its own into a corpse pile).
 ## Test-only patches for the software renderer: the decay shader outputs its palette colors directly and each
 ## zombie gets a material of its own; and every zombie is shown, though in the game the player (behind the wall)
 ## would not see them until they come over.
@@ -56,9 +57,16 @@ func _build() -> void:
 	env.environment = Environment.new()
 	env.environment.background_mode = Environment.BG_COLOR
 	env.environment.background_color = Color(0.2, 0.22, 0.24)
+	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.environment.ambient_light_color = Color(1, 1, 1)
+	env.environment.ambient_light_energy = 0.5
 	world.add_child(env)
+	var sun := DirectionalLight3D.new()     # the corpse pile is lit by the level's light
+	sun.rotation_degrees = Vector3(-55, 35, 0)
+	world.add_child(sun)
 	_box(world, Vector3(0, -0.5, 0), Vector3(60, 1, 60), Color(0.3, 0.32, 0.3), false)        # the ground
-	_box(world, Vector3(0, 1.3, 0), Vector3(16, 2.6, 0.6), Color(0.55, 0.52, 0.48), true)      # the wall
+	var h := float(OS.get_environment("H")) if OS.get_environment("H") != "" else 2.6
+	_box(world, Vector3(0, h * 0.5, 0), Vector3(22, h, 0.6), Color(0.55, 0.52, 0.48), true)    # the wall
 	_player = Player.new()
 	_player.position = Vector3(0, 0.05, -5)
 	_player.invulnerable = true
@@ -66,17 +74,18 @@ func _build() -> void:
 	for i in int(OS.get_environment("N")):
 		var e := Enemy.new()
 		e.kind = "shambler"
-		e.position = Vector3(randf_range(-5.0, 5.0), 0.05, randf_range(3.0, 9.0))
+		var n := int(OS.get_environment("N"))
+		e.position = Vector3(randf_range(-6.0, 6.0), 0.05, randf_range(3.0, 7.0 + n * 0.05))
 		world.add_child(e)
 		e.player = _player
 		e.aggro_range = 40.0
 		_zs.append(e)
 	var cam := Camera3D.new()
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
-	cam.size = 9.0
+	cam.size = 11.0
 	world.add_child(cam)
-	cam.position = Vector3(9.0, 7.0, 13.0)
-	cam.look_at(Vector3(0.0, 1.2, 0.5))
+	cam.position = Vector3(10.0, 9.0, 14.0)
+	cam.look_at(Vector3(0.0, 1.6, 1.0))
 	cam.make_current()
 	RenderingServer.render_loop_enabled = false
 
@@ -88,7 +97,11 @@ func _process(delta: float) -> bool:
 		_shot = 0
 		var st := {}
 		var over := 0
+		var left := 0
 		for e in _zs:
+			if not is_instance_valid(e):
+				continue   # crushed: part of the pile now
+			left += 1
 			st[e.state] = st.get(e.state, 0) + 1
 			if e.global_position.z < -0.5:
 				over += 1
@@ -110,7 +123,16 @@ func _process(delta: float) -> bool:
 				(mi as MeshInstance3D).material_override = m
 			for i in 12:
 				e.body.animate(e, 1.0 / 60.0)
-		print("after %ss: %s, heap bodies %d, over the wall %d" % [OS.get_environment("SECONDS"), st, Enemy._heap_n, over])
+		var pile := CorpsePile.it
+		var top := 0.0
+		if pile != null:
+			for k in pile.cells:
+				top = maxf(top, pile.cells[k] * CorpsePile.LAYER)
+			var psh: Shader = (pile._mesh.material_override as ShaderMaterial).shader
+			psh.code = psh.code.replace("ALBEDO = pow(c, vec3(2.2));", "ALBEDO = c;")
+		print("after %ss: %d of %d zombies left %s, live heap %d, crushed %d, pile %.1f m, trapped alive %d, over the wall %d" % [
+			OS.get_environment("SECONDS"), left, _zs.size(), st, Enemy._heap_n, pile.total if pile else 0, top,
+			pile.arms.size() if pile else 0, over])
 		_player.set_physics_process(false)
 		_player._visual.visible = false
 		_player._reticle.visible = false

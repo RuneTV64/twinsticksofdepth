@@ -248,20 +248,44 @@ World War Z but mindless: an accident, not a plan. All of it is in `enemy.gd` (t
   window sills included, is climbed by one zombie alone.
 - Going over (`state` "climb"): a scripted move, on its belly over the top and off the far edge, 2 to 4 s; it lands
   knocked down and gets up. A drop of 1.8 m or more can shake a limb off a rotten one.
-- The heap: when a zombie has pushed for 2.5 s at something it can't get over and 5 or more others are pressing
-  round it, every half second it has a 10% chance of going under them (`state` "heap"). Zombies that die pressing
-  or on a heap join it as corpses until they fade. Heaps are kept by 0.8 m cell (`Enemy._heap`), up to 5 bodies
-  (0.4 m each).
-- Everyone else walks on the heap: `perch` is how high a zombie stands (only the visual is raised; the physics body
-  stays on the ground). A step up of more than 0.85 m stops it, and it presses there, so the heap grows outward
-  into a rough ramp. From 1.2 m up, the top of a 2.6 m wall is in reach and it goes over.
-- The one on top of a heap drags itself out after 3 s with no crowd round it. Zombies in a heap or going over
-  can't be shoved or knocked down, but can be shot.
-- Cloud runs at a 2.6 m wall with the player behind it: 40 zombies, 15 over in 45 s; 20 zombies, 4 over after
-  about a minute; 10 zombies, none in two minutes. Nothing is done per tick when no heap exists anywhere.
-- Zombies don't look for heaps or ramps; they only ever walk at their prey. Raiders and the player don't climb
-  heaps. The climb uses the crawl pose; there is no pose of its own yet.
-- Review picture: `tools/preview/zombie_heap.png`, made by `tools/zombie_heap_preview.gd`.
+- Only where zombies are dense (owner, 20 Nov 2026). Density is the number on their feet within about 3 m
+  (`_density()`, from the crowd grid, looked at twice a second by zombies that are pushing). Under 12, nothing.
+- The heap (a couple of dozen): a zombie that has pushed for 2 s at something it can't get over, with 12 or more
+  standing round it, has a 20% chance every half second of going under them (`state` "heap"). The fallen don't count
+  as standing, so a small crowd stops once enough have gone under. Zombies that die pressing or on a heap join it
+  as corpses until they fade. Heaps are kept by 0.8 m cell (`Enemy._heap`), 4 live bodies deep (0.4 m each).
+- Everyone walks on the bodies: `perch` is how high a zombie (or the player) stands; only the visual is raised, the
+  physics body stays on the ground. A step up of more than 0.85 m stops it. One stuck for 3 s shuffles sideways
+  along what stopped it (`mill_speed`), which is how it blunders onto the heap. From 1.1 m up, the top of a 2.6 m
+  wall is in reach and it goes over. The one on top drags itself out after 3 s with no crowd round it.
+- Crushing (hundreds): a full heap that another zombie goes under crushes its bottom body. That zombie is freed for
+  good (owner: no respawn) and becomes 0.15 m of the corpse pile in that cell: `corpse_pile.gd` (`CorpsePile.it`,
+  one node for the level, made on the first crush). The pile stays and compounds; it stops at `max_height` 7 m,
+  about two and a half storeys (Claude's pick; the owner said 2 to 3). It is one mesh with a gore shader and a
+  stain round its foot, rebuilt at most twice a second.
+- Still alive in it: 1 crushed zombie in 8 is trapped alive. An arm sticks out and gropes (a stand-in made of
+  two simple shapes). Within 1 m it has a 35% chance a second to grab whoever is there (player or raider): a 0.7 s
+  stagger, and half the time a 10 damage bite.
+- People in the press: when a zombie goes under within 1.6 m of the person it was reaching for, that person takes
+  8 damage (`take_crush`). Raiders don't walk on piles yet.
+- The player on bodies (`player.gd`, Corpse pile exports): 0.4 speed, no run or dash, stamina drains, an 8% a
+  second chance of losing footing (more when hurried, shaken or panicked), composure drains, eyes are higher so
+  you see over more. At a wall whose top is within 1.6 m of your feet, Cover while pushing into it climbs over.
+- Finishers (owner, 20 Nov 2026; `player.gd`, Finisher exports): crosshair on the head of a zombie that is down
+  (crawling, knocked down, in a heap), within 1.7 m, then attack. Unarmed: stomp. Gun, weapon away: rifle butt
+  (1.4 times a stomp). Blows by Strength: a blow is STR/14 of a sound skull, so 14 = one blow, 10 = two, 6 =
+  three; rot softens the skull (`Enemy.take_stomp`). Gun, Ready: one round to the head, certain and loud. The same
+  works on a trapped one in the pile. Lock-on and the prompt go to the head of a downed zombie. The stomp has a
+  leg pose in `player_body.gd` (not rendered for review yet); the butt uses the bash pose.
+- Cloud runs with the player behind the wall. One storey (2.6 m): 12 zombies, nothing; 16, a few go under, none
+  over; 24, 11 over in a minute in one run and 3 in another; 200, 90 over in 30 s and 27 crushed. A 9 m wall, 250
+  zombies, 150 s: 145 crushed into a 3 m pile, 105 left, 10 to 20 trapped alive.
+- Zombies don't look for heaps or ramps; they only ever walk at their prey. The climb and the heap use the crawl
+  pose. Nothing is done per tick when there is no heap and no pile.
+- Review pictures: `tools/preview/zombie_heap.png` (40 at one storey, before crushing existed) and
+  `tools/preview/corpse_pile.png` (250 at 9 m), made by `tools/zombie_heap_preview.gd` (N, SECONDS, H).
+- To come (owner): how zombies spawn and how the horde moves; the turning-undead mechanic; the pile's clean-up
+  (the maggots, flies and worms lore).
 
 ## Character sheet (built 20 Nov 2026, in review; untested on the owner's PC)
 

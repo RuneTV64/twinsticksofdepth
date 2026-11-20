@@ -59,6 +59,9 @@ In cover: hunkered = hidden, safe from shots across it, but you see only a short
   Cover + push toward low cover = vault it.
 Stat test keys: 1/2 STR   3/4 END   5/6 WT   7/8 DEX
 Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt   L all on low model
+Finisher: crosshair on a downed zombie's head, close by, then attack. Unarmed = stomp, gun away = rifle butt
+  (blows by Strength), gun Ready = one shot to the head.
+Corpse piles can be walked on: slow, bad footing, and what is still alive in them grabs. Cover at a wall = climb it.
 Character page: C (pad: Back). It shows attributes, needs, composure and conditions.
 Cover test: G test gunner at the crosshair   Shift+G remove them
 Raiders: a camp in the south-west of the yard.  T adds one at the crosshair   Shift+T removes those

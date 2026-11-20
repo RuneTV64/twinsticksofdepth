@@ -76,6 +76,8 @@ var _reload_t := 0.0
 var _bash_cd := 0.0
 var _blind_t := 0.0
 var _vault_t := 0.0
+var _stomp_t := 0.0
+var _stomp_total := 1.0
 
 # ---- its mind
 var mode := "idle"                 # idle, fight, search, return
@@ -470,6 +472,18 @@ func take_bite(amount: float, dir: Vector3, _e: Enemy) -> void:
 
 func take_attack(amount: float, dir: Vector3, knock: float, _attacker: Enemy = null) -> void:
 	_damage(amount, dir, knock, false)
+
+
+## Caught where the horde is trampling its own.
+func take_crush(amount: float, dir: Vector3) -> void:
+	_damage(amount, dir, 2.0, false)
+
+
+## Something alive in the corpse pile has hold of its leg.
+func pile_grab(dir: Vector3, bite: float) -> void:
+	_stagger = maxf(_stagger, 0.7)
+	if bite > 0.0:
+		_damage(bite, dir, 0.0, false)
 
 
 ## The nearest living zombie it can see within zombie_sense, or null.
