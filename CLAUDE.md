@@ -32,6 +32,14 @@ the character models, shaders and their scripts are in `assets/characters/` and 
   goes with the crosshair, out to `free_look_range` 30 m (owner: decent, not too generous); let go and it
   comes back. Sight is unchanged: the fog of war doesn't lift. Zoomed right out, every zombie is on the low
   model (the detail swap is by distance from the camera).
+- Matched to Project Zomboid (owner, 20 Nov 2026: "compare how far zomboid lets you look and match it").
+  What could be found: its zoom steps run from 25% to 250% of the normal view, and aiming (or its pan key)
+  pans the camera toward the cursor; no source gives the pan as a number. So: the wheel now goes from 4.5 to
+  45 m (0.25 to 2.5 times the default 18 m); the crosshair's reach grows in step with the zoom (16 m at the
+  default, up to the edge of sight pulled right back; free look 30 m, up to 50 m); and the player's
+  `sight_range` went from 26 to 40 m so there is something to see out there. Raiders still see 18 m.
+- The cursor (ring and red x) is scaled with the camera's distance so it is the same size on screen at every
+  zoom (`cursor_size` 0.7 of what it was at the default: about 16 px radius at 1600 x 900).
 - Cutaway (built 20 Nov 2026, untested on the owner's PC): whatever stands between the camera and the player is cut
   open, with a dithered edge, so the player is never hidden behind a wall or a tall building. The feet of walls
   (up to 0.95 m) stay. `cutaway.gdshaderinc` has the test (`cutaway_hidden(world_pos, FRAGCOORD.xy)`); any spatial

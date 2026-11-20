@@ -6,8 +6,9 @@ extends Node3D
 @export var pitch_deg := 56.0
 @export var distance := 18.0
 ## The mouse wheel moves the camera in and out between these (m from what it looks at).
-@export var zoom_min := 9.0
-@export var zoom_max := 42.0
+## Project Zomboid's zoom steps run from 25% to 250% of its normal view; this is the same span round our 18 m.
+@export var zoom_min := 4.5
+@export var zoom_max := 45.0
 @export var zoom_step := 1.12         # each notch of the wheel: this much nearer or further
 @export var zoom_sharpness := 9.0
 @export var fov := 50.0

@@ -56,6 +56,7 @@ var barge_min_speed := 5.3
 @export var free_look_range := 30.0
 var free_look := false
 @export var cam_lead_max := Vector2(11.0, 6.0)   # m (east-west, north-south) the camera may lead by at the default zoom
+@export var cursor_size := 0.7           # the cursor's size on screen (1 = as it was at the default zoom)
 @export var look_cam_lead := 0.5        # weapon away: how much of the way to the crosshair the camera goes
 @export var reticle_edge := 0.06        # the crosshair stays this share of the screen in from its edges
 # Gear adds to the base range per stance. Set these when equipment changes (they can change
@@ -210,7 +211,7 @@ var shove_force := 9.0
 # You see a cone in front of you plus a small circle all around; walls cut both short. Enemies
 # outside it fade out and the fog of war covers what you can't see (see fog.gd).
 @export var sight_fov_deg := 110.0      # full width of the cone
-@export var sight_range := 26.0         # meters, how far the cone reaches
+@export var sight_range := 40.0         # meters, how far the cone reaches (26 until the camera could pull back this far)
 @export var base_sight_near := 3.0      # meters, all-round awareness (behind you too), at Wisdom 10
 var sight_near := 3.0
 @export var sight_eye_height := 1.5     # rays go out at this height, so low cover doesn't block sight
@@ -291,7 +292,7 @@ var cover_lean_dir := Vector3.ZERO # which way the body leans out (world), 0..1 
 var cover_blind := false           # firing blind right now (the body holds the gun up over or round)
 var cover_mark_face: Cover.Face = null   # the cover the crosshair is marking, for hold-Cover
 var cover_mark_t := 0.0
-var view_range := 26.0             # how far you see now: sight_range and sight_near, or less behind cover
+var view_range := 40.0             # how far you see now: sight_range and sight_near, or less behind cover
 var view_near := 3.0
 var _eye_h := 1.5                  # height the sight rays go out at now
 var _cover_u := 0.0                # where along the face you actually are (cover_t plus any lean out)
@@ -978,14 +979,16 @@ func _mouse_lock(delta: float) -> void:
 ## Max reticle distance right now: the shared base plus whatever the current stance's gear adds.
 ## Ready with a melee weapon keeps the (hidden) look point close, so turning stays quick.
 func current_reticle_range() -> float:
+	# Pulled back, the crosshair reaches further in step (the same share of the screen), as far as you can see.
+	var zf := maxf(camera_rig.distance / 18.0, 1.0) if camera_rig else 1.0
 	if free_look:
-		return free_look_range
+		return minf(free_look_range * zf, sight_range + 10.0)
 	if armed and weapon == "throw":
 		return throw_range()
 	if armed and is_melee():
 		return melee_look_range
 	var steady := prone_aim_reach if posture == 2 and armed else 0.0    # braced on the ground, you aim further
-	return maxf(reticle_range + (aim_range_bonus if armed else look_range_bonus) + steady, 0.5)
+	return maxf(minf(reticle_range * zf, sight_range) + (aim_range_bonus if armed else look_range_bonus) + steady, 0.5)
 
 
 func muzzle_position() -> Vector3:
@@ -2573,5 +2576,9 @@ func _update_visuals(delta: float) -> void:
 	_reticle_x.visible = reticle_visible and not dead and on_it
 	_reticle.global_position = global_position + reticle_offset + Vector3(0.0, 0.08, 0.0)
 	_reticle_x.global_position = _reticle.global_position
+	# The cursor stays the same size on the screen however far in or out the camera is.
+	var cs := cursor_size * (camera_rig.distance / 18.0 if camera_rig else 1.0)
+	_reticle.scale = Vector3.ONE * cs
+	_reticle_x.scale = Vector3.ONE * cs
 	# Ready: white. Weapon away: just a look cursor, a quiet grey.
 	_reticle_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.95) if armed else Color(0.62, 0.64, 0.66, 0.55)
