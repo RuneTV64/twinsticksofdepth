@@ -7,6 +7,33 @@ were stripped out the same day at the owner's request (`input_setup.gd`, `player
 Forward+ only: no Compatibility renderer, no web or phone builds (owner, 15 Nov 2026). The level is built in code (see README.md);
 the character models, shaders and their scripts are in `assets/characters/` and in our claude.ai Artifacts.
 
+## Where we left off (21 Nov 2026, the owner going to work; picking up from a phone)
+
+Everything built in the long session of 20 to 21 Nov is on `main` (last feature commit `46a3934`), and almost
+none of it has been played on the owner's PC: it was tested headless and with the software renderer in the cloud.
+The owner's first job at the PC is to pull and look. What most needs their eyes, in rough order:
+
+- The new ground and grass on Forward+ (never seen there): colours, the stepped light, shadows on the ground,
+  frame rate, the grass parting. B swaps back to the old ground if it misbehaves.
+- Night (N): the dark was never rendered at all in the cloud. Torches (E), the raiders' torches, the lamps.
+- The camera at 45 degrees with the wheel zoom, and whether the lighting on characters still looks right.
+- The treatment screen (H, J for a test wound), prone and crawling (X), zombies falling and getting up.
+- Feel and numbers everywhere: nearly every timing, range and chance is Claude's first guess.
+
+Open questions for the owner (asked in reports, not yet answered):
+
+- "A 45 degree rotation on the camera": fixed turn (built) or a camera the player turns in steps?
+- "Torch": built as a battery hand torch; did they mean a burning one?
+- Showing a missing limb on the player means touching the approved body model: may the pose code hide it?
+- Spring grass is a vivid green, summer rain floods a lot, the tall hiding grass looked thin: change any?
+- Raiders now see 18 m and the player 40 m: too generous to the player?
+
+What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
+the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
+with more meat than bone; spawning and horde migration; modular buildings; the clean-up lore. A session on a
+phone can't run Godot either: keep to the same way of working (scratch copy, headless tests, software renders,
+say what a picture can't show).
+
 ## Working with the owner
 
 - Commit and push to the session's working branch. Push to `main` only when the owner says so for that change; it
@@ -30,8 +57,8 @@ the character models, shaders and their scripts are in `assets/characters/` and 
   the screen), mouse travel, the camera lead. Lighting set from the camera (zombie and raider `key_dir`) is
   worked out once at start-up from the camera as it stands, so it follows; it is unchecked on real hardware.
 - In and out, and further (owner, 20 Nov 2026; untested on the owner's PC). The mouse wheel moves the camera
-  between 9 and 42 m from what it looks at (`camera_rig.gd` `zoom()`, 18 m by default; the angle never
-  changes). The crosshair roams 16 m (`reticle_range`, was 10) and is kept on the screen: at the edge it stops
+  in and out (`camera_rig.gd` `zoom()`, 18 m by default, first 9 to 42 m and now 4.5 to 45 m: see "Matched to
+  Project Zomboid" below; the angle never changes). The crosshair roams 16 m (`reticle_range`, was 10) and is kept on the screen: at the edge it stops
   and the view follows it. The camera leads toward it by half (0.45 Ready), never so far that the player leaves
   the screen (`cam_lead_max`). Mouse travel scales with the zoom, so the same hand movement covers the same
   share of the screen. Free look: hold F or the middle mouse button and the camera lets go of the player and
@@ -112,12 +139,13 @@ it). The owner said to sketch before building anything; wait for their critique 
   chamber and magazine well, and a magazine shows its rounds, to drag out by hand. Still to settle together: the
   rest of loading (R tap to swap magazines, R hold to thumb rounds in, where magazines are kept).
 - Order (owner): enemy AI that follows sound came first, because items will make noise. That is built (see Sound,
-  hordes and hunting). Items are next.
+  hordes and hunting). Of items, only the medical ones, a torch, a hatchet, rocks and bottles exist so far
+  (`items.gd`), with the slot inventory; the loot screen, containers and everything else here are not built.
 - Claude's earlier layout, which the owner answered against: items are records (weight, condition, category);
   container contents are rolled when first opened; time is applied on opening (spoiling, picked over by others);
   nothing respawns in a cupboard; keepsakes unlock starting builds.
 
-## Health, injury and medicine (being designed with the owner, 20 Nov 2026; nothing built)
+## Health, injury and medicine (designed with the owner 20 Nov 2026; the body, treatment and the bite are built)
 
 The owner put this ahead of items: how you take damage, get sick, get injured, get better, get worse and die.
 What the owner asked for: Sims-like needs (boredom, hunger, hygiene and so on) feeding a complex medical system;
@@ -674,7 +702,7 @@ with crouching and going prone.
   shot, up to 9 m, off by up to 17 degrees). A shove still tells them exactly: you are touching them.
 - Footsteps (`Player.noise_radius()`): running, dashing or rolling 10 m; walking 4.5 m; crouched 1.5 m; crawling
   0.8 m; standing still, nothing. A raider who hears them goes to look at where the sound was (once a second).
-  Zombies don't hear footsteps yet.
+  (Zombies hear them too, a little less far: see "More of it" below.)
 - Crouch is Ctrl and prone is X; each key gets you down and up again (`Player.posture` 0, 1, 2). Speed 0.55 and
   0.25 of walking. You are seen from 0.65 and 0.4 of the usual distance (`seen_mult()`): by raiders, and
   zombies notice you from that much nearer too. Crouched within 1.3 m behind low cover, or prone within 2.6 m, it
@@ -699,8 +727,8 @@ with crouching and going prone.
 - Tall grass (`tall_grass.gd`, `TallGrass.at()`): down low in it you are seen from much less far, on top of
   the stance: crouched 0.7 again, flat 0.35 again (`grass_crouch_seen`, `grass_prone_seen`). So flat in grass
   a raider has to be within about 2.5 m and a zombie 1.7 m. Standing in it changes nothing. One test patch by
-  the spawn (9 by 7 m, placed where it is clear of the level); the look is a stand-in of plain blades. It
-  hides nothing from the player and enemies don't use it. The owner mentioned "things like tall grass": other
+  the spawn (9 by 7 m, placed where it is clear of the level), drawn with the tall standing grass
+  (`GrassBlades`, see Ground and grass). It hides nothing from the player and enemies don't use it. The owner mentioned "things like tall grass": other
   such things (crops, reeds, brush) should be `TallGrass` patches or join the same check. Sheet: `tools/preview/stances.png`
   (`tools/cover_pose_preview.gd` ROW=2).
 - More of it (owner, 20 Nov 2026: "we ain't done with stealth yet", then "all of that" to the list of what was
@@ -835,8 +863,8 @@ then grasses, as a second batch. Everything is in `assets/ground/` (its README h
   run out, and then searches round where they stopped. He never goes back over prints he has followed. Rain
   and fresh snow wipe the trail from under him. Cloud run in snow: a raider 3 m from the start of a 24 m
   dog-leg trail took it up at once and found the player lying flat at the end of it in 10 s. He doesn't tell
-  the others, zombies don't follow tracks, and you can't yet hide or false-lay a trail except by walking on
-  firm ground.
+  the others, and you can't yet hide or false-lay a trail except by walking on firm ground. (Fresh zombies
+  follow tracks too: see "The mind goes with the body" under Small rules.)
 - Review sheets (software renderer, made by `tools/ground_preview.gd`, SHEET=dirt, grass or scene):
   `assets/ground/preview/dirt_seasons.png`, `dirt_scene_seasons.png`, `grass_seasons.png`,
   `grass_scene_seasons.png`.
