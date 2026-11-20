@@ -26,6 +26,24 @@ weather. **Status: in review** (made 20 Nov 2026; never seen on Forward+, only o
 | 3 | clay | bare clay: cracked when dry or frozen, slick when wet |
 | 4 | mud | a wet place: dark and puddled; dries to cracked flats in a drought, freezes hard |
 
+## Kinds of grass
+
+Painted on the ground's map like the dirts; drawn as blades (each texel column cut into strokes, lighter at the
+tip, darker at the foot). Green in spring, yellowing in a dry summer and through autumn, dead straw in winter.
+
+| # | Kind | What it is |
+|---|---|---|
+| 8 | lawn | short grass, close and even: a yard, a verge, grazed ground; daisies in spring |
+| 9 | meadow | long grass: flowers in spring and summer, seed heads later, straw by autumn |
+| 10 | rough | tussocks and weeds with bare earth between: waste ground, the edge of a field |
+
+Standing grass (`grass_blades.gd`, `grass_blades.gdshader`) is tufts of real blades scattered on top, one draw
+call a patch, in four kinds: `short` (0.2 m), `meadow` (0.5 m), `tall` (1 m: the grass you can hide in) and
+`tussock` (0.38 m clumps). It keeps the same colours and seasons as the painted grass: short and bright in
+spring, full height in summer, going to straw, beaten down and frosted in winter, buried by snow. The blades
+sway in sprite steps, and they part round whoever walks or crawls through them (`grass_push`, a project-wide
+shader value the player keeps up to date), wider the lower you are.
+
 ## Seasons and weather
 
 One project-wide shader value, `ground_season` (declared in `project.godot`, kept by `seasons.gd`):
@@ -48,7 +66,10 @@ g.setup(Rect2(-40, -112, 80, 152), "soil")      # the area (x, z, width, depth) 
 g.road([Vector2(0, 38), Vector2(2, 10), Vector2(0, -36)])
 g.rect("farm", Rect2(16, 12, 20, 20), 20.0)     # rows 20 degrees round
 g.blob("mud", Vector2(-8, 20), 4.0)
+g.rect("meadow", Rect2(-38, -30, 14, 34))
 g.apply()
+g.grow_grass()                                  # standing grass wherever it is painted meadow or rough
+add_child(GrassBlades.in_rect("tall", Rect2(6, 8, 9, 7)))   # or a patch of standing grass where you say
 ```
 
 One kind on its own (a patch, an earth floor): a `ShaderMaterial` with `dirt.gdshader` and its `kind`.
@@ -65,6 +86,9 @@ One kind on its own (a patch, an earth floor): a `ShaderMaterial` with `dirt.gds
 | `dirt_types.gdshaderinc` | the kinds of dirt |
 | `grass_types.gdshaderinc` | the kinds of grass that are part of the ground's surface |
 | `dirt.gdshader` | one kind of dirt on its own |
+| `grass.gdshader` | one kind of painted grass on its own |
+| `grass_blades.gdshader` | standing grass: sway, seasons, parting round the player |
+| `grass_blades.gd` | `GrassBlades`: makes the tuft meshes and scatters them |
 | `ground.gdshader` | a whole level's ground from a painted map |
 | `ground.gd` | `Ground`: builds the slab and paints the map |
 | `seasons.gd` | `Seasons`: the time of year and the weather |
@@ -75,6 +99,8 @@ One kind on its own (a patch, an earth floor): a `ShaderMaterial` with `dirt.gds
 
 - Forward+ on Godot 4.7: colours, the stepped light, shadows falling on it (the cloud renderer drew none), cost.
 - Zoomed right out a texel is about a screen pixel, so fine detail may shimmer.
+- Standing grass: no shadows cast, nothing but the player parts it (zombies and raiders walk through it
+  unmoved), and its cost with tens of thousands of tufts is unmeasured.
 - Nothing in the game reads the kind of ground yet (no mud slowing you, no tracks, no footstep sounds).
 - The texel grid is turned to the camera's fixed 45 degrees (`GROUND_TURN` in `ground_lib`); if the camera's
   angle ever changes, change it to match.

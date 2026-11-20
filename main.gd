@@ -327,7 +327,14 @@ func _build_environment() -> void:
 	ground.rect("farm", Rect2(18, 16, 18, 17), 14.0)
 	ground.blob("clay", Vector2(10, 31), 4.0)
 	ground.blob("mud", Vector2(-10, 24), 3.5)
+	# Grass: a lawn round the spawn, a meadow along the west side of the yard, rough ground toward the raider camp
+	# and under the tall grass.
+	ground.blob("lawn", Vector2(-4, 6), 5.0)
+	ground.rect("meadow", Rect2(-38, -30, 14, 34))
+	ground.blob("rough", Vector2(-18, 14), 6.0)
+	ground.rect("rough", Rect2(5, 7, 11, 9))
 	ground.apply()
+	_grow_grass.call_deferred(ground)      # once the level's walls and crates are in, so nothing grows inside them
 	# The old plain ground, kept to fall back on (B) if the new shader misbehaves on some machine.
 	var sh := Shader.new()
 	sh.code = """
@@ -607,6 +614,10 @@ func _first_aid(pos: Vector3) -> void:
 	b.contents = [Items.make("bandage", 3), Items.make("clean_rag", 2), Items.make("needle_thread"),
 		Items.make("tweezers"), Items.make("vodka"), Items.make("painkillers")]
 	add_child(b)
+
+
+func _grow_grass(ground: Ground) -> void:
+	ground.grow_grass()
 
 
 func _place_grass() -> void:

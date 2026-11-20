@@ -22,6 +22,7 @@ const WEATHER := [
 	["Winter, snow", Vector4(3.0, 0.1, 0.6, 0.8)],
 ]
 const DIRT := ["Soil", "Farm", "Road", "Clay", "Mud"]
+const GRASS := ["Lawn", "Meadow", "Rough"]
 
 var _frames := 0
 
@@ -51,7 +52,9 @@ func _build() -> void:
 	world.add_child(sun)
 	var sheet := OS.get_environment("SHEET")
 	if sheet == "" or sheet == "dirt":
-		_dirt_sheet(world)
+		_sheet(world, "res://assets/ground/dirt.gdshader", DIRT, 0)
+	elif sheet == "grass":
+		_sheet(world, "res://assets/ground/grass.gdshader", GRASS, 8)
 	elif sheet == "scene":
 		_scene(world, sun)
 
@@ -79,6 +82,18 @@ func _scene(world: Node3D, sun: DirectionalLight3D) -> void:
 		g.blob("lawn", Vector2(0, 12), 4.0)
 		g.blob("rough", Vector2(15, 4), 3.5)
 	g.apply()
+	if OS.get_environment("GRASS") != "":
+		for c in g.get_children():
+			pass
+		print("tufts: ", g.grow_grass())
+		world.add_child(GrassBlades.in_rect("tall", Rect2(-18, -6, 7, 6)))
+		world.add_child(GrassBlades.in_rect("short", Rect2(-3, 9, 6, 6), 10.0))
+		for c in g.get_children() + world.get_children():
+			if c is GrassBlades:
+				var gm := (c as GrassBlades).material_override as ShaderMaterial
+				if gm.shader.resource_path != "":
+					gm.shader = _patched("res://assets/ground/grass_blades.gdshader")
+		RenderingServer.global_shader_parameter_set("grass_push", Vector4(-14.5, 0, -3, 1.1))
 	# Something to cast shadows: a crate and a wall.
 	for b in [[Vector3(3, 0.6, 0.5), Vector3(1.2, 1.2, 1.2)], [Vector3(-4, 1.3, -2.5), Vector3(4.0, 2.6, 0.4)]]:
 		var m := MeshInstance3D.new()
@@ -105,13 +120,13 @@ func _scene(world: Node3D, sun: DirectionalLight3D) -> void:
 	cam.make_current()
 
 
-func _dirt_sheet(top: Node3D) -> void:
+func _sheet(top: Node3D, shader_path: String, names: Array, first_kind: int) -> void:
 	var world := Node3D.new()
 	world.rotation.y = deg_to_rad(45.0)       # the page's across and down are the ground frame's
 	top.add_child(world)
-	var sh := _patched("res://assets/ground/dirt.gdshader")
+	var sh := _patched(shader_path)
 	var cols := WEATHER.size()
-	var rows := DIRT.size()
+	var rows := names.size()
 	for r in rows:
 		for c in cols:
 			var m := MeshInstance3D.new()
@@ -120,7 +135,7 @@ func _dirt_sheet(top: Node3D) -> void:
 			m.mesh = pm
 			var mat := ShaderMaterial.new()
 			mat.shader = sh
-			mat.set_shader_parameter("kind", r)
+			mat.set_shader_parameter("kind", first_kind + r)
 			mat.set_shader_parameter("season_override", WEATHER[c][1])
 			var x := (c - (cols - 1) * 0.5) * (TILE + GAP)
 			var z := (r - (rows - 1) * 0.5) * (TILE + GAP)
@@ -135,7 +150,7 @@ func _dirt_sheet(top: Node3D) -> void:
 			world.add_child(m)
 			if r == 0:
 				_label(world, WEATHER[c][0], Vector3(x, 0.1, z - TILE * 0.5 - 0.3))
-		_label(world, DIRT[r], Vector3(-(cols * 0.5) * (TILE + GAP) - 0.9, 0.1, (r - (rows - 1) * 0.5) * (TILE + GAP)))
+		_label(world, names[r], Vector3(-(cols * 0.5) * (TILE + GAP) - 0.9, 0.1, (r - (rows - 1) * 0.5) * (TILE + GAP)))
 	_camera_down(world, Vector2(cols * (TILE + GAP) + 2.6, rows * (TILE + GAP) + 1.0), Vector2(-0.9, -0.3))
 
 

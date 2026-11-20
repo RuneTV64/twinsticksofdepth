@@ -37,6 +37,10 @@ ground_season={
 "type": "vec4",
 "value": Vector4(1, 0, 0, 0)
 }
+grass_push={
+"type": "vec4",
+"value": Vector4(0, -1000, 0, 0)
+}
 cutaway_focus={
 "type": "vec3",
 "value": Vector3(0, -1000, 0)

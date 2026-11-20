@@ -356,6 +356,7 @@ var _torch_light: SpotLight3D
 @export var torch_range := 16.0          # m the beam reaches
 @export var torch_angle_deg := 24.0      # half its width
 @export var torch_seen := 1.5            # carrying a light in the dark, you are seen from this much further than by day
+var _grass_push := Vector4.ZERO
 var _lit_t := 0.0                # your own muzzle flash is still showing you up
 var prone_w := 0.0               # for the body: 1 = lying flat
 ## Prone, you lie along prone_dir (head that way) and crawl on your front. With a gun raised you stay put:
@@ -2622,6 +2623,11 @@ func _reset_vitals() -> void:
 
 # ---------------------------------------------------------------- visuals
 func _update_visuals(delta: float) -> void:
+	# Standing grass parts round you: wider the lower you are (crawling flattens a swathe).
+	var push := Vector4(global_position.x, global_position.y, global_position.z, 0.0 if dead else [0.6, 0.8, 1.15][posture])
+	if push != _grass_push:
+		_grass_push = push
+		RenderingServer.global_shader_parameter_set("grass_push", push)
 	var lie := prone_dir if posture == 2 else facing     # flat on the ground the body lies where it lay; only the aim turns
 	_visual.rotation.y = atan2(-lie.x, -lie.z)
 	# The body poses itself from our state: stance, speed, punches, shoves, reload, hits, death.

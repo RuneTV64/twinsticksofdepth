@@ -146,6 +146,31 @@ func apply() -> void:
 	material.set_shader_parameter("road_width", road_width)
 
 
+## Standing grass wherever the ground is painted as grass: long blades on meadow, tussocks on rough ground. (Lawn
+## is short enough to be the painted surface alone.) Call it after the painting is done. Returns how many tufts.
+func grow_grass() -> int:
+	var total := 0
+	for pair in [["meadow", "meadow"], ["rough", "tussock"]]:
+		var want := int(KINDS[pair[0]]) * 16
+		var per_cell := float(GrassBlades.KINDS[pair[1]]["density"]) * CELL * CELL
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash(pair[0])
+		var pts := PackedVector2Array()
+		for y in _h:
+			for x in _w:
+				if _img.get_pixel(x, y).r8 != want:
+					continue
+				var n := int(per_cell) + (1 if rng.randf() < per_cell - int(per_cell) else 0)
+				for i in n:
+					var p := area.position + (Vector2(x, y) + Vector2(rng.randf(), rng.randf())) * CELL
+					if Cover.has_room(p, null):
+						pts.append(p)
+		if not pts.is_empty():
+			add_child(GrassBlades.at_points(pair[1], pts))
+			total += pts.size()
+	return total
+
+
 ## What the ground is made of at a place ("soil", "road"...), for anything that cares (footsteps, mud, tracks).
 func kind_at(pos: Vector3) -> String:
 	var c := _cell(Vector2(pos.x, pos.z))
