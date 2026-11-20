@@ -17,7 +17,14 @@ extends CharacterBody3D
 
 @export var kind := "dummy"
 @export var max_hp := 100.0            # dummies; shamblers use shambler_hp
-@export var shambler_hp := 50.0        # rotten and fragile: two shots, or a long beating with fists
+@export var shambler_hp := 50.0        # at the middle of decay. Scaled by rot (see Toughness)
+@export_group("Toughness")
+# The fresher the body, the more it takes: more damage to put down, a harder skull, steadier on its feet. A
+# long-rotted one is fragile on all three. Each pair is fresh .. fully rotted.
+@export var hp_by_rot := Vector2(1.7, 0.85)        # times shambler_hp
+@export var skull_by_rot := Vector2(0.55, 1.4)     # how much of a blow gets through to the skull
+@export var topple_by_rot := Vector2(0.3, 1.8)     # times knockdown_chance
+@export_group("")
 @export var move_speed := 1.5
 @export var aggro_range := 12.0
 @export var attack_range := 1.45       # dummies don't attack; kept for tuning other kinds
@@ -25,7 +32,9 @@ extends CharacterBody3D
 @export var attack_cooldown := 1.3
 @export var shambler_respawn := 90.0   # seconds a killed shambler stays gone, so a bullet buys real time
 @export var investigate_time := 10.0   # how long a heard noise keeps pulling it in
-@export var fade_time := 0.25          # seconds to fade out of (or into) the player's view
+@export var fade_time := 0.25          # seconds to fade into the player's view
+@export var linger_time := 1.2         # s it stays in view after you look away: you remember where it was
+@export var fade_out_time := 0.9       # ... then s to fade out (it has moved on by then, which is why it goes)
 
 @export_group("Zombie abilities")
 @export var grab_range := 1.05         # m: how close it has to be to reach for you
@@ -177,6 +186,7 @@ var _dead_t := 0.0
 var _corpse_t := 0.0
 var _sway := 0.0
 var _alpha := 1.0                # 1 = in the player's view, fades to 0 when it isn't
+var _out_t := 0.0                # s since it left the player's view
 var _noise_pos := Vector3.ZERO   # where the last noise it heard came from
 var _noise_t := 0.0              # > 0 while it is still drawn to that spot
 var _bite_cd := 0.0
@@ -250,6 +260,8 @@ func _new_zombie(reroll := true) -> void:
 	if reroll:   # the first roll happens in shambler.gd's own _ready
 		body.new_zombie()
 	_pace = randf_range(0.88, 1.12)
+	max_hp = shambler_hp * lerpf(hp_by_rot.x, hp_by_rot.y, body.rot())
+	hp = max_hp
 	crawling = body.legs() < 2
 	_set_state("walk")
 	_apart_t = fall_apart_every * randf_range(0.5, 1.5)
@@ -295,7 +307,7 @@ func take_hit(dmg: float, dir: Vector3, knock: float) -> void:
 				if r <= 0.0:
 					_lose(limbs[i], dir * 2.5 + Vector3.UP * 1.5)
 					break
-	if knock >= 3.0 and randf() < knockdown_chance * (1.0 + body.rot()):
+	if knock >= 3.0 and randf() < knockdown_chance * lerpf(topple_by_rot.x, topple_by_rot.y, body.rot()):
 		_knock_down()
 
 
@@ -332,7 +344,14 @@ func hear_noise(pos: Vector3, _by_player := true) -> void:
 ## script time in a 226-zombie crowd, with every zombie re-setting them every tick.)
 func _update_fade(delta: float) -> void:
 	var seen := player == null or player.can_see(global_position)
-	_alpha = move_toward(_alpha, 1.0 if seen else 0.0, delta / maxf(fade_time, 0.01))
+	if seen:
+		_out_t = 0.0
+		_alpha = move_toward(_alpha, 1.0, delta / maxf(fade_time, 0.01))
+	else:
+		# Out of your view it lingers a moment, as you remember where it was, and then fades.
+		_out_t += delta
+		if _out_t > linger_time or _alpha < 0.99:
+			_alpha = move_toward(_alpha, 0.0, delta / maxf(fade_out_time, 0.01))
 	if body != null:
 		var shown := _alpha > 0.02 or _corpse_t > 0.0
 		if _visual.visible != shown:
@@ -359,7 +378,7 @@ func shove(dir: Vector3, force: float) -> void:
 	if state != "down" and state != "getup":
 		_let_go()
 		_set_state("walk")
-	if randf() < knockdown_chance * 0.5 * (1.0 + body.rot()):
+	if randf() < knockdown_chance * 0.5 * lerpf(topple_by_rot.x, topple_by_rot.y, body.rot()):
 		_knock_down()
 
 
@@ -701,12 +720,17 @@ func is_down() -> bool:
 	return body != null and not dead and (crawling or state == "down" or state == "heap") and state != "climb"
 
 
+## How much of a blow gets through to its skull: little on a fresh body, a lot on a rotted one.
+func skull_softness() -> float:
+	return lerpf(skull_by_rot.x, skull_by_rot.y, body.rot()) if body != null else 1.0
+
+
 ## A blow to the head while it is down (a stomp, a rifle butt). `power` 1 is enough for a sound skull; rot softens
 ## it. Returns true if that finished it.
 func take_stomp(power: float, dir: Vector3) -> bool:
 	if dead:
 		return false
-	head_dmg += power * (1.0 + 0.5 * body.rot() if body != null else 1.0)
+	head_dmg += power * skull_softness()
 	_flash = 0.1
 	hurt_t = 0.18
 	_since_hit = 0.0

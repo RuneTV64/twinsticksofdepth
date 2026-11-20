@@ -2,11 +2,11 @@ class_name Door
 extends Node3D
 ## Hinged door. This node sits on the hinge; the panel runs along local +X.
 ## The collision body is a child of the hinge, so it swings with the door you see.
-##  - Walk into it (either stance) and it swings away from you. That opens AND closes it.
-##  - Interact (weapon away) opens or closes it.
+##  - Click it (interact, weapon away) to open or close it. Walking into it does nothing for the player
+##    (owner, 20 Nov 2026). Zombies and raiders still shoulder it open as they walk into it.
 ##  - Run or dash into a shut door to barge it. Power = (STR + WT) x speed. If the power beats
 ##    the door's toughness it slams open, but it still hurts. If not, you bounce off and hurt more.
-##  - Locked doors won't push open. Barge them; every failed barge weakens them a bit.
+##  - Locked doors won't open to a click. Barge them; every failed barge weakens them a bit.
 
 @export var width := 1.6
 @export var height := 2.3

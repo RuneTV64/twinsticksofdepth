@@ -34,7 +34,7 @@ Cover  Space: tap = slide into nearest cover / leave it; hold = go to the cover 
 Roll  Space twice quickly, out of cover: rolls the way you are moving"""
 
 const HELP_TAIL := """
-Doors: walk into them to push them open or shut.
+Doors: click them (weapon away) to open or shut them.
 Run or dash into a shut one to barge it (it hurts).
 Aim: a red reticle on an enemy = aimed shot (more damage, headshot chance)
 Lock-on: a crosshair resting near an enemy settles onto it; move the mouse to take it off.

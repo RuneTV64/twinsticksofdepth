@@ -108,7 +108,30 @@ Claude's proposal, waiting for the owner's critique (sketch: `tools/sketches/tre
 - Other reasons to learn it: anatomy helps you kill (aimed shots, finishers); dissecting the dead is how you
   practise; maggots from corpses clean infected wounds; you can treat other people.
 - Needs proposed: food, water, rest (exist), plus hygiene and morale (boredom, company), warmth with the seasons.
-- Open: what a zombie bite does (the turning mechanic), whether limbs can be lost, whether a toilet need exists.
+- The owner's answers (20 Nov 2026):
+  - The bite: surviving it takes the right resources, good timing and luck, and depends on where the bite is.
+    Some places can be chopped off. Certain medicines (steroids, maybe) help fight the infection, but only
+    amputation and luck can really cure it. The character is permanently disabled afterwards. A hand can be
+    replaced by a low-mobility hook or an improvised hand, a leg by a prosthetic or a peg leg; those are to be
+    designed later.
+  - How close to death: the player must be able to tell they are close to death but not exactly how close.
+    Medical gives the best guess, for someone who really wants to know how long they have.
+  - Toilet is a need and also a resource: it feeds compost (see Loot). More will be done with it.
+  - When you turn, your old character walks the map as a zombie carrying your things: "Absolutely".
+  - The hands-on treatment is "exactly what I had in mind".
+
+## Small rules the owner has set (20 Nov 2026)
+
+- Zombies linger when you look away: one that leaves your view stays drawn for `linger_time` 1.2 s (you remember
+  where it was) and then fades over 0.9 s; it has moved on by then. Fading in is still quick. (`enemy.gd`.)
+- Zombies are tougher the fresher they are, on three counts (`enemy.gd`, Toughness): health 1.7 to 0.85 times
+  `shambler_hp`, how much of a blow reaches the skull 0.55 to 1.4 (so a fresh one takes 3 stomps at Strength 10
+  and a rotted one 2), and how easily it is knocked over 0.3 to 1.8 times `knockdown_chance`. Raiders were left
+  as they were: the owner said dying easily is fair while everyone is naked.
+- Doors open and close on a click (interact, weapon away). Walking into one does nothing for the player. Running
+  or dashing into a shut one still barges it. Zombies and raiders still shoulder doors open by walking into them;
+  the owner hasn't said whether that should change.
+- Still to settle (owner): what clicking on things does with the weapon Ready and with it away.
 
 ## Naming: zombies and shamblers
 

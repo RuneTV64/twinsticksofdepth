@@ -384,7 +384,7 @@ func _build_level() -> void:
 		_ammo(p)
 
 	_sign(Vector3(3, 1.6, 4), "Ammo: weapon away, walk up, interact")
-	_sign(Vector3(0, 3.2, -9.6), "Walk into the door to push it")
+	_sign(Vector3(0, 3.2, -9.6), "Click the door to open it")
 	_sign(Vector3(7.6, 3.2, -16), "Locked: dash into it")
 	_sign(Vector3(-15, 3.0, 2), "Dummies")
 	_sign(Vector3(20, 3.0, 0), "Shamblers")

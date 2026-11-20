@@ -10,7 +10,7 @@ extends CharacterBody3D
 ##    pops you out to aim; attack without Ready fires blind. See the Cover section below and cover.gd.
 ##  READY (hold right-click / Q): the mouse sets facing, the camera
 ##    leads toward the aim point. Attack button attacks. Slower, no running (dash still works).
-## Doors work in either stance: walk into them to push them, run or dash into them to barge.
+## Doors: click one (weapon away) to open or close it; run or dash into a shut one to barge it.
 
 # ---------- Stats ----------
 # The character sheet (character_sheet.gd) holds the attributes, needs, composure and conditions. There is no
@@ -1218,7 +1218,9 @@ func _update_finisher() -> void:
 
 ## How many blows a sound skull takes at your Strength, with what is in your hands.
 func finisher_blows() -> int:
-	return ceili(1.0 / _blow_power() - 0.001)
+	var soft := finish_target.skull_softness() if finish_target != null else 1.0
+	var left := 1.0 - (finish_target.head_dmg if finish_target != null else 0.0)
+	return maxi(ceili(left / (_blow_power() * soft) - 0.001), 1)
 
 
 func _blow_power() -> float:
@@ -1545,10 +1547,7 @@ func _handle_collisions(pre_vel: Vector3) -> void:
 		if spd >= barge_min_speed and _barge_cd <= 0.0 and door.is_shut():
 			_barge(door, spd, into)
 			return
-		if spd > 0.4:
-			if not door.push(global_position, into, spd) and _locked_msg_cd <= 0.0:
-				show_status("Won't budge. Run or dash into it to barge it open.", 2.0)
-				_locked_msg_cd = 2.5
+		# (Walking into a door no longer pushes it: you open and close doors by clicking them. Owner, 20 Nov 2026.)
 
 
 func _barge(door: Door, spd: float, into: Vector3) -> void:
@@ -1860,8 +1859,8 @@ func interact_prompt() -> String:
 		if armed and not is_melee() and mag > 0:
 			return "[%s]  Shoot it in the head (1 round, loud)" % btn
 		var n := finisher_blows()
-		return "[%s]  %s its head (%s at your Strength)" % [btn, "Stomp" if is_melee() else "Rifle-butt",
-			"one blow" if n <= 1 else "%d blows" % n]
+		return "[%s]  %s its head (%s)" % [btn, "Stomp" if is_melee() else "Rifle-butt",
+			"one blow" if n <= 1 else "about %d blows" % n]
 	if interact_target == null:
 		return ""
 	var txt: String = interact_target.call("prompt_text", self)

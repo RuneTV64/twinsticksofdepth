@@ -7,7 +7,7 @@ You switch between two stances so that exploring and fighting use different cont
 
 - **Weapon away (default):** you face the way you walk. The mouse moves a crosshair, and the camera pans to keep it centered. Your facing doesn't change. When you let go, the camera comes back to you and the crosshair hides. The attack button works as **Interact**. Hold Sprint to run.
 - **Ready (HOLD):** the reticle appears on you and you move it out from there. The mouse sets your facing once the reticle is off you, and the camera leans toward where you aim. The attack button **attacks**. You move slower and can't run, but you can still dash.
-- **Doors work in either stance.** Walk into a door to push it open or shut. Run or dash into a shut door to barge it. The camera angle never rotates; it only pans.
+- **Doors:** click a door (weapon away) to open or shut it. Run or dash into a shut door to barge it. The camera angle never rotates; it only pans.
 
 ## Controls
 Mouse and keyboard only. There is no controller support.
