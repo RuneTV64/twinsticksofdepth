@@ -17,6 +17,7 @@ extends CharacterBody3D
 
 @export var kind := "dummy"
 @export var max_hp := 100.0            # dummies; shamblers use shambler_hp
+@export var footstep_hearing := 0.8    # zombies hear footsteps from this much of the distance a raider does
 @export var body_blow_damage := 16.0   # a full-strength stomp or butt on a downed zombie's body (not its head)
 @export var shambler_hp := 50.0        # at the middle of decay. Scaled by rot (see Toughness)
 @export_group("Toughness")
@@ -1072,6 +1073,10 @@ func _look_about(delta: float) -> void:
 
 ## Pick who to go for: the nearest living person it has noticed, you or a raider. With no one noticed it keeps
 ## the player in mind (it still comes to noises), as before raiders existed.
+static func _xz2(v: Vector3) -> float:
+	return Vector2(v.x, v.z).length()
+
+
 func _pick_prey() -> void:
 	var best = null
 	var best_d := INF
@@ -1090,6 +1095,11 @@ func _pick_prey() -> void:
 		if dr < notice_r and dr < best_d:
 			best = r
 			best_d = dr
+	# Footsteps: one with nothing in sight that hears you move turns toward the sound.
+	if best == null and player != null and not player.dead and kind == "shambler":
+		var nr: float = player.noise_radius() * footstep_hearing
+		if nr > 0.0 and _xz2(player.global_position - global_position) <= nr:
+			hear_noise(player.global_position)
 	if best == null and player != null and not player.dead:
 		best = player
 	prey = best

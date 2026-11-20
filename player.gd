@@ -219,8 +219,9 @@ const SIGHT_RAYS := 240                 # one every 1.5 degrees, all the way rou
 @export var cam_stance_sharpness := 3.0 # how gently the camera settles after Ready / lower / weapon swap
 
 ## Weapons on the quick wheel, in slot order (slot 0 is at the left, going clockwise).
-const WEAPONS: Array[String] = ["fists", "gun"]
-const WEAPON_NAMES := {"fists": "Unarmed", "gun": "Gun"}
+const WEAPONS: Array[String] = ["fists", "gun", "throw"]
+const THROWABLES: Array[String] = ["bottle", "rock"]     # what "throw" throws, the first you have
+const WEAPON_NAMES := {"fists": "Unarmed", "gun": "Gun", "throw": "Throw"}
 const WHEEL_MOUSE_RADIUS := 90.0        # pixels of mouse travel from center to the wheel's rim
 
 # ---------- Aimed shots (reticle red on the enemy you hit) ----------
@@ -312,6 +313,7 @@ var perch := 0.0                   # how far above the ground you stand (on a he
 var _wall_box: Cover.Box = null    # the solid thing you are walking into, if any (for climbing it from the pile)
 var _wall_n := Vector3.ZERO
 var finish_target: Enemy = null    # a downed zombie whose head the crosshair is on
+var takedown_target: Raider = null   # a raider you are behind, unnoticed, close enough to take down quietly
 var finish_part := ""              # which part of it the crosshair is on: only "Head" finishes it
 var _finish_part := ""
 var finish_pile = null             # ... or where a trapped one in the corpse pile is (Vector3), or null
@@ -359,7 +361,13 @@ var _on_back := false
 @export var back_beyond_deg := 110.0     # aiming further round than this from where your head points: onto your back
 @export var front_within_deg := 80.0     # ... and nearer than this: back onto your stomach
 @export var prone_aim_reach := 6.0       # m further the crosshair roams while aiming a gun from the ground
+@export_group("Throwing")
+@export var throw_base := 8.0            # m you can throw at Strength 0 ...
+@export var throw_per_str := 0.6         # ... plus this for each point (14 m at Strength 10)
+@export var throw_cooldown := 0.7
 @export_group("Stealth")
+@export var takedown_reach := 1.6        # m: how close behind someone you have to be
+@export var takedown_noise := 3.0        # m it is heard
 @export var crouch_speed := 0.55         # of walking speed
 @export var prone_speed := 0.25
 @export var crouch_seen := 0.65          # crouched, you are seen from this much of the usual distance
@@ -604,13 +612,13 @@ func add_ammo(n: int) -> void:
 
 # ---------------------------------------------------------------- weapons + quick wheel
 func is_melee() -> bool:
-	return weapon == "fists"
+	return weapon != "gun"      # fists, or something to throw: nothing that shoots
 
 
 ## True while your guard is up: Ready unarmed with stamina left to spend.
 ## A drained guard stays down until you've caught your breath (winded clears).
 func is_guarding() -> bool:
-	return armed and is_melee() and not dead and not winded and stamina > 0.0 and not sheet.one_armed and posture != 2
+	return armed and weapon == "fists" and not dead and not winded and stamina > 0.0 and not sheet.one_armed and posture != 2
 
 
 func equip(w: String) -> void:
@@ -972,6 +980,8 @@ func _mouse_lock(delta: float) -> void:
 func current_reticle_range() -> float:
 	if free_look:
 		return free_look_range
+	if armed and weapon == "throw":
+		return throw_range()
 	if armed and is_melee():
 		return melee_look_range
 	var steady := prone_aim_reach if posture == 2 and armed else 0.0    # braced on the ground, you aim further
@@ -1347,6 +1357,7 @@ func _update_finisher() -> void:
 			and _xz(hover_target.global_position - global_position).length() <= finisher_reach + 0.4:
 		finish_target = hover_target
 		finish_part = hover_part
+	_update_takedown()
 	if finish_target == null and CorpsePile.it != null:
 		# Any limb or head sticking out of the pile: there is no telling which are still alive.
 		var p = CorpsePile.it.piece_near(aim, finisher_aim + 0.1)
@@ -1836,6 +1847,18 @@ func _update_combat() -> void:
 	if Input.is_action_just_pressed("reload") and not is_melee():
 		_start_reload()
 	cover_blind = false
+	# A quiet take-down: behind someone who doesn't know you are there.
+	if attack_tapped and takedown_target != null and _fire_cd <= 0.0 and _stagger <= 0.0:
+		_takedown()
+		return
+	if weapon == "throw":
+		# Something to throw: Ready and click, or from behind cover without showing yourself.
+		if attack_tapped and interact_target != null and not armed:
+			interact_target.call("interact", self)
+			_body.reach()
+		elif attack_tapped and (armed or in_cover) and _fire_cd <= 0.0 and _stagger <= 0.0 and _draw_t <= 0.0:
+			_throw()
+		return
 	if in_cover and cover_mode != "pop" and not is_melee():
 		# In cover and not popped out: the attack button fires blind, over the cover or round its end.
 		# (Something to interact with right beside you still comes first.)
@@ -2073,6 +2096,11 @@ const PART_WORDS := {"Head": "head", "Torso": "body", "ArmL": "left arm", "ArmR"
 
 
 func interact_prompt() -> String:
+	if takedown_target != null:
+		return "[Left-click]  Take him down quietly"
+	if weapon == "throw" and (armed or in_cover) and finish_target == null:
+		var id := throw_item()
+		return "[Left-click]  Throw the %s at the crosshair" % Items.name_of(id).to_lower() if id != "" else "Nothing to throw"
 	if finish_target == null and finish_pile != null:
 		return "[%s]  %s it, in case it's alive" % ["Left-click",
 			"Shoot" if armed and not is_melee() and mag > 0 else ("Stomp" if is_melee() else "Rifle-butt")]
@@ -2368,6 +2396,97 @@ func low_hidden_from(from: Vector3) -> bool:
 		if me.distance_to(near) <= reach:
 			return true
 	return false
+
+
+# ---------------------------------------------------------------- throwing
+## How far you can throw: further the stronger you are.
+func throw_range() -> float:
+	return throw_base + throw_per_str * strength
+
+
+## What you would throw now (the first of THROWABLES you carry), or "".
+func throw_item() -> String:
+	for id in THROWABLES:
+		if inv.has(id):
+			return id
+	return ""
+
+
+## Throw it at the crosshair. It arcs, so it clears anything lower than the top of its arc (low cover always; a
+## one-storey wall from far enough back); otherwise it drops at the foot of what it hit. From behind cover it
+## goes over or round without you showing yourself. It makes a noise where it lands.
+func _throw() -> void:
+	var id := throw_item()
+	if id == "":
+		show_status("Nothing to throw. Rocks and bottles lie about.", 1.2)
+		_fire_cd = 0.3
+		return
+	var aim := reticle_offset.limit_length(throw_range())
+	if aim.length() < 1.0:
+		aim = facing * 1.0
+	var from := global_position + Vector3(0.0, 1.6 if posture == 0 and not in_cover else 1.0, 0.0)
+	var to := global_position + aim
+	to.y = 0.05
+	var dist := aim.length()
+	var peak := 0.6 + dist * 0.22
+	var hit := Projectile.wall_hit(get_world_3d().direct_space_state, from, Vector3(to.x, from.y, to.z), [get_rid()])
+	if not hit.is_empty():
+		var box := Cover.box_of(hit["collider"])
+		var own := in_cover and cover_face != null and box == cover_face.box
+		if not own and (box == null or box.top > from.y + peak - 0.3):
+			# It hits it and drops at its foot.
+			var hp: Vector3 = hit["position"]
+			var back := (from - hp)
+			back.y = 0.0
+			to = Vector3(hp.x, 0.05, hp.z) + back.normalized() * 0.35
+			peak *= 0.5
+		elif own:
+			peak = maxf(peak, box.top - from.y + 0.6)     # up and over what you are hiding behind
+	inv.use(id)
+	var th := Thrown.new()
+	th.item = id
+	th.from = from
+	th.to = to
+	th.peak = peak
+	th.flight = 0.45 + from.distance_to(to) * 0.045
+	th.thrower = self
+	get_parent().add_child(th)
+	_fire_cd = throw_cooldown
+	stamina = maxf(stamina - 4.0, 0.0)
+	if not in_cover:
+		facing = aim.normalized()
+	_body.reach()
+	if throw_item() == "":
+		show_status("That was the last thing you had to throw.", 1.2)
+
+
+# ---------------------------------------------------------------- quiet take-downs
+## Behind a raider who doesn't know you are there, close enough to touch, weapon raised: one click and he is
+## down without a sound to speak of.
+func _update_takedown() -> void:
+	takedown_target = null
+	if not armed or dead or hover_target == null or not (hover_target is Raider):
+		return
+	var r := hover_target as Raider
+	var to_me := global_position - r.global_position
+	to_me.y = 0.0
+	if r.sees or r.mode == "fight" or to_me.length() > takedown_reach or to_me.normalized().dot(r.facing) > -0.2:
+		return
+	takedown_target = r
+
+
+func _takedown() -> void:
+	var r := takedown_target
+	takedown_target = null
+	var to := r.global_position - global_position
+	to.y = 0.0
+	facing = to.normalized()
+	r.take_hit(r.hp + 1.0, facing, 0.0)
+	Earshot.make(global_position, takedown_noise, get_tree(), r)
+	_fire_cd = 0.9
+	stamina = maxf(stamina - 12.0, 0.0)
+	_body.reach()
+	show_status("Taken down, quietly.", 1.2)
 
 
 ## Sit down and see to your wounds (H), or put it down again.

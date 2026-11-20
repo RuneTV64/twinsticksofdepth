@@ -396,6 +396,17 @@ func _build_level() -> void:
 	for p in [Vector3(-3, 0, 4), Vector3(1.5, 0, -20)]:
 		_first_aid(p)
 	_sign(Vector3(-3, 1.6, 4), "First aid: take it, then H treats wounds")
+	# A tool box (the hatchet and the steroids, for a bite), and things to throw lying about.
+	var tools := ItemPickup.new()
+	tools.title = "Tool box"
+	tools.tint = Color(0.7, 0.3, 0.2)
+	tools.position = Vector3(-5, 0, 4)
+	tools.contents = [Items.make("steroids"), Items.make("hatchet")]
+	add_child(tools)
+	for p in [Vector3(-1.5, 0, 3), Vector3(1.5, 0, 3), Vector3(-9, 0, 9), Vector3(-14, 0, 13)]:
+		_throwable("rock", p)
+	for p in [Vector3(0, 0, 2.5), Vector3(-2.5, 0, 2.5), Vector3(-11, 0, 11)]:
+		_throwable("bottle", p)
 	_sign(Vector3(0, 3.2, -9.6), "Click the door to open it")
 	_sign(Vector3(7.6, 3.2, -16), "Locked: bash it (Strength 13, dash)")
 	_sign(Vector3(-15, 3.0, 2), "Dummies")
@@ -583,7 +594,18 @@ func _first_aid(pos: Vector3) -> void:
 	var b := ItemPickup.new()
 	b.position = pos
 	b.contents = [Items.make("bandage", 3), Items.make("clean_rag", 2), Items.make("needle_thread"),
-		Items.make("tweezers"), Items.make("vodka"), Items.make("painkillers"), Items.make("steroids"), Items.make("hatchet")]
+		Items.make("tweezers"), Items.make("vodka"), Items.make("painkillers")]
+	add_child(b)
+
+
+## One thing to throw, lying on the ground.
+func _throwable(id: String, pos: Vector3) -> void:
+	var b := ItemPickup.new()
+	b.title = Items.name_of(id)
+	b.small = true
+	b.tint = Thrown.LOOK[id][1]
+	b.position = pos
+	b.contents = [Items.make(id)]
 	add_child(b)
 
 

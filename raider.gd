@@ -112,6 +112,9 @@ var _shot_cd := 0.0
 var _blind_left := 0
 var _unseen_t := 99.0
 var _see_t := 0.0
+var _mark: Label3D
+var _mark_t := 0.0                 # s the "!" stays up
+@export var shout_range := 14.0    # m: how far its shout carries when it sees you (other raiders, and zombies)
 var notice := 0.0                  # 0 nothing .. 1 it has seen you
 var _steps_t := 0.0
 var _cover_cd := 0.0
@@ -180,6 +183,17 @@ func _ready() -> void:
 	_weapon_mat.emission_energy_multiplier = 0.0
 	gun.material_override = _weapon_mat
 	rbody.attach_weapon(gun)
+
+	# What it is thinking, over its head: "?" as it starts to notice you, "!" when it has.
+	_mark = Label3D.new()
+	_mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_mark.no_depth_test = true
+	_mark.font_size = 96
+	_mark.outline_size = 14
+	_mark.pixel_size = 0.01
+	_mark.position.y = 2.75
+	_mark.visible = false
+	_visual.add_child(_mark)
 
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -279,6 +293,18 @@ func _physics_process(delta: float) -> void:
 			else:
 				notice = maxf(notice - 0.2 / notice_fade, 0.0)
 			sees = notice >= 1.0
+		# The mark over its head (only ever seen when the raider itself is).
+		_mark_t -= 0.2
+		var show_q := mode != "fight" and notice > 0.12 and notice < 1.0
+		var show_x := _mark_t > 0.0
+		if _mark.visible != (show_q or show_x):
+			_mark.visible = show_q or show_x
+		if show_x:
+			_mark.text = "!"
+			_mark.modulate = Color(1.0, 0.25, 0.2)
+		elif show_q:
+			_mark.text = "?"
+			_mark.modulate = Color(1.0, 0.85, 0.3, 0.35 + 0.65 * notice)
 		# Footsteps: it hears what it can't see, and goes to look. It learns where the sound was, no more.
 		_steps_t -= 0.2
 		var nr: float = player.noise_radius()
@@ -521,6 +547,15 @@ func _alert() -> void:
 			others += 1
 	_side = [0, 1, -1][others % 3]
 	_from = global_position
+	_mark_t = 1.4
+	if mode != "fight":
+		# It shouts. Raiders in earshot learn where it saw you and come looking; zombies come to the shout.
+		Earshot.make(global_position, shout_range, get_tree(), self, false)
+		for r in get_tree().get_nodes_in_group("raiders"):
+			var o := r as Raider
+			if o != null and o != self and not o.dead and o.mode != "fight" \
+					and o.global_position.distance_to(global_position) <= shout_range:
+				o.last_seen = last_seen
 	mode = "fight"
 	armed = true
 	_phase = "duck"
@@ -1020,7 +1055,7 @@ func _pose_for_cover() -> void:
 				crouch = 0.0 if cover_side == 0 else 0.75
 		if cover_side != 0 and (cover_mode != "hunker" or cover_blind):
 			lean = Vector3(cover_face.dir.x, 0.0, cover_face.dir.y) * cover_side * (1.0 if cover_mode == "pop" else 0.7)
-	cover_crouch = crouch
+	cover_crouch = crouch if mode != "search" or in_cover else maxf(crouch, 0.55)    # out looking, it goes low
 	cover_lean_dir = lean
 
 

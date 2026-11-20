@@ -15,6 +15,8 @@ const DEFS := {
 	"vodka": {"name": "Vodka", "w": 0.7, "cat": "medical", "uses": 4, "for": "Washes a wound clean. It stings."},
 	"steroids": {"name": "Steroids", "w": 0.03, "cat": "medical", "uses": 4, "for": "Holds a bite's infection back for a few minutes. It cures nothing."},
 	"hatchet": {"name": "Hatchet", "w": 1.2, "cat": "tool", "for": "Chops. In the last resort, a limb."},
+	"rock": {"name": "Rock", "w": 0.4, "cat": "thrown", "stack": 3, "for": "Thrown, it makes a noise where it lands. It can be picked up again."},
+	"bottle": {"name": "Bottle", "w": 0.4, "cat": "thrown", "stack": 3, "for": "Thrown, it smashes: louder than a rock, and gone."},
 	"painkillers": {"name": "Painkillers", "w": 0.03, "cat": "medical", "uses": 6, "for": "Dulls pain for a few minutes: steadier hands, less slowed."},
 }
 

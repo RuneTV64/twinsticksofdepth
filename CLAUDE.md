@@ -641,8 +641,44 @@ with crouching and going prone.
   its sides, turned over along its length for the back (`player_body.gd` `_prone_w`, `Player.prone_back`); the
   arms and gun don't point where you aim. It needs a real crawl and real aiming poses. Sheet: `tools/preview/stances.png`
   (`tools/cover_pose_preview.gd` ROW=2).
-- Not built: anything shown to the player about how close a raider is to noticing; quiet take-downs; raiders
-  crouching or going prone; light and dark; zombies hearing footsteps; raiders telling each other.
+- More of it (owner, 20 Nov 2026: "we ain't done with stealth yet", then "all of that" to the list of what was
+  missing). Built the same day, untested on the owner's PC:
+  - The mark over a raider's head (`_mark`): a yellow "?" that firms up as it starts to notice you, a red "!"
+    for 1.4 s when it has. Only seen when the raider itself is.
+  - Quiet take-down (`Player._update_takedown()`, `_takedown()`): weapon raised, crosshair on a raider who
+    hasn't seen you and isn't fighting, within 1.6 m and behind him, left-click: he is dead, heard 3 m off.
+    Any weapon. No animation of its own and no Strength check yet.
+  - Zombies hear footsteps from 0.8 of the distance a raider does (`footstep_hearing`) and turn toward them.
+  - Raiders tell each other: one that sees you shouts (`shout_range` 14 m). Raiders in earshot who aren't
+    fighting learn where it saw you and come looking; zombies come to the shout.
+  - Raiders out searching go in a crouch (the look only: it doesn't yet make them harder to see or quieter).
+    They don't go prone.
+  - Light and dark: not built. It needs a time of day and the level's lighting, which can't be checked in a
+    cloud session.
+
+## Throwing (built 20 Nov 2026, in review; untested on the owner's PC)
+
+The owner: pick up and throw things like rocks and bottles; the noise sends zombies off toward it and brings
+raiders to look; hold Ready to ready it, left-click to throw; it can be used from behind cover.
+
+- Rocks and bottles are items (`items.gd`, 0.4 kg, up to 3 to a slot that can take the weight) lying about as
+  small pickups (`ItemPickup.small`; `main.gd` `_throwable()`): seven near the spawn and on the way to the
+  raider camp.
+- "Throw" is the third thing on the Tab wheel (`Player.WEAPONS`). `is_melee()` now means "not the gun", so
+  everything that asks about guns treats a throwable like empty hands; only the guard, the shove and the
+  punch ask for fists by name. Ready, the crosshair roams your throwing range: 8 m plus 0.6 a point of Strength
+  (14 m at 10). Left-click throws the first of bottle, rock that you carry (`_throw()`); 0.7 s between throws.
+- From behind cover a click throws without Ready and without leaving the hunker.
+- `thrown.gd` (`Thrown`): it arcs (the top of the arc is 0.6 m plus 0.22 a metre thrown above your hand). It
+  clears low cover always and anything whose top is under the arc (a one-storey wall from about 6 m back);
+  otherwise it drops at the foot of what it hit. Landing is a noise through `Earshot`: rock 9 m, bottle 14 m.
+  Zombies turn and walk to it (their usual sound memory); raiders on watch go to look, and one that has lost
+  you takes it for you. A rock lies where it landed and can be picked up again; a bottle is gone.
+- Cloud run: a bottle thrown 12 m sent a zombie 6 m from the landing toward it and put a raider on watch 7 m
+  away into a search of that exact spot, without it knowing where the player was.
+- Not built: hitting someone with it, the bottle's broken glass, a throwing pose (it uses the reach), an arc
+  shown before you throw, throwing other things. The hatchet and steroids moved to a "Tool box" by the spawn so
+  the first-aid box leaves your hands free.
 
 ## Character sheet (built 20 Nov 2026, in review; untested on the owner's PC)
 

@@ -26,6 +26,9 @@ const HELP_KEYS := """CONTROLS
 Move  WASD
 Look (weapon away)  Mouse moves the crosshair as far as you can see; the camera follows
 Camera in and out  Mouse wheel
+Throw  Pick up rocks and bottles, choose Throw on the Tab wheel, hold Ready, left-click: it lands at the crosshair
+  and the noise draws zombies and raiders. From behind cover a click throws without showing yourself.
+Take-down  Weapon raised, right behind a raider who hasn't noticed you, crosshair on him: left-click.
 Crouch  Ctrl (again to stand)      Prone  X (again to get up)
   Prone with a gun raised: you stay put and the crosshair reaches further. Aim behind you and you roll onto your back.
 Free look (HOLD)  F or middle mouse button: the camera leaves you and follows the crosshair further out
@@ -382,7 +385,7 @@ func _process(delta: float) -> void:
 		if _sheet_panel.visible:
 			_sheet.text = _sheet_text()
 	var stance := "READY" if player.armed else "WEAPON AWAY"
-	if player.armed and player.is_melee():
+	if player.armed and player.weapon == "fists":
 		if not player.is_guarding():
 			stance += "  - SPENT"
 		else:
@@ -418,7 +421,14 @@ func _process(delta: float) -> void:
 		roundi(player.barge_power(player.run_speed)), roundi(player.barge_power(player.dash_speed)),
 		roundi(player.part_chance("Head", 8.0) * 100.0), roundi(player.part_chance("Torso", 8.0) * 100.0)]
 
-	_ammo.text = "FISTS" if player.is_melee() else "%d / %d" % [player.mag, player.reserve]
+	if player.weapon == "throw":
+		var have := 0
+		for k in player.inv.slots:
+			if Player.THROWABLES.has(player.inv.slots[k]["id"]):
+				have += int(player.inv.slots[k].get("n", 1))
+		_ammo.text = "THROW  x%d" % have
+	else:
+		_ammo.text = "FISTS" if player.is_melee() else "%d / %d" % [player.mag, player.reserve]
 	_ammo.modulate = Color(1, 1, 1, 1.0 if player.armed else 0.45)
 
 	_wheel.visible = player.wheel_open

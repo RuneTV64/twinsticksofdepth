@@ -24,6 +24,8 @@ Mouse and keyboard only. There is no controller support.
 | Weapon wheel (hold) | Tab |
 | Reload | R |
 | Crouch / Prone (press again to get up) | Ctrl / X |
+| Throw a rock or bottle (pick them up; choose Throw on the wheel) | Hold Ready, left-click; from cover, just left-click |
+| Quiet take-down (behind a raider who hasn't noticed you) | Weapon raised, left-click on him |
 | Camera in and out | Mouse wheel |
 | Free look (hold): the camera follows the crosshair further out | F or middle mouse button |
 | Character page | C |

@@ -4,6 +4,8 @@ extends Node3D
 ## goes into your slots. What won't fit stays in the box.
 
 @export var title := "First-aid box"
+var small := false           # one small thing lying on the ground (a rock, a bottle), not a box
+var tint := Color(0.85, 0.87, 0.82)
 var contents: Array[Dictionary] = []
 
 var _mesh: MeshInstance3D
@@ -16,14 +18,14 @@ func _ready() -> void:
 	add_to_group("interactables")
 	_mesh = MeshInstance3D.new()
 	var b := BoxMesh.new()
-	b.size = Vector3(0.55, 0.3, 0.35)
+	b.size = Vector3(0.55, 0.3, 0.35) if not small else Vector3(0.2, 0.14, 0.2)
 	_mesh.mesh = b
 	_mat = StandardMaterial3D.new()
-	_mat.albedo_color = Color(0.85, 0.87, 0.82)
-	_mat.emission_enabled = true
+	_mat.albedo_color = tint
+	_mat.emission_enabled = not small
 	_mat.emission = Color(0.1, 0.4, 0.15)
 	_mesh.material_override = _mat
-	_mesh.position.y = 0.3
+	_mesh.position.y = 0.3 if not small else 0.08
 	add_child(_mesh)
 
 
@@ -45,7 +47,7 @@ func interact_point() -> Vector3:
 
 
 func prompt_text(_p: Player) -> String:
-	return "Take what is in the %s" % title.to_lower()
+	return ("Pick up the %s" if small else "Take what is in the %s") % title.to_lower()
 
 
 func interact(p: Player) -> void:
@@ -59,7 +61,13 @@ func interact(p: Player) -> void:
 			left.append(rest)
 	contents = left
 	p.recompute_stats()
-	if left.is_empty():
-		p.show_status("Took everything from the %s. H treats wounds." % title.to_lower(), 2.5)
+	if left.is_empty() and small:
+		p.show_status("%s taken. Tab: Throw." % title, 1.5)
+		queue_free()
+	elif small:
+		p.show_status("No room for it: your pockets, belt and hands are full.", 1.8)
+	elif left.is_empty():
+		p.show_status("Took everything from the %s." % title.to_lower(), 2.5)
+		queue_free()
 	else:
 		p.show_status("Took %d things; no room for the rest." % took, 2.0)
