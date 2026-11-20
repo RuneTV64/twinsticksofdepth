@@ -1,9 +1,12 @@
 class_name CamRig
 extends Node3D
-## Locked-angle camera. It never rotates; it only pans to the player's camera focus
-## (the player, the free-look crosshair, or a lead toward the aim point).
+## Locked-angle camera. It never rotates in play; it only pans to the player's camera focus
+## (the player, the free-look crosshair, or a lead toward the aim point), and moves in and out.
+## It is set at 45 degrees round (owner, 20 Nov 2026): north is toward the top right of the screen, as in an
+## isometric game. Everything that maps the screen to the ground (moving, the mouse) asks yaw() for it.
 
 @export var pitch_deg := 56.0
+@export var yaw_deg := 45.0           # turned this far round (0 = looking due north). Set once; it doesn't turn in play
 @export var distance := 18.0
 ## The mouse wheel moves the camera in and out between these (m from what it looks at).
 ## Project Zomboid's zoom steps run from 25% to 250% of its normal view; this is the same span round our 18 m.
@@ -27,6 +30,7 @@ func _ready() -> void:
 	cam.fov = fov
 	add_child(cam)
 	_want = distance
+	rotation.y = deg_to_rad(yaw_deg)
 	cam.far = 400.0
 	_place()
 	cam.rotation = Vector3(-deg_to_rad(pitch_deg), 0.0, 0.0)
@@ -36,6 +40,11 @@ func _ready() -> void:
 func _place() -> void:
 	var p := deg_to_rad(pitch_deg)
 	cam.position = Vector3(0.0, sin(p) * distance, cos(p) * distance)
+
+
+## How far round the camera is turned (radians).
+func yaw() -> float:
+	return rotation.y
 
 
 ## Wheel notches: negative = in, positive = out. The angle never changes, only how far back the camera is.

@@ -46,6 +46,7 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	Cover.clear()
+	TallGrass.clear()
 	Cover.bounds = Rect2(WORLD_X0, WORLD_Z0, WORLD_X1 - WORLD_X0, WORLD_Z1 - WORLD_Z0)
 	_build_environment()
 	_build_level()
@@ -403,6 +404,7 @@ func _build_level() -> void:
 	tools.position = Vector3(-5, 0, 4)
 	tools.contents = [Items.make("steroids"), Items.make("hatchet")]
 	add_child(tools)
+	_place_grass.call_deferred()     # once the whole level is built, so it lands clear of everything
 	for p in [Vector3(-1.5, 0, 3), Vector3(1.5, 0, 3), Vector3(-9, 0, 9), Vector3(-14, 0, 13)]:
 		_throwable("rock", p)
 	for p in [Vector3(0, 0, 2.5), Vector3(-2.5, 0, 2.5), Vector3(-11, 0, 11)]:
@@ -596,6 +598,22 @@ func _first_aid(pos: Vector3) -> void:
 	b.contents = [Items.make("bandage", 3), Items.make("clean_rag", 2), Items.make("needle_thread"),
 		Items.make("tweezers"), Items.make("vodka"), Items.make("painkillers")]
 	add_child(b)
+
+
+func _place_grass() -> void:
+	# Tall grass to go to ground in (a stand-in look): the first of these patches that is clear of everything.
+	for r: Rect2 in [Rect2(6, 8, 9, 7), Rect2(-16, 16, 9, 7), Rect2(8, 18, 9, 7)]:
+		var clear_of := true
+		for c: Vector2 in [r.position, r.end, Vector2(r.end.x, r.position.y), Vector2(r.position.x, r.end.y), r.get_center()]:
+			clear_of = clear_of and Cover.has_room(c, null)
+		for b in Cover.boxes:
+			clear_of = clear_of and not b.rect.intersects(r)
+		if clear_of:
+			var g := TallGrass.new()
+			g.area = r
+			add_child(g)
+			_sign(Vector3(r.get_center().x, 1.9, r.get_center().y), "Tall grass: crouch (Ctrl) or lie down (X) in it")
+			break
 
 
 ## One thing to throw, lying on the ground.

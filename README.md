@@ -10,7 +10,7 @@ You switch between two stances so that exploring and fighting use different cont
 - **Doors:** click a door (weapon away) to open or shut it. A character with Strength 13 or more can bash a shut door in by dashing at it; running into one does nothing. Shut doors stop zombies and raiders. The camera angle never rotates; it only pans.
 
 ## Controls
-Mouse and keyboard only. There is no controller support.
+Mouse and keyboard only. There is no controller support. The view is turned 45 degrees (north is toward the top right); the movement keys follow the screen.
 
 | | Mouse + Keyboard |
 |---|---|

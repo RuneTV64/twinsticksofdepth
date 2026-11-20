@@ -55,7 +55,7 @@ var barge_min_speed := 5.3
 ## can roam this far. You still only see what your eyes can (the fog of war doesn't lift).
 @export var free_look_range := 30.0
 var free_look := false
-@export var cam_lead_max := Vector2(11.0, 6.0)   # m (east-west, north-south) the camera may lead by at the default zoom
+@export var cam_lead_max := Vector2(11.0, 6.0)   # m (across the screen, up and down it) the camera may lead by at the default zoom
 @export var cursor_size := 0.7           # the cursor's size on screen (1 = as it was at the default zoom)
 @export var look_cam_lead := 0.5        # weapon away: how much of the way to the crosshair the camera goes
 @export var reticle_edge := 0.06        # the crosshair stays this share of the screen in from its edges
@@ -373,6 +373,8 @@ var _on_back := false
 @export var prone_speed := 0.25
 @export var crouch_seen := 0.65          # crouched, you are seen from this much of the usual distance
 @export var prone_seen := 0.4
+@export var grass_crouch_seen := 0.7      # crouched in tall grass: this much again
+@export var grass_prone_seen := 0.35      # flat in tall grass: you have to be nearly trodden on (about 2.5 m for a raider)
 @export var crouch_hide_reach := 1.3     # m: crouched this close behind low cover, it hides you from the far side
 @export var prone_hide_reach := 2.6
 @export var noise_run := 10.0            # m your footsteps carry: running
@@ -575,9 +577,16 @@ func _cam_offset() -> Vector3:
 	# The camera goes part of the way to the crosshair, and never so far that you leave the screen.
 	var o := reticle_offset * (ready_cam_lead if armed else look_cam_lead)
 	var k := camera_rig.distance / 18.0 if camera_rig else 1.0
+	var yaw := camera_rig.yaw() if camera_rig else 0.0
+	o = o.rotated(Vector3.UP, -yaw)        # into the screen's own left-right and up-down
 	o.x = clampf(o.x, -cam_lead_max.x * k, cam_lead_max.x * k)
 	o.z = clampf(o.z, -cam_lead_max.y * k, cam_lead_max.y * k)
-	return o
+	return o.rotated(Vector3.UP, yaw)
+
+
+## A direction on the screen (x right, y down) as a direction on the ground, whichever way the camera is turned.
+func screen_to_ground(v: Vector2) -> Vector3:
+	return Vector3(v.x, 0.0, v.y).rotated(Vector3.UP, camera_rig.yaw() if camera_rig else 0.0)
 
 
 ## Keep the crosshair on the screen: at the edge it stops and pushes the view along (the camera follows it), so
@@ -709,7 +718,7 @@ func _input(event: InputEvent) -> void:
 			var rel: Vector2 = event.relative
 			# The same hand movement covers the same share of the screen however far out the camera is.
 			var far := camera_rig.distance / 18.0 if camera_rig else 1.0
-			reticle_offset += Vector3(rel.x, 0.0, rel.y) * mouse_sens * far
+			reticle_offset += screen_to_ground(rel) * mouse_sens * far
 			reticle_offset = reticle_offset.limit_length(current_reticle_range())
 			_keep_reticle_on_screen()
 			_mouse_idle = 0.0
@@ -728,7 +737,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var mv := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	var move_dir := Vector3(mv.x, 0.0, mv.y)
+	var move_dir := screen_to_ground(mv)      # up on the keys is up on the screen
 	if _stagger > 0.0:
 		move_dir = Vector3.ZERO
 	_update_held(delta, mv)
@@ -2369,7 +2378,10 @@ func _update_posture() -> void:
 
 ## How far off you can be seen, as a share of the watcher's usual range.
 func seen_mult() -> float:
-	return [1.0, crouch_seen, prone_seen][posture]
+	var m: float = [1.0, crouch_seen, prone_seen][posture]
+	if posture > 0 and TallGrass.at(global_position):
+		m *= grass_crouch_seen if posture == 1 else grass_prone_seen      # down in tall grass
+	return m
 
 
 ## How far your footsteps carry right now (0 = silent: standing still).

@@ -392,6 +392,8 @@ func _process(delta: float) -> void:
 			stance += "  - guarding"
 	if player.posture > 0:
 		stance += "  - CROUCHED" if player.posture == 1 else ("  - PRONE" if player.prone_back < 0.5 else "  - ON YOUR BACK")
+		if TallGrass.at(player.global_position):
+			stance += " in tall grass"
 	if player.running:
 		stance += "  - running"
 	if player.cover_entering:

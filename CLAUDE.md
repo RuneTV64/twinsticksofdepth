@@ -21,8 +21,14 @@ the character models, shaders and their scripts are in `assets/characters/` and 
 
 ## Camera
 
-- The camera never turns (owner, 20 Nov 2026): it stays locked looking north, and only pans. No rotation of any
-  kind, snapped or free. Code may go on assuming a fixed view (lighting, mouse-to-world mapping).
+- The camera never turns in play (owner, 20 Nov 2026): it only pans and moves in and out. No rotation, snapped
+  or free. Later the same day the owner decided the view itself is turned 45 degrees: `camera_rig.gd`
+  `yaw_deg` 45, so north is toward the top right of the screen, as in an isometric game. (Claude took "a 45
+  degree rotation on the camera" to mean this fixed turn, not a camera the player can rotate; if the owner
+  meant turning in 45 degree steps, everything already asks the rig for its yaw.) Anything that maps the
+  screen to the ground must go through `Player.screen_to_ground()` / `CamRig.yaw()`: movement keys (up is up
+  the screen), mouse travel, the camera lead. Lighting set from the camera (zombie and raider `key_dir`) is
+  worked out once at start-up from the camera as it stands, so it follows; it is unchecked on real hardware.
 - In and out, and further (owner, 20 Nov 2026; untested on the owner's PC). The mouse wheel moves the camera
   between 9 and 42 m from what it looks at (`camera_rig.gd` `zoom()`, 18 m by default; the angle never
   changes). The crosshair roams 16 m (`reticle_range`, was 10) and is kept on the screen: at the edge it stops
@@ -645,9 +651,17 @@ with crouching and going prone.
   `front_within_deg` 80 again, or lower the gun, and you roll back over. Rolling takes `roll_over_time` 0.5 s
   and you can't fire during it. Aiming a gun from the ground, the crosshair roams 6 m further
   (`prone_aim_reach`, 22 m in all).
-- Poses: the crouch reuses the cover squat. Prone is a stand-in: the whole body tipped flat, face down, arms at
-  its sides, turned over along its length for the back (`player_body.gd` `_prone_w`, `Player.prone_back`); the
-  arms and gun don't point where you aim. It needs a real crawl and real aiming poses. Sheet: `tools/preview/stances.png`
+- Poses (`player_body.gd`, `_prone_w`, `Player.prone_back`): the crouch reuses the cover squat. Prone has
+  real poses now: lying on the front with the chest propped and the head up; crawling, the hands planted
+  ahead with the elbows wide and pulling back in turn, one knee drawn up at a time; with a gun, it lies out in
+  front on the ground and turns to where you aim while the body stays put; on the back, knees up and feet
+  planted, chin down, the gun held over the belly pointing past the feet.
+- Tall grass (`tall_grass.gd`, `TallGrass.at()`): down low in it you are seen from much less far, on top of
+  the stance: crouched 0.7 again, flat 0.35 again (`grass_crouch_seen`, `grass_prone_seen`). So flat in grass
+  a raider has to be within about 2.5 m and a zombie 1.7 m. Standing in it changes nothing. One test patch by
+  the spawn (9 by 7 m, placed where it is clear of the level); the look is a stand-in of plain blades. It
+  hides nothing from the player and enemies don't use it. The owner mentioned "things like tall grass": other
+  such things (crops, reeds, brush) should be `TallGrass` patches or join the same check. Sheet: `tools/preview/stances.png`
   (`tools/cover_pose_preview.gd` ROW=2).
 - More of it (owner, 20 Nov 2026: "we ain't done with stealth yet", then "all of that" to the list of what was
   missing). Built the same day, untested on the owner's PC:

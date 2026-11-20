@@ -277,6 +277,19 @@ func animate(p, delta: float) -> void:
 		_tq[_leg[k][1]] = _rx(kn + 2.0 * crouch)
 		_tq[_leg[k][2]] = _rx((th[k] * cos(a) - kn) * w - crouch + sgn * split) * _rz(-wide)
 
+	# ---- flat on the ground: crawling, one knee is drawn up at a time and the toes trail; on the back (to shoot
+	# behind) the knees are up and the feet planted
+	if _prone_w > 0.001:
+		var bk: float = p.prone_back
+		for k in 2:
+			var sgn := 1.0 if k == 0 else -1.0
+			var kick := maxf(0.0, sin(_phase + k * PI)) * m
+			var q0 := _rz(sgn * (0.14 + 0.4 * kick)) * _rx(-0.3 * kick)
+			var q1 := _rx(0.12 + 0.9 * kick)
+			_tq[_leg[k][0]] = _tq[_leg[k][0]].slerp(q0.slerp(_rz(sgn * 0.12) * _rx(-0.75), bk), _prone_w)
+			_tq[_leg[k][1]] = _tq[_leg[k][1]].slerp(q1.slerp(_rx(1.25), bk), _prone_w)
+			_tq[_leg[k][2]] = _tq[_leg[k][2]].slerp(_rx(0.55 * (1.0 - bk) - 0.3 * bk), _prone_w)
+
 	# ---- a finishing stomp: the right knee comes up, then the boot goes down hard
 	if p._stomp_t > 0.0 and melee:
 		var su: float = 1.0 - p._stomp_t / maxf(p._stomp_total, 0.01)
@@ -301,13 +314,20 @@ func animate(p, delta: float) -> void:
 		# Flat on the front. Rolling onto the back (to shoot behind) turns the body over along its length; the
 		# head stays where it was.
 		var over: float = p.prone_back * PI
-		_tq[_hips] = _rz(over) * _rx(1.57 * _prone_w) * _tq[_hips]
+		_tq[_hips] = _rz(over) * _rx(1.57 * _prone_w) * Quaternion.IDENTITY.slerp(_tq[_hips], 1.0 - _prone_w)
 	_tq[_chest] = _ry(-hip_yaw + 0.6 * stance_yaw + punch_twist + 0.12 * _look) \
 		* Quaternion(lean_axis, lean) * _rx(bend) * _rz(-0.34 * _lean) \
 		* _ry(0.19 * sn * m * (1.0 + 0.6 * _run_w)) * _rz(0.035 * cs * m + 0.014 * sw)
 	_tq[_neck] = _ry(-0.45 * stance_yaw - 0.5 * punch_twist + 0.35 * _look - 0.09 * sn * m) \
 		* _rx(-0.03 * m + 0.018 * b * ba - 0.6 * lean * cos(_dir) + 0.1 * tired - 0.15 * _flinch) * _rz(-0.014 * sw + 0.14 * _lean)
 	_tq[_head] = _ry(-0.55 * stance_yaw - 0.3 * punch_twist + 0.45 * _look) * _rx(-0.06 * ready_w - 0.3 * _cover_w) * _rz(0.1 * _lean)   # head stays level when hunched or leaning
+	if _prone_w > 0.001:
+		# On the front: chest propped a little, head up to see ahead, the shoulders rocking with the crawl.
+		# On the back: curled up a little, chin to the chest, to see down past the feet.
+		var bk2: float = p.prone_back
+		_tq[_chest] = _tq[_chest].slerp(_rx(lerpf(-0.28, 0.3, bk2)) * _ry(0.16 * sn * m * (1.0 - bk2)), _prone_w)
+		_tq[_neck] = _tq[_neck].slerp(_rx(lerpf(-0.5, 0.4, bk2)), _prone_w)
+		_tq[_head] = _tq[_head].slerp(_rx(lerpf(-0.5, 0.35, bk2)), _prone_w)
 
 	# Keep the lower foot on the ground whatever the legs are doing (this is also the walk's bob).
 	_hips_off = Vector3(-0.012 * cs * m, 0.0, 0.0)
@@ -326,6 +346,15 @@ func animate(p, delta: float) -> void:
 	# Blind fire: the gun goes up over the cover (when squatting behind it) or out round its end.
 	gun_o += Vector3(0.3 * _lean, 0.46 * _cover_w, 0.06) * _blind_w
 	var gun_b := Basis(_rx(-0.12 * _recoil + 0.4 * reload_w) * _rz(0.45 * reload_w))
+	if _prone_w > 0.001 and not melee:
+		# Lying down the gun is out in front on the ground, or (on the back) held over the belly pointing past
+		# the feet. It turns to where you aim; the body stays where it lies.
+		var bk3: float = p.prone_back
+		var rel: float = (p.prone_dir as Vector3).signed_angle_to(p.facing, Vector3.UP)
+		var piv := Vector3(0.0, lerpf(0.16, 0.3, bk3), 0.45)
+		var aim_q := _ry(rel)
+		gun_o = gun_o.lerp(piv + Basis(aim_q) * Vector3(-0.03, lerpf(0.02, 0.14, bk3), 0.6), _prone_w)
+		gun_b = Basis(gun_b.get_rotation_quaternion().slerp(aim_q, _prone_w))
 	var grip := gun_o + gun_b * Vector3(0.0, -0.05, -0.27)       # right hand
 	var fore := gun_o + gun_b * Vector3(0.05, -0.06, 0.0)        # left hand
 	if reload_w > 0.0:
@@ -371,6 +400,10 @@ func animate(p, delta: float) -> void:
 			else:
 				gpose = _solve_arm(k, grip, Vector3(-0.6, -0.5, -0.7), Quaternion.IDENTITY)
 			pose = _blend_arm(pose, gpose, _gun_w)
+		if _prone_w > 0.001 and _gun_w < 0.999:
+			# Crawling: the hands are planted out in front, elbows wide, and pull back one at a time.
+			var ctgt := Vector3(sgn * 0.3, 0.04, 0.8 + 0.2 * sin(ph) * m)
+			pose = _blend_arm(pose, _solve_arm(k, ctgt, Vector3(sgn, 0.25, -0.4), Quaternion.IDENTITY), _prone_w * (1.0 - _gun_w))
 		if k == 1 and reach_w > 0.001:
 			var rpose := _solve_arm(k, Vector3(-0.12, cg.origin.y - 0.1, 0.56), Vector3(-0.6, -1.0, 0.0), Quaternion.IDENTITY)
 			pose = _blend_arm(pose, rpose, reach_w)

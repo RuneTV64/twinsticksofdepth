@@ -38,8 +38,8 @@ func _cells(row: int) -> Array:
 			["Prone", 0.0, 1, {"prone_w": 1.0, "nowall": true}],
 			["Prone, crawling", 0.0, 1, {"prone_w": 1.0, "velocity": Vector3(0.5, 0, 0), "nowall": true}],
 			["Prone, gun Ready, aiming ahead", 0.0, 1, {"prone_w": 1.0, "armed": true, "weapon": "gun", "nowall": true}],
-			["Rolling over (halfway)", 0.0, 1, {"prone_w": 1.0, "prone_back": 0.5, "armed": true, "weapon": "gun", "nowall": true}],
-			["Aiming behind: on your back", 0.0, 1, {"prone_w": 1.0, "prone_back": 1.0, "armed": true, "weapon": "gun", "nowall": true}],
+			["Aiming 70 degrees round", 0.0, 1, {"prone_w": 1.0, "armed": true, "weapon": "gun", "aim_round": 70.0, "nowall": true}],
+			["Aiming behind: on your back", 0.0, 1, {"prone_w": 1.0, "prone_back": 1.0, "armed": true, "weapon": "gun", "aim_round": 180.0, "nowall": true}],
 		]
 	return [
 		["Back to the wall", 2.6, 1, {}],
@@ -98,11 +98,19 @@ func _build(row: int) -> void:
 		p._body.material.shader = _shader
 		p.facing = Vector3(0, 0, c[2])
 		for k in f:
-			if k != "lift" and k != "over" and k != "nowall":
+			if k != "lift" and k != "over" and k != "nowall" and k != "aim_round":
 				p.set(k, f[k])
+		if f.has("prone_w"):
+			# Lying across the picture, head to the right, so the pose is seen from the side.
+			p.posture = 2
+			p.prone_dir = Vector3(1, 0, 0)
+			p.facing = p.prone_dir.rotated(Vector3.UP, deg_to_rad(f.get("aim_round", 0.0)))
+			if f.has("velocity"):
+				p._body._phase = 1.2      # mid-stride
 		for n in 90:
 			p._update_visuals(DT)
 		p._reticle.visible = false
+		p._reticle_x.visible = false
 		var l := Label3D.new()
 		l.text = c[0]
 		l.font_size = 30
