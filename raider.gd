@@ -25,7 +25,7 @@ extends Enemy
 
 @export_group("Raider")
 @export var raider_hp := 60.0           # at Constitution 10
-@export var sight := 26.0               # m
+@export var sight := 18.0               # m. Lowered from 26 (owner, 20 Nov 2026): they shot you from further than you could look
 @export var sight_fov_deg := 150.0      # on watch: how wide in front it notices you
 @export var close_sense := 4.0          # m: on watch, it notices you this close whichever way it faces
 @export var shot_damage := 12.0

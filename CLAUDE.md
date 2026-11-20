@@ -645,7 +645,7 @@ The owner asked for raiders made from the existing player model and skin layers,
   as raiders yet (no clothes exist): they look like the player with a different skin.
 - Each has a `CharacterSheet` with attributes rolled 8 to 12: CON sets health (60 at 10), END speed, DEX aim;
   being hurt drops composure and spoils their aim for a while.
-- AI (`mode`): idle (on watch, sees 26 m in a 150 degree cone, 4 m all round; comes to gunshots), fight, search
+- AI (`mode`): idle (on watch, sees 18 m (was 26; the owner had it lowered) in a 150 degree cone, 4 m all round; comes to gunshots), fight, search
   (goes to where it last saw or heard you, looks about, goes home), return.
 - Fighting: `_pick_cover()` finds cover between it and you within 12 m, with a clear straight walk there and a
   clear line to you once popped out; then it cycles hunker (reloads) -> peek -> pop out, aim 0.55 s, 1 to 3 shots
