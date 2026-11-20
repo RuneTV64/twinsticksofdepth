@@ -17,6 +17,7 @@ extends CharacterBody3D
 
 @export var kind := "dummy"
 @export var max_hp := 100.0            # dummies; shamblers use shambler_hp
+@export var body_blow_damage := 16.0   # a full-strength stomp or butt on a downed zombie's body (not its head)
 @export var shambler_hp := 50.0        # at the middle of decay. Scaled by rot (see Toughness)
 @export_group("Toughness")
 # The fresher the body, the more it takes: more damage to put down, a harder skull, steadier on its feet. A
@@ -732,6 +733,50 @@ func aim_point() -> Vector3:
 	if body != null and not dead and (crawling or state == "down" or state == "heap"):
 		return global_position + facing * 0.7
 	return global_position
+
+
+## Where its body parts are (world), for whoever is picking one out with the crosshair. Parts that are gone are
+## left out. On its feet it stands up; on the ground it lies along its facing, head first.
+func part_points() -> Dictionary:
+	var out := {}
+	var right := Vector3(-facing.z, 0.0, facing.x)
+	var at := global_position + Vector3(0.0, perch, 0.0)
+	var down := body != null and (crawling or state == "down" or state == "heap" or dead)
+	var spots := {"Head": [0.7, 0.0, 0.2], "Torso": [0.25, 0.0, 0.18], "ArmL": [0.4, -0.38, 0.12], "ArmR": [0.4, 0.38, 0.12],
+		"LegL": [-0.5, -0.16, 0.1], "LegR": [-0.5, 0.16, 0.1]} if down else \
+		{"Head": [0.0, 0.0, 1.66], "Torso": [0.0, 0.0, 1.2], "ArmL": [0.0, -0.36, 1.1], "ArmR": [0.0, 0.36, 1.1],
+		"LegL": [0.0, -0.14, 0.45], "LegR": [0.0, 0.14, 0.45]}
+	for slot: String in spots:
+		if kind == "shambler" and body != null and (body.part(slot) == "Destroyed" or (slot == "Head" and not body.has_head())):
+			continue
+		var s: Array = spots[slot]
+		out[slot] = at + facing * float(s[0]) + right * float(s[1]) + Vector3(0.0, float(s[2]), 0.0)
+	return out
+
+
+## A hit on one part of it. The head is a kill. An arm or a leg takes less out of it but may come off (a rotten
+## one more easily); a leg hit that doesn't take the leg may still put it down.
+func take_part_hit(part: String, dmg: float, dir: Vector3, knock: float) -> void:
+	if dead:
+		return
+	if part == "Head":
+		take_headshot(dir, knock * 2.0)
+		return
+	if part == "Torso" or kind != "shambler":
+		take_hit(dmg * (1.0 if part == "Torso" else 0.65), dir, knock)
+		return
+	take_hit(dmg * 0.65, dir, knock)
+	if dead or body.part(part) == "Destroyed":
+		return
+	if randf() < 0.3 + 0.4 * body.rot():
+		_lose(part, dir * 3.0 + Vector3.UP * 1.5)
+	elif part.begins_with("Leg") and randf() < 0.5:
+		_knock_down()
+
+
+## A stomp or a blow on a downed one that isn't on its head: it hurts it, no more.
+func take_body_blow(power: float, part: String, dir: Vector3) -> void:
+	take_part_hit(part, body_blow_damage * power, dir, 0.0)
 
 
 ## Is it on the ground, where its head can be stomped?

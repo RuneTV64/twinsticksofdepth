@@ -16,6 +16,25 @@ var shooter: Player
 var aimed_at: Enemy = null      # enemy under the reticle when fired; bonuses apply only to it
 var aimed_mult := 1.0
 var headshot_chance := 0.0
+var aim_part := ""              # the part of aimed_at the crosshair was on ("" = none: an unaimed shot)
+var part_chance := 0.0          # chance the shot lands on that part
+const STRAY := {"Torso": 5.0, "ArmL": 1.0, "ArmR": 1.0, "LegL": 1.5, "LegR": 1.5, "Head": 0.3}
+
+
+## Where a shot lands when it doesn't land where it was meant to (or wasn't meant for anywhere): mostly the body.
+static func stray_part(not_this := "") -> String:
+	var total := 0.0
+	for k: String in STRAY:
+		if k != not_this:
+			total += float(STRAY[k])
+	var r := randf() * total
+	for k: String in STRAY:
+		if k == not_this:
+			continue
+		r -= float(STRAY[k])
+		if r <= 0.0:
+			return k
+	return "Torso"
 var targets_player := false     # fired by a raider or the test gunner: it can hit the player and zombies, not raiders
 var origin := Vector3.ZERO      # where it was fired from: cover is judged from here
 var _travel := 0.0
@@ -97,11 +116,21 @@ func _physics_process(delta: float) -> void:
 			queue_free()
 			return
 	if best_e != null:
-		if best_e == aimed_at and randf() < headshot_chance:
+		if is_instance_valid(shooter):
+			# The player's shot: it lands on the part the crosshair was on, with luck; otherwise somewhere else on it.
+			var part := stray_part()
+			if best_e == aimed_at and aim_part != "":
+				part = aim_part if randf() < part_chance else stray_part(aim_part)
+			var parts: Dictionary = best_e.part_points()
+			if not parts.has(part):
+				part = "Torso"
+			best_e.take_part_hit(part, damage, dir, knock)
+			_report("HIT %s in the %s%s" % [best_e.kind, part, " (aimed there)" if part == aim_part else ""])
+			if part == "Head" and is_instance_valid(shooter):
+				shooter.show_status("HEADSHOT!", 1.0)
+		elif best_e == aimed_at and randf() < headshot_chance:
 			best_e.take_headshot(dir, knock * 2.0)   # one-hit kill; may take the head off
 			_report("HEADSHOT on %s" % best_e.kind)
-			if is_instance_valid(shooter):
-				shooter.show_status("HEADSHOT!", 1.0)
 		elif best_e == aimed_at:
 			best_e.take_hit(damage * aimed_mult, dir, knock)
 			_report("AIMED HIT %s x%.2f, hp now %d" % [best_e.kind, aimed_mult, ceili(best_e.hp)])

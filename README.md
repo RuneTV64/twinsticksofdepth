@@ -17,7 +17,7 @@ Mouse and keyboard only. There is no controller support.
 | Move | WASD |
 | Look / aim | Mouse |
 | Ready (hold) | Right mouse button (Q also works) |
-| Attack (Ready) / Interact (weapon away) / Finisher | Left-click |
+| Attack or finisher (Ready) / Interact (weapon away) | Left-click |
 | Sprint: tap = dash, hold = run | Shift |
 | Cover: tap = in or out, hold = go to the marked cover | Space |
 | Roll (out of cover) | Space twice quickly |

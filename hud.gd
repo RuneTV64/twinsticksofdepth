@@ -37,7 +37,9 @@ Roll  Space twice quickly, out of cover: rolls the way you are moving"""
 const HELP_TAIL := """
 Doors: click them (weapon away) to open or shut them.
 A strong character (Strength 13) can bash a shut one in by dashing at it (it hurts). Doors stop zombies and raiders.
-Aim: a red reticle on an enemy = aimed shot (more damage, headshot chance)
+Aim: the crosshair is a small grey x. Ready, on an enemy it goes red, and the part of them it is on (head, body,
+  an arm, a leg) is where the shot is likeliest to land: likelier close up and with Dexterity. Head = a kill;
+  arms and legs can come off; a leg hit can put one down.
 Lock-on: a crosshair resting near an enemy settles onto it; move the mouse to take it off.
 Unarmed + Ready: attack = punch (weak; a bit harder standing still).
 Hold Ready and face a zombie: when it gets within reach you shove it back,
@@ -50,8 +52,9 @@ In cover: hunkered = hidden, safe from shots across it, but you see only a short
   Space while moving toward low cover = vault it.
 Stat test keys: 1/2 STR   3/4 END   5/6 WT   7/8 DEX
 Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt   L all on low model
-Finisher: crosshair on a downed zombie's head, close by, then attack. Unarmed = stomp, gun away = rifle butt
-  (blows by Strength), gun Ready = one shot to the head.
+Finisher: weapon raised (Ready), crosshair on a downed zombie close by, then left-click. On its head it finishes
+  it: fists Ready = stomp (blows by Strength), gun Ready = one shot, gun empty = rifle butt. Anywhere else on it
+  only hurts it.
 Corpse piles can be walked on: slow, bad footing, and what is still alive in them grabs. Space at a wall = climb it.
 Character page: C. It shows attributes, needs, composure, your body, what you carry, and conditions.
 Wounds: H sits you down to treat them by hand with what you carry (a first-aid box is by the spawn).
@@ -308,8 +311,8 @@ func _sheet_text() -> String:
 	t += "   Health %d (heals %.1f/s)     Stamina %d (back at %.0f/s)     Walk %.1f  Ready %.1f  Run %.1f  Dash %.1f m/s\n" % [
 		roundi(player.max_health), player.heal_rate, roundi(player.max_stamina), player.stamina_regen,
 		player.walk_speed, player.ready_speed, player.run_speed, player.dash_speed]
-	t += "   Aimed shot x%.2f   Headshot %d%%   Reload %.2f s   Punch x%.2f   Shove %.1f m/s   Aware all round %.1f m   Barge %d / %d\n\n" % [
-		player.aimed_mult, roundi(player.headshot_chance * 100.0), player.reload_time, player.melee_mult,
+	t += "   Shot at 8 m: head %d%%, body %d%%   Reload %.2f s   Punch x%.2f   Shove %.1f m/s   Aware all round %.1f m   Barge %d / %d\n\n" % [
+		roundi(player.part_chance("Head", 8.0) * 100.0), roundi(player.part_chance("Torso", 8.0) * 100.0), player.reload_time, player.melee_mult,
 		player.shove_force, player.sight_near, roundi(player.barge_power(player.run_speed)),
 		roundi(player.barge_power(player.dash_speed))]
 	t += "[b]NEEDS[/b]   [color=#999]%s[/color]\n[table=3]" % (
@@ -403,11 +406,11 @@ func _process(delta: float) -> void:
 	_st_fill.bg_color = Color(0.9, 0.5, 0.15) if player.winded \
 		else Color(0.3, 0.8, 0.35).lerp(Color(0.9, 0.8, 0.2), player.fatigue())
 
-	_stats.text = "STR %d  END %d  WT %d  DEX %d   ->  walk %.1f  ready %.1f  run %.1f  dash %.1f   barge power: run %d / dash %d   aimed x%.2f  headshot %d%%" % [
+	_stats.text = "STR %d  END %d  WT %d  DEX %d   ->  walk %.1f  ready %.1f  run %.1f  dash %.1f   barge power: run %d / dash %d   at 8 m: head %d%%  body %d%%" % [
 		roundi(player.strength), roundi(player.endurance), roundi(player.weight), roundi(player.dexterity),
 		player.walk_speed, player.ready_speed, player.run_speed, player.dash_speed,
 		roundi(player.barge_power(player.run_speed)), roundi(player.barge_power(player.dash_speed)),
-		player.aimed_mult, roundi(player.headshot_chance * 100.0)]
+		roundi(player.part_chance("Head", 8.0) * 100.0), roundi(player.part_chance("Torso", 8.0) * 100.0)]
 
 	_ammo.text = "FISTS" if player.is_melee() else "%d / %d" % [player.mag, player.reserve]
 	_ammo.modulate = Color(1, 1, 1, 1.0 if player.armed else 0.45)

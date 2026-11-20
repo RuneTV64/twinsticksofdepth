@@ -402,6 +402,24 @@ changes, update both, and keep them the same files.
   grasping fingers; the head turns toward its target. Springs run only in view within 14 m (`springs` to switch
   off): about +38% per posing there. Motion clips: `source/zombie_anim_clip.gd` + `zombie_anim_gif.py`
   (before/after GIFs in `preview/zombie_motion_*.gif`); stills can't show motion.
+- Aiming at a part (owner, 20 Nov 2026; built the same day, untested on the owner's PC). The crosshair is a
+  small grey x (weapon away too, and with fists Ready: it no longer hides). Ready, on an enemy it goes red, and
+  the part of them it is on is where the shot is likeliest to land. `Enemy.part_points()` gives where the six
+  parts are (standing up, or lying along its facing); `Player._update_hover()` takes each part where the camera
+  sees it against the ground (the camera never turns) and picks the nearest within `hover_radius` 0.34 m
+  (`hover_target`, `hover_part`). The gun turns to whoever the crosshair is on, so a shot at the head goes at
+  the zombie and not over it. `Player.part_chance(part, dist)`: a base by part (head 0.22, body 0.7, arm 0.3,
+  leg 0.38) times Dexterity (4% a point) and the sheet's aim, times `gun_accuracy`, times range (1.8 at arm's
+  length down to 0.35, over `accurate_range` 10 m times the gun times `scope_mult`). At DEX 10: head 36% at 2 m,
+  27% at 7 m, 13% at 15 m; body 95%, 87%, 42%. Guns and scopes as items are to set `gun_accuracy` and
+  `scope_mult`. A shot that doesn't land where it was aimed lands elsewhere on them, mostly the body
+  (`Projectile.stray_part()`); so does a shot fired with the crosshair off them. `Enemy.take_part_hit()`: head
+  = a kill; body = full damage; an arm or leg = 0.65 damage and it may come off (30%, up to 70% rotted); a leg
+  hit may knock it down. The old aimed-shot damage bonus and flat headshot chance are no longer used for the
+  player (raiders still use them). The prompt names the part and how good the shot is in words, never a number.
+  The same picking is to be used for melee and for finishers (owner: "aiming guns will work similarly").
+- Lock-on with it: once the crosshair is on someone it is not pulled (you are choosing a part); the pull only
+  brings a crosshair resting near an enemy onto them.
 - Lock-on (sticky aim, 20 Nov 2026, untested on the owner's PC): `player.gd` `_lock_pull()`. Once the mouse rests,
   a crosshair within `lock_on_mouse_radius` 1 m of a living enemy the player can see settles onto it (dead centre
   inside `lock_on_core` 0.5 m, fading to nothing at the radius, so it never sticks) and follows it; moving the
@@ -491,9 +509,12 @@ World War Z but mindless: an accident, not a plan. All of it is in `enemy.gd` (t
 - The player on bodies (`player.gd`, Corpse pile exports): 0.4 speed, no run or dash, stamina drains, an 8% a
   second chance of losing footing (more when hurried, shaken or panicked), composure drains, eyes are higher so
   you see over more. At a wall whose top is within 1.6 m of your feet, Cover while pushing into it climbs over.
-- Finishers (owner, 20 Nov 2026; `player.gd`, Finisher exports): crosshair on the head of a zombie that is down
-  (crawling, knocked down, in a heap), within 1.7 m, then attack. Unarmed: stomp. Gun, weapon away: rifle butt
-  (1.4 times a stomp). Blows by Strength: a blow is STR/14 of a sound skull, so 14 = one blow, 10 = two, 6 =
+- Finishers (owner, 20 Nov 2026; `player.gd`, Finisher exports). Changed by the owner the same day: only with
+  the weapon raised (Ready), the crosshair on a downed zombie (crawling, knocked down, in a heap) within about
+  2 m, then left-click. Weapon away, the click only interacts. It works on any part of it, but only the head
+  finishes it: a blow anywhere else is `Enemy.take_body_blow()` (`body_blow_damage` 16 at full power; a limb may
+  come off). Fists Ready: stomp. Gun Ready with a round: one shot. Gun Ready and empty: rifle butt (1.4 times a
+  stomp). Blows by Strength: a blow is STR/14 of a sound skull, so 14 = one blow, 10 = two, 6 =
   three; rot softens the skull (`Enemy.take_stomp`). Gun, Ready: one round to the head, certain and loud. The same
   works on a trapped one in the pile. Lock-on and the prompt go to the head of a downed zombie. The stomp has a
   leg pose in `player_body.gd` (not rendered for review yet); the butt uses the bash pose.

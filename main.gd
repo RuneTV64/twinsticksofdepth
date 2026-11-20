@@ -105,7 +105,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_J:   # a test wound, to try the treatment screen on
 				var tw: Array = [["deep cut", "ArmL", 30.0], ["gunshot", "Torso", 26.0], ["bite", "ArmR", 20.0]][_test_wound % 3]
 				_test_wound += 1
-				player._wound(tw[0], tw[1], tw[2])
+				player._wound(tw[0], tw[2], tw[1])
 				player.show_status("Test wound: %s." % tw[0])
 			KEY_PAGEUP: hud.sheet_select(-1)
 			KEY_PAGEDOWN: hud.sheet_select(1)

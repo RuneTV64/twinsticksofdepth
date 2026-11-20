@@ -255,6 +255,17 @@ var spawn_point := Vector3.ZERO
 var reticle_offset := Vector3.ZERO
 var reticle_visible := false
 var reticle_on_enemy := false
+## The enemy the crosshair is on, and which part of it ("Head", "Torso", "ArmL"...). Ready only.
+var hover_target: Enemy = null
+var hover_part := ""
+@export var hover_radius := 0.34       # m (on the ground, as the camera sees it) from a part to count as on it
+@export_group("Accuracy")
+## The chance a shot lands on the part the crosshair is on, at arm's length, before skill, range and the gun.
+const PART_CHANCE := {"Head": 0.22, "Torso": 0.7, "ArmL": 0.3, "ArmR": 0.3, "LegL": 0.38, "LegR": 0.38}
+@export var gun_accuracy := 1.0        # the gun in your hands (1 = an ordinary one). Guns as items will set it
+@export var scope_mult := 1.0          # a scope stretches the range you are accurate over (1 = none)
+@export var accurate_range := 10.0     # m over which an ordinary gun, unscoped, loses its close-range edge
+@export_group("")
 var reticle_target: Enemy = null   # the enemy under the reticle (Ready only counts as "aimed")
 var lock_target: Enemy = null      # the enemy the crosshair is being drawn onto (lock-on), or null
 var _aim_raw := Vector3.ZERO       # where the mouse points (cover marking uses it)
@@ -294,6 +305,8 @@ var perch := 0.0                   # how far above the ground you stand (on a he
 var _wall_box: Cover.Box = null    # the solid thing you are walking into, if any (for climbing it from the pile)
 var _wall_n := Vector3.ZERO
 var finish_target: Enemy = null    # a downed zombie whose head the crosshair is on
+var finish_part := ""              # which part of it the crosshair is on: only "Head" finishes it
+var _finish_part := ""
 var finish_pile = null             # ... or where a trapped one in the corpse pile is (Vector3), or null
 var _roll_t := 0.0                 # > 0 while rolling (the body reads these three)
 var _roll_total := 0.55
@@ -385,19 +398,24 @@ func _ready() -> void:
 	_body.attach_weapon(_weapon)   # the body carries it: in hand when Ready, on the back otherwise
 	_apply_weapon_look()
 
+	# The crosshair: a small x on the ground. Grey; red on an enemy.
 	_reticle = MeshInstance3D.new()
-	var tm := TorusMesh.new()
-	tm.inner_radius = 0.3
-	tm.outer_radius = 0.42
-	tm.rings = 24
-	tm.ring_segments = 6
+	var tm := BoxMesh.new()
+	tm.size = Vector3(0.36, 0.01, 0.06)
 	_reticle.mesh = tm
+	_reticle.rotation.y = PI * 0.25
+	var bar2 := MeshInstance3D.new()
+	bar2.mesh = tm
+	bar2.rotation.y = PI * 0.5
+	bar2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_reticle.add_child(bar2)
 	_reticle_mat = StandardMaterial3D.new()
 	_reticle_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_reticle_mat.no_depth_test = true
 	_reticle_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_reticle_mat.render_priority = 10
 	_reticle.material_override = _reticle_mat
+	bar2.material_override = _reticle_mat
 	_reticle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_reticle.top_level = true
 	add_child(_reticle)
@@ -849,7 +867,8 @@ func _lock_pull(point: Vector3, radius: float) -> Vector3:
 ## The mouse has full control while it moves. Once it rests near an enemy, the crosshair settles
 ## onto that enemy and follows it.
 func _mouse_lock(delta: float) -> void:
-	if not lock_on_mouse or _mouse_idle < lock_on_mouse_settle:
+	# Once the crosshair is on someone it stays where you put it: you are choosing which part of them.
+	if not lock_on_mouse or _mouse_idle < lock_on_mouse_settle or hover_target != null:
 		lock_target = null
 		return
 	reticle_offset += _lock_pull(reticle_offset, lock_on_mouse_radius) * (1.0 - exp(-lock_on_sharpness * delta))
@@ -1222,21 +1241,16 @@ func _climb_wall_from_pile() -> void:
 func _update_finisher() -> void:
 	finish_target = null
 	finish_pile = null
-	if dead or not reticle_visible or not held_by.is_empty() or in_cover or _vault_t > 0.0:
+	finish_part = ""
+	# Only with your weapon raised, and the crosshair on a downed one within reach. Any part of it will do, but
+	# only the head finishes it.
+	if dead or not armed or not reticle_visible or not held_by.is_empty() or in_cover or _vault_t > 0.0:
 		return
 	var aim := global_position + reticle_offset
-	var best := finisher_aim
-	for e in get_tree().get_nodes_in_group("enemies"):
-		var en := e as Enemy
-		if en == null or not en.is_down():
-			continue
-		var head := en.aim_point()
-		if _xz(head - global_position).length() > finisher_reach:
-			continue
-		var d := _xz(head - aim).length()
-		if d < best:
-			best = d
-			finish_target = en
+	if hover_target != null and hover_target.is_down() \
+			and _xz(hover_target.global_position - global_position).length() <= finisher_reach + 0.4:
+		finish_target = hover_target
+		finish_part = hover_part
 	if finish_target == null and CorpsePile.it != null:
 		# Any limb or head sticking out of the pile: there is no telling which are still alive.
 		var p = CorpsePile.it.piece_near(aim, finisher_aim + 0.1)
@@ -1256,6 +1270,7 @@ func _blow_power() -> float:
 
 
 func _start_finisher() -> void:
+	_finish_part = finish_part
 	_finish_on = finish_target
 	_finish_at = finish_pile
 	var at: Vector3 = finish_target.aim_point() if finish_target != null else finish_pile
@@ -1270,7 +1285,9 @@ func _start_finisher() -> void:
 		_fire_cd = fire_interval
 		shots_fired += 1
 		Earshot.make(global_position, shot_noise_range, get_tree())
-		if _finish_on != null:
+		if _finish_on != null and _finish_part != "Head":
+			_finish_on.take_part_hit(_finish_part, shot_damage, Vector3.DOWN, 0.0)   # point blank: it can't miss
+		elif _finish_on != null:
 			_finish_on.take_hit(_finish_on.hp + 1.0, Vector3.DOWN, 0.0)
 			show_status("Finished it", 0.7)
 		elif CorpsePile.it != null:
@@ -1295,7 +1312,10 @@ func _land_finisher() -> void:
 		if not is_instance_valid(_finish_on) or not _finish_on.is_down():
 			return   # it got up, or it's gone
 		Earshot.make(global_position, stomp_noise_range, get_tree(), _finish_on)
-		if _finish_on.take_stomp(_blow_power(), Vector3.DOWN):
+		if _finish_part != "Head":
+			_finish_on.take_body_blow(_blow_power(), _finish_part, Vector3.DOWN)
+			show_status("It's down" if _finish_on.dead else "Go for the head!", 0.7)
+		elif _finish_on.take_stomp(_blow_power(), Vector3.DOWN):
 			show_status("Skull crushed", 0.8)
 		else:
 			show_status("Again!", 0.6)
@@ -1424,10 +1444,59 @@ func can_see(pos: Vector3, radius := 0.4) -> bool:
 ## the same path the projectile takes (from the muzzle, along your current facing, same hit
 ## radius and wall check), so a wall, a shut door, a body in the way, or a facing that hasn't
 ## turned onto the target yet all keep it white.
+## Which enemy, and which part of it, the crosshair is on. The crosshair is a point on the ground; a part that
+## is up off the ground is taken where the camera sees it against the ground (the camera never turns).
+func _update_hover() -> void:
+	hover_target = null
+	hover_part = ""
+	if not armed or dead or not reticle_visible:
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	var c := cam.global_position
+	var aim := global_position + reticle_offset
+	var reach := current_reticle_range() + 2.0
+	var best := hover_radius
+	for e in get_tree().get_nodes_in_group("enemies"):
+		var en := e as Enemy
+		if en == null or en.dead or en._alpha < 0.5 or _xz(en.global_position - global_position).length() > reach:
+			continue
+		var pts: Dictionary = en.part_points()
+		for slot: String in pts:
+			var q: Vector3 = pts[slot]
+			var g := c + (q - c) * (c.y / maxf(c.y - q.y, 0.01))    # where the camera sees it on the ground
+			var d := _xz(g - aim).length()
+			if slot == "Torso":
+				d *= 0.8        # the biggest part: a little easier to be on
+			if d < best:
+				best = d
+				hover_target = en
+				hover_part = slot
+
+
+## The chance a shot at this range lands on the part aimed at: better up close, with Dexterity, with a better
+## gun or a scope; worse shaken, hurt or tired.
+func part_chance(part: String, dist: float) -> float:
+	var skill := maxf(1.0 + 0.04 * sheet.bonus("dexterity"), 0.4) * sheet.aim_mult
+	var near := clampf(1.8 - dist / maxf(accurate_range * gun_accuracy * scope_mult, 1.0) * 0.8, 0.35, 1.8)
+	return clampf(float(PART_CHANCE.get(part, 0.3)) * skill * gun_accuracy * near, 0.02, 0.95)
+
+
 func _update_line_of_fire() -> void:
 	reticle_on_enemy = false
 	reticle_target = null
+	_update_hover()
 	if not armed or dead or is_melee() or (in_cover and cover_mode != "pop"):
+		return
+	if hover_target != null:
+		# The crosshair is on someone: that is who you are aiming at, if nothing solid is in the way.
+		var m := muzzle_position()
+		var tgt := hover_target.global_position + Vector3(0.0, 1.0, 0.0)
+		var w := Projectile.wall_hit(get_world_3d().direct_space_state, m, tgt, [get_rid()])
+		if w.is_empty() or m.distance_to(w["position"]) >= m.distance_to(tgt) - 0.5:
+			reticle_target = hover_target
+			reticle_on_enemy = true
 		return
 	var from := muzzle_position()
 	var to := from + facing * Projectile.MAX_DIST
@@ -1475,6 +1544,9 @@ func _update_facing(delta: float, move_dir: Vector3) -> void:
 			want = n3
 		facing = _turn_toward(facing, want, turn_speed * delta)
 		return
+	elif armed and hover_target != null and not is_melee():
+		want = hover_target.global_position - global_position   # the gun points at who the crosshair is on
+		want.y = 0.0
 	elif armed:
 		want = reticle_offset
 	elif _dash_t > 0.0:
@@ -1760,11 +1832,10 @@ func _shoot(dir: Vector3, from: Vector3, aimed: bool) -> void:
 	shot.exclude = [get_rid()]
 	shot.shooter = self
 	# Fired with the reticle on an enemy: the shot is "aimed" at that enemy.
-	if aimed and reticle_target != null:
+	if aimed and reticle_target != null and hover_target == reticle_target:
 		shot.aimed_at = reticle_target
-		# Conditions (shaken, tired, hurt) eat into the bonus, not the base damage.
-		shot.aimed_mult = 1.0 + (aimed_mult - 1.0) * sheet.aim_mult
-		shot.headshot_chance = headshot_chance * sheet.aim_mult
+		shot.aim_part = hover_part
+		shot.part_chance = part_chance(hover_part, _xz(reticle_target.global_position - global_position).length())
 	shots_fired += 1
 	print("[fire] #%d dir %s mag %d%s" % [shots_fired, dir, mag, "" if aimed else " (blind)"])
 	shot.position = from
@@ -1891,17 +1962,28 @@ func _update_interact() -> void:
 			interact_target = n
 
 
+const PART_WORDS := {"Head": "head", "Torso": "body", "ArmL": "left arm", "ArmR": "right arm", "LegL": "left leg", "LegR": "right leg"}
+
+
 func interact_prompt() -> String:
 	if finish_target == null and finish_pile != null:
 		return "[%s]  %s it, in case it's alive" % ["Left-click",
 			"Shoot" if armed and not is_melee() and mag > 0 else ("Stomp" if is_melee() else "Rifle-butt")]
 	if finish_target != null:
 		var btn := "Left-click"
+		var where: String = PART_WORDS.get(finish_part, "body")
 		if armed and not is_melee() and mag > 0:
-			return "[%s]  Shoot it in the head (1 round, loud)" % btn
+			return "[%s]  Shoot it in the %s (1 round, loud)" % [btn, where]
+		if finish_part != "Head":
+			return "[%s]  %s its %s (it hurts it; the head finishes it)" % [btn, "Stomp" if is_melee() else "Rifle-butt", where]
 		var n := finisher_blows()
 		return "[%s]  %s its head (%s)" % [btn, "Stomp" if is_melee() else "Rifle-butt",
 			"one blow" if n <= 1 else "about %d blows" % n]
+	if armed and not is_melee() and reticle_target != null and hover_part != "":
+		# Aiming: which part, and roughly how good the shot is. Never a number.
+		var ch := part_chance(hover_part, _xz(reticle_target.global_position - global_position).length())
+		return "%s: %s" % [str(PART_WORDS.get(hover_part, "body")).capitalize(),
+			"a long shot" if ch < 0.15 else ("a hard shot" if ch < 0.35 else ("a fair shot" if ch < 0.6 else ("a good shot" if ch < 0.93 else "can't miss")))]
 	if interact_target == null:
 		return ""
 	var txt: String = interact_target.call("prompt_text", self)
@@ -2198,14 +2280,9 @@ func _update_visuals(delta: float) -> void:
 	if _cover_mark.visible:
 		var ms := Cover.spot(cover_mark_face, cover_mark_t)
 		_cover_mark.global_position = Vector3(ms.x, global_position.y + 0.06, ms.y)
-	_reticle.visible = reticle_visible and not dead and not (armed and is_melee())
+	_reticle.visible = reticle_visible and not dead
 	_reticle.global_position = global_position + reticle_offset + Vector3(0.0, 0.08, 0.0)
-	if finish_target != null or finish_pile != null:
-		_reticle_mat.albedo_color = Color(1.0, 0.6, 0.1, 0.95)   # on a head you can finish
-	elif not armed:
-		# Weapon away: just a look cursor, so keep it a quiet gray (no enemy highlight).
-		_reticle_mat.albedo_color = Color(0.62, 0.64, 0.66, 0.55)
-	elif reticle_on_enemy:
-		_reticle_mat.albedo_color = Color(1.0, 0.2, 0.15, 0.95)
+	if armed and (hover_target != null or finish_pile != null):
+		_reticle_mat.albedo_color = Color(1.0, 0.2, 0.15, 0.95)   # on an enemy
 	else:
-		_reticle_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.95)
+		_reticle_mat.albedo_color = Color(0.66, 0.68, 0.7, 0.8 if armed else 0.55)
