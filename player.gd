@@ -324,6 +324,12 @@ var _dash_t := 0.0
 var _dash_dir := Vector3.ZERO
 var _stagger := 0.0
 var held_by: Array[Enemy] = []   # zombies that have hold of you
+## What you carry: weighted slots (inventory.gd).
+var inv := Inventory.new()
+## Seeing to your wounds (the treatment screen is open). You don't move, and you see only a short way.
+var treating := false
+var treat_look := false          # looking up from it (ALT held): your view is back, your hands stop
+@export var treat_sight := 3.0   # m: how far you see while your eyes are on the wound
 var invulnerable := false          # test switch (F7): nothing hurts you
 var _struggle := 0.0
 var _last_mv := Vector2.ZERO
@@ -588,7 +594,7 @@ func _input(event: InputEvent) -> void:
 		if wheel_open:
 			# The mouse points at the wheel instead of moving the crosshair.
 			_wheel_vec = (_wheel_vec + event.relative).limit_length(WHEEL_MOUSE_RADIUS)
-		elif Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not dead:
+		elif Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not dead and not treating:
 			var rel: Vector2 = event.relative
 			reticle_offset += Vector3(rel.x, 0.0, rel.y) * mouse_sens
 			reticle_offset = reticle_offset.limit_length(current_reticle_range())
@@ -598,6 +604,7 @@ func _input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
 	if dead:
+		treating = false
 		_respawn_t -= delta
 		velocity = Vector3.ZERO
 		wheel_open = false
@@ -611,6 +618,19 @@ func _physics_process(delta: float) -> void:
 	if _stagger > 0.0:
 		move_dir = Vector3.ZERO
 	_update_held(delta, mv)
+
+	if treating:
+		treat_look = Input.is_action_pressed("look_up")
+		if mv.length() > 0.3 or not held_by.is_empty() or _stagger > 0.0:
+			stop_treat()
+		else:
+			# Sat down over it: nothing else happens until you put it down.
+			cover_crouch = 0.85
+			velocity = velocity.move_toward(Vector3.ZERO, decel * delta)
+			move_and_slide()
+			_update_sight(delta)
+			_update_visuals(delta)
+			return
 
 	_update_wheel()
 	_update_stance()
@@ -1363,10 +1383,11 @@ func _update_sight(delta := 0.0) -> void:
 	# Hunkered behind cover you see only a short way, all round, and your eyes are below the top of low cover.
 	# Peeking or popped out, your view is back (and you can be seen).
 	var hunkered := in_cover and cover_mode == "hunker"
+	var eyes_down := treating and not treat_look
 	var low_eyes := in_cover and cover_face != null and cover_face.low and (hunkered or cover_side != 0)
 	var k := 1.0 - exp(-10.0 * delta) if delta > 0.0 else 1.0
-	view_range = lerpf(view_range, cover_hunker_sight if hunkered else sight_range, k)
-	view_near = lerpf(view_near, cover_hunker_sight if hunkered else sight_near, k)
+	view_range = lerpf(view_range, treat_sight if eyes_down else (cover_hunker_sight if hunkered else sight_range), k)
+	view_near = lerpf(view_near, treat_sight if eyes_down else (cover_hunker_sight if hunkered else sight_near), k)
 	_eye_h = lerpf(_eye_h, (0.6 if low_eyes else sight_eye_height) + perch, k)   # higher up, you see over more
 	if sight_rays.size() != SIGHT_RAYS:
 		sight_rays.resize(SIGHT_RAYS)
@@ -2012,6 +2033,7 @@ func _update_held(delta: float, mv: Vector2) -> void:
 func take_damage(amount: float, dir: Vector3, knock: float, fright := true) -> void:
 	if dead or invulnerable:
 		return
+	stop_treat()
 	health -= amount
 	if fright:
 		sheet.hurt(amount / max_health)
@@ -2056,6 +2078,27 @@ func take_shot(amount: float, dir: Vector3, knock: float, from: Vector3) -> Stri
 
 
 ## A wound on the body (sheet.body) from damage just taken. Nothing if the damage didn't count.
+## Sit down and see to your wounds (H), or put it down again.
+func toggle_treat() -> void:
+	if treating:
+		stop_treat()
+	elif dead:
+		pass
+	elif not held_by.is_empty():
+		show_status("Not while something has hold of you.")
+	elif armed or _roll_t > 0.0 or _roll_rec_t > 0.0 or _vault_t > 0.0 or _dash_t > 0.0:
+		show_status("Put your weapon away and stand still first.")
+	else:
+		treating = true
+		treat_look = false
+		running = false
+
+
+func stop_treat() -> void:
+	treating = false
+	treat_look = false
+
+
 func _wound(kind: String, amount: float, part: String) -> void:
 	if dead or invulnerable:
 		return

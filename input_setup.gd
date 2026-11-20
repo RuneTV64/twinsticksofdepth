@@ -37,6 +37,10 @@ static func apply() -> void:
 	_action("reload", 0.5)
 	_key("reload", KEY_R)
 
+	# Look up from what your hands are doing (treating a wound; searching, later).
+	_action("look_up", 0.5)
+	_key("look_up", KEY_ALT)
+
 
 static func _action(n: StringName, dz: float) -> void:
 	if InputMap.has_action(n):

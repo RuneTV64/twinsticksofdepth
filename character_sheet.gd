@@ -209,7 +209,7 @@ func _rebuild() -> void:
 	# The body: bleeding, blood lost, pain. Adrenaline hides the pain, not the bleeding.
 	if body.bleeding > 0.25:
 		_add("Bleeding badly", "you are losing blood fast")
-	elif body.bleeding > 0.02:
+	elif body.bleeding > body.ooze:
 		_add("Bleeding", "you are losing blood")
 	var feel := body.blood_feel()
 	if feel == "Pale":

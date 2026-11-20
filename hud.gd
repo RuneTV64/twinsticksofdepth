@@ -18,6 +18,7 @@ var _hp: ProgressBar
 var _st: ProgressBar
 var _st_fill: StyleBoxFlat
 var _debug: Label
+var treat: TreatmentScreen     # seeing to wounds (H)
 var _wheel: Control
 var _wheel_labels: Array[Label] = []
 
@@ -52,7 +53,10 @@ Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt   L all on low model
 Finisher: crosshair on a downed zombie's head, close by, then attack. Unarmed = stomp, gun away = rifle butt
   (blows by Strength), gun Ready = one shot to the head.
 Corpse piles can be walked on: slow, bad footing, and what is still alive in them grabs. Space at a wall = climb it.
-Character page: C. It shows attributes, needs, composure and conditions.
+Character page: C. It shows attributes, needs, composure, your body, what you carry, and conditions.
+Wounds: H sits you down to treat them by hand with what you carry (a first-aid box is by the spawn).
+  Your view closes in; hold ALT to look up. Moving puts it down. Keys 1-7 or a click pick a tool.
+  J gives you a test wound (a deep cut, a gunshot, a bite in turn).
 Horde: noise warms an area and draws zombies in from round about. Z shows the readout. Killed ones don't come back.
 Cutaway: walls between the camera and you open up. V switches it off and on, to compare.
 Cover test: G test gunner at the crosshair   Shift+G remove them
@@ -158,6 +162,10 @@ func _ready() -> void:
 	_sheet.add_theme_font_size_override("normal_font_size", 17)
 	_sheet.add_theme_font_size_override("bold_font_size", 17)
 	_sheet_panel.add_child(_sheet)
+
+	treat = TreatmentScreen.new()
+	treat.player = player
+	root.add_child(treat)
 
 	# Quick weapon wheel: a ring of slots in the middle of the screen, shown while it's held open.
 	_wheel = Control.new()
@@ -327,7 +335,13 @@ func _sheet_text() -> String:
 	var guess := b.time_left_guess()
 	if guess != "":
 		t += "   [color=#d6a04a]%s[/color]\n" % guess
-	t += "\n[b]CONDITIONS[/b]\n"
+	t += "\n[b]CARRYING[/b]   [color=#999]no bag: slots, each up to a weight.  %.1f kg in all.  H treats wounds.[/color]\n   " % player.inv.weight()
+	for sl in Inventory.SLOTS:
+		var it = player.inv.slots.get(sl[0])
+		t += "%s: %s      " % [sl[1], Items.label(it) if it != null else "[color=#777]empty[/color]"]
+		if sl[0] == "pocket4" or sl[0] == "belt2":
+			t += "\n   "
+	t += "\n\n[b]CONDITIONS[/b]\n"
 	if s.conditions.is_empty():
 		t += "   [color=#999]None[/color]\n"
 	for c in s.conditions:
@@ -399,7 +413,12 @@ func _process(delta: float) -> void:
 			l.modulate = Color(1.0, 0.8, 0.4) if i == player.wheel_choice else Color.WHITE
 		_wheel.queue_redraw()
 
-	_prompt.text = player.interact_prompt()
+	if treat.visible != player.treating:
+		if player.treating:
+			treat.open()
+		else:
+			treat.close()
+	_prompt.text = player.interact_prompt() if not player.treating else ""
 	_prompt.modulate = Color(1, 1, 1, 0.5 if player.armed else 1.0)
 
 	var mask := Input.get_mouse_button_mask()

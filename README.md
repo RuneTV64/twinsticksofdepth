@@ -24,10 +24,12 @@ Mouse and keyboard only. There is no controller support.
 | Weapon wheel (hold) | Tab |
 | Reload | R |
 | Character page | C |
+| Treat wounds (sit down to it) | H; keys 1 to 7 or a click pick a tool; hold Alt to look up |
 
 F1 hides the help text. Esc frees the mouse, and clicking captures it again. Keys 1 to 6 lower or raise STR, END and WT live, so you can feel how the stats change movement.
 
 ## What's in the level
+- **First-aid box** by the spawn (and one in the yard house): take it, then H treats wounds by hand. J gives you a test wound.
 - **Ammo crate** next to spawn. It's the first interaction: put your weapon away, walk up and interact. Crates respawn.
 - **Dummies** to the west. They heal after 3 seconds and respawn fast.
 - **Shamblers** to the east, plus two inside the house. They're slow and walk straight at you, and they shove doors open just like you do. Each one is a different person, dead for a different time, with different parts missing (see Zombies).

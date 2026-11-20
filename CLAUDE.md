@@ -138,11 +138,43 @@ Built so far (20 Nov 2026, untested on the owner's PC): the foundation only.
 - Medical is a stand-in number, 0 to 10, set on the character page (C) until skills exist. 0 to 1: you know what
   hurts and what bleeds. 2: the kind of wound and how bad. 3: you can see it closing. 4 and up: a rough guess at
   how long you have, rougher the less you know.
-- Stand-ins: small wounds clot (bleeding halves every 60 s) and close after 150 s; `deep_floor` is 0, so even
-  deep wounds stop in the end, because nothing can be treated yet (three gunshots cost about a third of your
-  blood). The old health number and its automatic healing are still there underneath.
-- Next, in order: the treatment screen (it needs supplies, and items don't exist: a stand-in kit, or items
-  first); the bite, amputation and turning; sickness; the new needs (hygiene, morale, toilet, warmth).
+- Stand-ins: small wounds clot (bleeding halves every 60 s) and close after 150 s (about 60 s stitched and
+  dressed). The old health number and its automatic healing are still there underneath.
+- Deep wounds (severity 0.55 and up) no longer stop by themselves: they ease to `deep_floor` 0.35 of their
+  bleeding and stay there until stitched or dressed. A severe deep cut left alone kills in about 9 minutes.
+  Bleeding under `ooze` 0.025 costs no blood.
+
+Items and the treatment screen (built 20 Nov 2026, in review; untested on the owner's PC). The owner said to
+build the items needed to test the kits, so only medical items exist.
+
+- `items.gd` (`Items.DEFS`): bandage, clean rag, needle and thread (12 stitches), tweezers, vodka (4 washes),
+  painkillers (6). A carried item is a Dictionary: `{"id", "n"}` for a stack, `{"id", "uses"}` for something used
+  up. `inventory.gd` (`Inventory`, `player.inv`): the agreed weighted slots with no bag: four pockets (0.5 kg),
+  two belt (1.5 kg), two hands (20 kg), one thing or one stack each. Jeans pockets are assumed until clothes
+  exist. Shown on the character page under Carrying. Carried weight does not feed the WT number yet.
+- `item_pickup.gd` (`ItemPickup`): a first-aid box, taken with interact. One by the spawn, one in the yard house.
+- `treatment_screen.gd` (`TreatmentScreen`, `hud.treat`): H sits you down (`Player.toggle_treat()`,
+  `player.treating`). Left: your body, as much as Medical lets you tell. Right: one wound close up. The pointer
+  is your hand: it shakes with pain, lost composure and lost blood (`shake()`), less with Dexterity and
+  painkillers. Tools by click or keys 1 to 7. You see only `treat_sight` 3 m while it is open; ALT (`look_up`)
+  looks up and stops your hands; moving, being grabbed or being hit puts it down.
+  - Press: hold the bare hand or a rag on the wound, best on the bleeder. Pressure holds a deep wound at a fifth
+    of what it bleeds left alone, and it wells back up over `well_up_time` 30 s: you work against that.
+  - Clean: tweezers click out what is in it (a bullet, a tooth, grit; a miss digs into flesh); vodka is held
+    and swept along the wound. Too much blood (over 0.1) hides the wound from tweezers and needle.
+  - Close: one stitch a click along the wound. `stitches_needed()` 2 to 7; `closed_frac()` counts the evenly
+    spaced places that have a stitch near. Slight cuts need none; a bite is left open.
+  - Dress: hold and wind round the wound three turns with a bandage (or a rag, poorer). A bare-hand click takes
+    a dressing off (it is lost).
+  - Shut in dirty (stitched or dressed unwashed or with something in it) it festers: the pain doesn't ease and
+    it closes slowly. What festering leads to waits for sickness.
+  - Medical: 1 marks the bleeder; 2 names the wound and shows what is in it; 3 shows where stitches should go.
+  - A new hit on a treated wound tears it open: stitches and dressing go.
+- J gives a test wound (deep cut, gunshot, bite in turn). Review sheet: `tools/preview/treatment_screen.png`
+  (flat placeholder shapes, not the 8-shade look; the skin is one fixed colour, not the character's).
+- Not built: splints and breaks (nothing causes a break yet), the wound's own look per body part, treating
+  other people, dropping or moving items between slots.
+- Next, in order: the bite, amputation and turning; sickness; the new needs (hygiene, morale, toilet, warmth).
 
 ## Small rules the owner has set (20 Nov 2026)
 
@@ -340,7 +372,7 @@ changes, update both, and keep them the same files.
   mouse takes it off. Exports in the Lock-on group. (The stick version went with the controller.)
 - Debug keys: G adds a test gunner at the crosshair (Shift+G removes them); T adds a raider (Shift+T removes those);
   V switches the cutaway off and on; Z shows the horde readout.
-- Debug keys: F1 help, C character page, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
+- Debug keys: H treat wounds, J a test wound, F1 help, C character page, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera's rest point over the player

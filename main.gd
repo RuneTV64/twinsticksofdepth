@@ -24,6 +24,7 @@ const WORLD_Z1 := 40.0    # south edge
 var player: Player
 var rig: CamRig
 var hud: Hud
+var _test_wound := 0
 var fog: Node3D
 var cutaway: Cutaway
 var horde: Horde
@@ -100,6 +101,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F3:
 				hud.toggle_debug()
 			KEY_C: hud.toggle_sheet()
+			KEY_H: player.toggle_treat()
+			KEY_J:   # a test wound, to try the treatment screen on
+				var tw: Array = [["deep cut", "ArmL", 30.0], ["gunshot", "Torso", 26.0], ["bite", "LegR", 20.0]][_test_wound % 3]
+				_test_wound += 1
+				player._wound(tw[0], tw[1], tw[2])
+				player.show_status("Test wound: %s." % tw[0])
 			KEY_PAGEUP: hud.sheet_select(-1)
 			KEY_PAGEDOWN: hud.sheet_select(1)
 			KEY_MINUS: hud.sheet_adjust(-1)
@@ -384,6 +391,11 @@ func _build_level() -> void:
 		_ammo(p)
 
 	_sign(Vector3(3, 1.6, 4), "Ammo: weapon away, walk up, interact")
+
+	# A first-aid box by the spawn, and one in the yard house: what the treatment screen (H) needs.
+	for p in [Vector3(-3, 0, 4), Vector3(1.5, 0, -20)]:
+		_first_aid(p)
+	_sign(Vector3(-3, 1.6, 4), "First aid: take it, then H treats wounds")
 	_sign(Vector3(0, 3.2, -9.6), "Click the door to open it")
 	_sign(Vector3(7.6, 3.2, -16), "Locked: bash it (Strength 13, dash)")
 	_sign(Vector3(-15, 3.0, 2), "Dummies")
@@ -565,6 +577,14 @@ func _flat_box(pos: Vector3, size: Vector3, col: Color) -> void:
 	m.position = pos
 	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(m)
+
+
+func _first_aid(pos: Vector3) -> void:
+	var b := ItemPickup.new()
+	b.position = pos
+	b.contents = [Items.make("bandage", 3), Items.make("clean_rag", 2), Items.make("needle_thread"),
+		Items.make("tweezers"), Items.make("vodka"), Items.make("painkillers")]
+	add_child(b)
 
 
 func _ammo(pos: Vector3) -> void:

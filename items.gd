@@ -1,0 +1,42 @@
+class_name Items
+extends RefCounted
+## What things are. One record per kind of item: its name, weight (kg), category, how many stack in one slot or
+## how many uses one has, and what it is for. Only the medical things exist so far (enough to treat wounds);
+## household things, food, clothes and guns come with the loot system.
+##
+## A carried item is a small Dictionary: {"id": "bandage", "n": 3} for a stack, {"id": "vodka", "uses": 4} for
+## something used up bit by bit.
+
+const DEFS := {
+	"bandage": {"name": "Bandage", "w": 0.05, "cat": "medical", "stack": 5, "for": "Dresses a wound: keeps it clean and nearly stops the bleeding."},
+	"clean_rag": {"name": "Clean rag", "w": 0.05, "cat": "medical", "stack": 5, "for": "Pressed on a wound it stops bleeding faster than a bare hand. A poor dressing, but a dressing."},
+	"needle_thread": {"name": "Needle and thread", "w": 0.02, "cat": "medical", "uses": 12, "for": "Stitches a wound shut, one stitch a use."},
+	"tweezers": {"name": "Tweezers", "w": 0.02, "cat": "medical", "for": "Picks glass, grit and bullets out of a wound."},
+	"vodka": {"name": "Vodka", "w": 0.7, "cat": "medical", "uses": 4, "for": "Washes a wound clean. It stings."},
+	"painkillers": {"name": "Painkillers", "w": 0.03, "cat": "medical", "uses": 6, "for": "Dulls pain for a few minutes: steadier hands, less slowed."},
+}
+
+
+static func name_of(id: String) -> String:
+	return DEFS[id]["name"] if DEFS.has(id) else id
+
+
+## A fresh one of these (a full stack of `n`, or with all its uses).
+static func make(id: String, n := 1) -> Dictionary:
+	var d: Dictionary = DEFS[id]
+	if d.has("uses"):
+		return {"id": id, "uses": int(d["uses"])}
+	return {"id": id, "n": n}
+
+
+static func weight(item: Dictionary) -> float:
+	var d: Dictionary = DEFS[item["id"]]
+	return float(d["w"]) * (int(item["n"]) if item.has("n") else 1)
+
+
+## How it reads in a list: "Bandage x3", "Vodka (4 left)".
+static func label(item: Dictionary) -> String:
+	var nm := name_of(item["id"])
+	if item.has("uses"):
+		return "%s (%d left)" % [nm, int(item["uses"])]
+	return "%s x%d" % [nm, int(item["n"])] if int(item["n"]) > 1 else nm
