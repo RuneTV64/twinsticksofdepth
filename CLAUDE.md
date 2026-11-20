@@ -223,7 +223,8 @@ document; keep it in step when the rules change).
   you turn into it, it is a burst that picks up and dies away over 0.55 s, you come up facing the way you rolled,
   and then spend 0.45 s getting to your feet (no moving, turning to your aim or attacking) before control comes
   back. It costs 32 stamina, a third of an ordinary bar, and needs 60% of that to start. Nothing can grab you while
-  going over; while getting up, anything can. Not while held, winded, or standing on bodies. The first tap still
+  going over; while getting up, anything can. Once up you turn round to your aim at `roll_turn_speed` 9 rad/s,
+  with the mouse too (owner: mouse aim, normally instant, is eased here). Not while held, winded, or standing on bodies. The first tap still
   acts at once (it may start a slide to cover; the second tap drops that and rolls). `player.gd` Roll exports;
   the tumble and the getting up are in `player_body.gd` (two moments of the tumble are on the cover pose sheet).
 - Three states (`cover_mode`):

@@ -115,6 +115,7 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var roll_distance := 3.2        # m it covers
 @export var roll_recover := 0.45        # s getting back to your feet afterwards
 @export var roll_cost := 32.0           # stamina: a third of an ordinary person's
+@export var roll_turn_speed := 9.0      # rad/s turning from the way you rolled to your aim, mouse included
 @export_group("Corpse pile")
 # Heaps of fallen zombies and the crushed pile under them can be walked on (Enemy.heap_height). It is slow, the
 # footing is bad, and the ones still alive in it grab at you. From high enough on it you can get over a wall.
@@ -303,6 +304,7 @@ var _roll_t := 0.0                 # > 0 while rolling (the body reads these thr
 var _roll_total := 0.55
 var _roll_dir := Vector3.ZERO
 var _roll_rec_t := 0.0             # > 0 while getting back up after a roll
+var _roll_turning := false         # up from a roll and still turning round to the aim
 var _tap_t := 99.0                 # s since the last Cover tap made out of cover
 var _stomp_t := 0.0                # > 0 while a finishing blow is under way (the body reads these)
 var _stomp_total := 1.0
@@ -1493,6 +1495,7 @@ func _update_facing(delta: float, move_dir: Vector3) -> void:
 	if _roll_t > 0.0 or _roll_rec_t > 0.0:
 		# You turn into the roll and come up facing the way you went; only then do you turn to where you aim.
 		facing = _turn_toward(facing, _roll_dir, 26.0 * delta)
+		_roll_turning = true
 		return
 	var want := Vector3.ZERO
 	var rate := turn_speed
@@ -1524,10 +1527,17 @@ func _update_facing(delta: float, move_dir: Vector3) -> void:
 	if want.length() < (aim_min_dist if armed else 0.01):
 		return
 	want = want.normalized()
-	if armed and not using_pad:
+	if armed and not using_pad and _roll_turning:
+		# Just up from a roll: even with the mouse you turn round to your aim, you don't snap to it.
+		facing = _turn_toward(facing, want, roll_turn_speed * delta)
+		if facing.dot(want) > 0.999:
+			_roll_turning = false
+	elif armed and not using_pad:
 		facing = want
 	else:
 		facing = _turn_toward(facing, want, rate * delta)
+		if facing.dot(want) > 0.999:
+			_roll_turning = false
 
 
 func _turn_toward(from: Vector3, to: Vector3, step: float) -> Vector3:
