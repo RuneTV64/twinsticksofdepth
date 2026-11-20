@@ -197,7 +197,7 @@ changes, update both, and keep them the same files.
   0.5 m, fading to nothing at the radius, so it never sticks) and follows it. Stick: shifts where the tilt points,
   only while tilted. Mouse: settles on once the mouse rests (`lock_on_mouse_radius` 1 m). Exports in the Lock-on group.
 - Debug keys: G adds a test gunner at the crosshair (Shift+G removes them): a stand-in raider for the cover rules.
-- Debug keys: F1 help, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
+- Debug keys: F1 help, C character page, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera's rest point over the player
@@ -237,6 +237,32 @@ document; keep it in step when the rules change).
   `tools/preview/cover_poses.png`, made by `tools/cover_pose_preview.gd`.
 - Not built yet: raider AI using cover (the faces and rules are ready for it), zombies climbing low cover, cover
   protecting anyone but the player.
+
+## Character sheet (built 20 Nov 2026, in review; untested on the owner's PC)
+
+The owner wants stats that cross The Sims with a zombie RPG: like Zomboid, with its own flavor. First version, from
+a list of "the human experience as stats" the owner brought; the picks below are Claude's and are up for critique.
+
+- `character_sheet.gd` (`CharacterSheet`): the Player has one (`player.sheet`); raiders and other players should too.
+- Seven attributes, 1 to 20, 10 = an ordinary adult: STR, DEX, END, CON, INT, WIS, CHA. Wired: STR (load, barging,
+  punches, shoves), DEX (aimed damage, headshots, reload, blind-fire spread), END (stamina, regen, top speed), CON
+  (health, healing), WIS (all-round awareness, keeping composure). INT and CHA are shown but do nothing yet
+  (skills, crafting, people). `CharacterSheet.GOVERNS` / `LATER` say what each does and is meant to do.
+  `player.recompute_stats()` turns them into numbers; at all 10s the game plays exactly as before.
+- Needs (the Sims side): food, water, rest, 100 = satisfied. They bring staged conditions (Hungry, Very hungry,
+  Starving...) but don't run down yet: `needs_rate` is 0 until there is a clock and things to eat and drink.
+- Composure, 100 calm to 0 panic: zombies within 6 m and being held wear it down, damage knocks it, quiet brings
+  it back (twice as fast hunkered in cover). Shaken under 50, Panicked under 20: worse aim, wilder blind fire.
+- Fight-or-flight (a trait every person has): grabbed or hurt, 8 s of Adrenaline (+10% speed, effort costs 40%
+  less, Hurt ignored), then a 15 s Crash (slow stamina regen); it can't hit again for a minute after.
+- Conditions also come from health (Hurt under 50%, Badly hurt under 25%: slower, worse aim; new, the game had no
+  penalty for low health), load (Overloaded) and Winded. They are rebuilt 4 times a second on the sheet's slow
+  clock (`Player._tick_timers`), into multipliers the Player reads (`speed_mult`, `aim_mult`...).
+- The page: C / pad Back. PgUp PgDn or D-pad up/down picks a row, - = or D-pad left/right changes it (test
+  editing: this becomes levelling and eating). Conditions also list at the right edge of the screen. Render:
+  `tools/preview/character_page.png`.
+- Not built: picked traits (good and bad, at character creation), skills and XP, food and drink, sleep, the clock,
+  body temperature, caffeine and other consumables, soreness, clothing and footwear effects.
 
 ## Character shaders and models: how they are built
 

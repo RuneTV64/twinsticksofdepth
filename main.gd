@@ -82,6 +82,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				hud.toggle_help()
 			KEY_F3:
 				hud.toggle_debug()
+			KEY_C: hud.toggle_sheet()
+			KEY_PAGEUP: hud.sheet_select(-1)
+			KEY_PAGEDOWN: hud.sheet_select(1)
+			KEY_MINUS: hud.sheet_adjust(-1)
+			KEY_EQUAL: hud.sheet_adjust(1)
 			KEY_1: _stat("strength", -1)
 			KEY_2: _stat("strength", 1)
 			KEY_3: _stat("endurance", -1)
@@ -105,6 +110,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F7:
 				player.invulnerable = not player.invulnerable
 				player.show_status("Can't be hurt: %s" % ("ON" if player.invulnerable else "OFF"), 1.5)
+	elif event is InputEventJoypadButton and event.pressed:
+		match event.button_index:
+			JOY_BUTTON_BACK: hud.toggle_sheet()
+			JOY_BUTTON_DPAD_UP: hud.sheet_select(-1)
+			JOY_BUTTON_DPAD_DOWN: hud.sheet_select(1)
+			JOY_BUTTON_DPAD_LEFT: hud.sheet_adjust(-1)
+			JOY_BUTTON_DPAD_RIGHT: hud.sheet_adjust(1)
 	elif event is InputEventMouseButton and event.pressed \
 			and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

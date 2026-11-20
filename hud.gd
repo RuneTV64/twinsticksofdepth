@@ -9,6 +9,11 @@ var _stats: Label
 var _ammo: Label
 var _prompt: Label
 var _status: Label
+var _conds: RichTextLabel      # conditions affecting you now, right edge of the screen
+var _sheet: RichTextLabel      # the character page (C / Back)
+var _sheet_panel: PanelContainer
+var _sheet_row := 0            # which row test editing changes
+var _sheet_t := 0.0
 var _hp: ProgressBar
 var _st: ProgressBar
 var _st_fill: StyleBoxFlat
@@ -54,6 +59,7 @@ In cover: hunkered = hidden, safe from shots across it, but you see only a short
   Cover + push toward low cover = vault it.
 Stat test keys: 1/2 STR   3/4 END   5/6 WT   7/8 DEX
 Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt   L all on low model
+Character page: C (pad: Back). It shows attributes, needs, composure and conditions.
 Cover test: G test gunner at the crosshair   Shift+G remove them
 F1 hide help    Esc free mouse"""
 
@@ -118,6 +124,44 @@ func _ready() -> void:
 	_ammo.offset_top = -80
 	_ammo.offset_bottom = -20
 	_ammo.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	_conds = RichTextLabel.new()
+	_conds.bbcode_enabled = true
+	_conds.fit_content = true
+	_conds.scroll_active = false
+	_conds.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_conds.add_theme_font_size_override("normal_font_size", 18)
+	_conds.add_theme_color_override("font_outline_color", Color.BLACK)
+	_conds.add_theme_constant_override("outline_size", 6)
+	_conds.anchor_left = 1.0
+	_conds.anchor_right = 1.0
+	_conds.anchor_top = 0.35
+	_conds.anchor_bottom = 0.35
+	_conds.offset_left = -420
+	_conds.offset_right = -20
+	root.add_child(_conds)
+
+	# The character page: everything on the sheet, in one panel over the middle of the screen.
+	_sheet_panel = PanelContainer.new()
+	_sheet_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sheet_panel.set_anchors_preset(Control.PRESET_CENTER)
+	_sheet_panel.offset_left = -560
+	_sheet_panel.offset_right = 560
+	_sheet_panel.offset_top = -400
+	_sheet_panel.offset_bottom = 400
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.05, 0.06, 0.07, 0.9)
+	bg.set_content_margin_all(22)
+	_sheet_panel.add_theme_stylebox_override("panel", bg)
+	_sheet_panel.visible = false
+	root.add_child(_sheet_panel)
+	_sheet = RichTextLabel.new()
+	_sheet.bbcode_enabled = true
+	_sheet.scroll_active = false
+	_sheet.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sheet.add_theme_font_size_override("normal_font_size", 17)
+	_sheet.add_theme_font_size_override("bold_font_size", 17)
+	_sheet_panel.add_child(_sheet)
 
 	# Quick weapon wheel: a ring of slots in the middle of the screen, shown while it's held open.
 	_wheel = Control.new()
@@ -189,9 +233,107 @@ func toggle_debug() -> void:
 	_debug.visible = not _debug.visible
 
 
-func _process(_delta: float) -> void:
+# ---------------------------------------------------------------- character page
+## Rows test editing can change: the seven attributes, the load carried, the three needs.
+func _sheet_rows() -> Array:
+	var rows: Array = []
+	rows.append_array(CharacterSheet.ATTRS)
+	rows.append("weight")
+	rows.append_array(CharacterSheet.NEEDS)
+	return rows
+
+
+func toggle_sheet() -> void:
+	_sheet_panel.visible = not _sheet_panel.visible
+	_sheet_t = 0.0
+
+
+func sheet_select(d: int) -> void:
+	if _sheet_panel.visible:
+		_sheet_row = posmod(_sheet_row + d, _sheet_rows().size())
+		_sheet_t = 0.0
+
+
+## Test editing (this becomes levelling up and eating): change the picked row.
+func sheet_adjust(d: int) -> void:
+	if not _sheet_panel.visible:
+		return
+	var row: String = _sheet_rows()[_sheet_row]
+	var s := player.sheet
+	if row == "weight":
+		player.weight = maxf(player.weight + d, 1.0)
+	elif CharacterSheet.NEEDS.has(row):
+		s.set_need(row, float(s.needs[row]) + d * 10.0)
+	else:
+		s.set_attr(row, s.attr(row) + d)
+	player.recompute_stats()
+	_sheet_t = 0.0
+
+
+func _meter(v: float, width := 20) -> String:
+	var n := clampi(roundi(v / 100.0 * width), 0, width)
+	return "[color=#9fd3a0]%s[/color][color=#444]%s[/color]" % ["#".repeat(n), "-".repeat(width - n)]
+
+
+func _mark(row: String) -> String:
+	return "[color=#ffc04d]>[/color] " if _sheet_rows()[_sheet_row] == row else "   "
+
+
+func _cell(text: String) -> String:
+	return "[cell]%s   [/cell]" % text
+
+
+func _sheet_text() -> String:
+	var s := player.sheet
+	var t := "[b]CHARACTER[/b]      [color=#999]C / Back closes.   PgUp PgDn / D-pad up down picks a row.   - = / D-pad left right changes it (test editing).[/color]\n\n"
+	t += "[b]ATTRIBUTES[/b]   [color=#999]1 to 20; 10 is an ordinary adult[/color]\n[table=4]"
+	for a in CharacterSheet.ATTRS:
+		var does: String = CharacterSheet.GOVERNS[a]
+		var later := "[color=#777]Later: %s[/color]" % CharacterSheet.LATER[a]
+		t += _cell(_mark(a) + "[b]%s[/b]" % CharacterSheet.SHORT[a]) + _cell("%d" % roundi(s.attr(a))) \
+			+ _cell(a.capitalize()) + _cell(does + ".  " + later if does != "" else "[color=#c9a]Not wired yet.[/color]  " + later)
+	t += _cell(_mark("weight") + "[b]WT[/b]") + _cell("%d" % roundi(player.weight)) + _cell("Load carried") \
+		+ _cell("Against Strength: over it you slow down and effort costs more")
+	t += "[/table]\n"
+	t += "[b]WHAT THEY ADD UP TO[/b]\n"
+	t += "   Health %d (heals %.1f/s)     Stamina %d (back at %.0f/s)     Walk %.1f  Ready %.1f  Run %.1f  Dash %.1f m/s\n" % [
+		roundi(player.max_health), player.heal_rate, roundi(player.max_stamina), player.stamina_regen,
+		player.walk_speed, player.ready_speed, player.run_speed, player.dash_speed]
+	t += "   Aimed shot x%.2f   Headshot %d%%   Reload %.2f s   Punch x%.2f   Shove %.1f m/s   Aware all round %.1f m   Barge %d / %d\n\n" % [
+		player.aimed_mult, roundi(player.headshot_chance * 100.0), player.reload_time, player.melee_mult,
+		player.shove_force, player.sight_near, roundi(player.barge_power(player.run_speed)),
+		roundi(player.barge_power(player.dash_speed))]
+	t += "[b]NEEDS[/b]   [color=#999]%s[/color]\n[table=3]" % (
+		"not running down yet: waits for the clock and for things to eat and drink" if s.needs_rate <= 0.0 else "running down with time")
+	for n in CharacterSheet.NEEDS:
+		t += _cell(_mark(n) + CharacterSheet.NEED_NAMES[n]) + _cell(_meter(s.needs[n])) + _cell("%d" % roundi(s.needs[n]))
+	t += "[/table]\n"
+	t += "[b]COMPOSURE[/b]   %s  %d   [color=#999]danger wears it down; quiet brings it back, cover faster[/color]\n\n" % [
+		_meter(s.composure), roundi(s.composure)]
+	t += "[b]CONDITIONS[/b]\n"
+	if s.conditions.is_empty():
+		t += "   [color=#999]None[/color]\n"
+	for c in s.conditions:
+		t += "   [color=%s]%s[/color]   %s\n" % ["#e8836b" if c["bad"] else "#8fd18f", c["name"], c["text"]]
+	t += "\n[b]TRAITS[/b]\n"
+	for tr in s.traits:
+		t += "   [color=#d8c27a]%s[/color]   %s\n" % [tr["name"], tr["text"]]
+	return t
+
+
+func _process(delta: float) -> void:
 	if player == null:
 		return
+	# The sheet moves a few times a second, so its page and the condition list are redrawn at that pace.
+	_sheet_t -= delta
+	if _sheet_t <= 0.0:
+		_sheet_t = 0.25
+		var lines := ""
+		for c in player.sheet.conditions:
+			lines += "[right][color=%s]%s[/color][/right]\n" % ["#e8836b" if c["bad"] else "#8fd18f", c["name"]]
+		_conds.text = lines
+		if _sheet_panel.visible:
+			_sheet.text = _sheet_text()
 	var stance := "READY" if player.armed else "WEAPON AWAY"
 	if player.armed and player.is_melee():
 		if not player.is_guarding():

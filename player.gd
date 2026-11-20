@@ -11,11 +11,21 @@ extends CharacterBody3D
 ##    leads toward the aim point. Attack button attacks. Slower, no running (dash still works).
 ## Doors work in either stance: walk into them to push them, run or dash into them to barge.
 
-# ---------- Stats (there is no speed stat: speed comes from these three) ----------
-@export var strength := 10.0
-@export var endurance := 10.0
-@export var weight := 8.0
-@export var dexterity := 10.0           # aimed-shot damage and headshot chance
+# ---------- Stats ----------
+# The character sheet (character_sheet.gd) holds the attributes, needs, composure and conditions. There is no
+# speed stat: speed comes from strength, endurance and the load carried. recompute_stats() turns the sheet into
+# the numbers below; call it after changing an attribute.
+var sheet := CharacterSheet.new()
+var strength: float:
+	get: return sheet.attr("strength")
+	set(v): sheet.set_attr("strength", v)
+var endurance: float:
+	get: return sheet.attr("endurance")
+	set(v): sheet.set_attr("endurance", v)
+var dexterity: float:                    # aimed-shot damage and headshot chance
+	get: return sheet.attr("dexterity")
+	set(v): sheet.set_attr("dexterity", v)
+@export var weight := 8.0                # the load you carry
 
 # Derived in recompute_stats()
 var walk_speed := 2.1
@@ -96,7 +106,12 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var vault_cost := 6.0           # stamina
 @export_group("")
 @export var interact_range := 1.9
-@export var max_health := 100.0
+@export var base_max_health := 100.0    # at Constitution 10
+var max_health := 100.0
+@export var base_heal_rate := 4.0       # health per second once you've been left alone a while, at Constitution 10
+var heal_rate := 4.0
+var melee_mult := 1.0                   # punch damage, from Strength
+var _sheet_t := 0.0
 
 # ---------- Fatigue: low stamina slows all movement ----------
 @export var fatigue_start := 0.5        # stamina fraction where you start slowing down
@@ -106,7 +121,8 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 # ---------- Weapon (placeholder ranged weapon; tech level is still open) ----------
 @export var mag_size := 8
 @export var fire_interval := 0.2
-@export var reload_time := 1.1
+@export var base_reload_time := 1.1     # at Dexterity 10
+var reload_time := 1.1
 @export var shot_damage := 25.0
 @export var shot_speed := 140.0         # m/s; fast enough to read as a gunshot, not a thrown bolt
 @export var shot_kick := 2.6            # m/s shoved backward per shot
@@ -138,7 +154,8 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var shove_range := 0.1          # meters; a zombie this close in front of you gets shoved
 @export var shove_arc_dot := 0.4        # "in front" = within this cone of your facing (dot)
 @export var shove_adjacent := 1.4       # meters; zombies this close to a shoved one go with it
-@export var shove_force := 9.0          # m/s the enemy is thrown back (about 1.5m of travel)
+@export var base_shove_force := 9.0     # m/s the enemy is thrown back (about 1.5m of travel), at Strength 10
+var shove_force := 9.0
 @export var shove_cost := 12.0          # stamina per shove
 # Guard: Ready unarmed and facing an attacker stops its hit and costs stamina instead. Against
 # a zombie that is a last-moment shove before the bite. (Proper blocking is for fighting people.)
@@ -158,7 +175,8 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 # outside it fade out and the fog of war covers what you can't see (see fog.gd).
 @export var sight_fov_deg := 110.0      # full width of the cone
 @export var sight_range := 26.0         # meters, how far the cone reaches
-@export var sight_near := 3.0           # meters, all-round awareness (behind you too)
+@export var base_sight_near := 3.0      # meters, all-round awareness (behind you too), at Wisdom 10
+var sight_near := 3.0
 @export var sight_eye_height := 1.5     # rays go out at this height, so low cover doesn't block sight
 const SIGHT_RAYS := 240                 # one every 1.5 degrees, all the way round
 
@@ -365,10 +383,17 @@ func _ready() -> void:
 ##  - burden = weight / strength. Carrying more than your frame handles slows you.
 ##  - endurance = stamina pool, regen, and a small bump to top speed.
 ##  - weight makes runs and dashes cost more, and dashes shorter.
+##  - strength also scales punches and shoves; dexterity, reloading; constitution, health and healing;
+##    wisdom, how far you are aware of things all round you. Each is +/- a few percent per point from 10.
 func recompute_stats() -> void:
-	strength = maxf(strength, 1.0)
-	endurance = maxf(endurance, 1.0)
 	weight = maxf(weight, 1.0)
+	melee_mult = maxf(1.0 + 0.04 * sheet.bonus("strength"), 0.5)
+	shove_force = base_shove_force * maxf(1.0 + 0.03 * sheet.bonus("strength"), 0.6)
+	reload_time = base_reload_time * clampf(1.0 - 0.02 * sheet.bonus("dexterity"), 0.7, 1.3)
+	max_health = base_max_health * maxf(1.0 + 0.03 * sheet.bonus("constitution"), 0.5)
+	heal_rate = base_heal_rate * maxf(1.0 + 0.05 * sheet.bonus("constitution"), 0.3)
+	sight_near = base_sight_near * maxf(1.0 + 0.04 * sheet.bonus("wisdom"), 0.5)
+	health = minf(health, max_health)
 	var burden := weight / strength
 	var mobility := clampf(1.0 - 0.4 * (burden - 0.8), 0.55, 1.25)
 	var fitness := 1.0 + 0.02 * (endurance - 10.0)
@@ -384,7 +409,6 @@ func recompute_stats() -> void:
 	barge_min_speed = run_speed * 0.79   # a walk never barges; a fresh run does, a tired one doesn't
 	# Aimed shots: dexterity and the weapon's firepower both raise the bonus and the headshot odds.
 	# Defaults (DEX 10, 25 damage) give x1.5 damage and a 13% headshot chance.
-	dexterity = maxf(dexterity, 1.0)
 	aimed_mult = 1.0 + dexterity * aim_bonus_per_dex + shot_damage * aim_bonus_per_firepower
 	headshot_chance = clampf(dexterity * headshot_per_dex + shot_damage * headshot_per_firepower,
 		0.0, headshot_max_chance)
@@ -582,7 +606,7 @@ func _physics_process(delta: float) -> void:
 			spd = run_speed
 		var tired := fatigue()
 		spd *= lerpf(1.0, fatigue_min_speed, tired)
-		spd *= held_speed()
+		spd *= held_speed() * sheet.speed_mult
 		var want := move_dir * spd
 		var rate := decel
 		if want.length() > 0.01:
@@ -626,7 +650,14 @@ func _tick_timers(delta: float) -> void:
 	status_t -= delta
 	_heal_delay -= delta
 	if not dead and _heal_delay <= 0.0 and health < max_health:
-		health = minf(health + 4.0 * delta, max_health)
+		health = minf(health + heal_rate * sheet.heal_mult * delta, max_health)
+	# The sheet's slow clock: needs, composure and conditions move a few times a second, not every tick.
+	_sheet_t += delta
+	if _sheet_t >= 0.25:
+		if not dead:
+			sheet.tick(_sheet_t, _threat(), not held_by.is_empty(), in_cover and cover_mode == "hunker",
+				health / max_health, winded, weight / strength)
+		_sheet_t = 0.0
 	if _reload_t > 0.0:
 		_reload_t -= delta
 		if _reload_t <= 0.0:
@@ -794,6 +825,20 @@ func current_reticle_range() -> float:
 
 func muzzle_position() -> Vector3:
 	return global_position + Vector3(0.0, 1.1, 0.0) + facing * 0.3
+
+
+## How much danger is right on you, for composure: 1 for a zombie at arm's length, less further off, nothing
+## past 6 m; a crowd adds up. Dummies don't count.
+func _threat() -> float:
+	var total := 0.0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		var en := e as Enemy
+		if en == null or en.dead or en.kind == "dummy":
+			continue
+		var d := Vector2(en.global_position.x - global_position.x, en.global_position.z - global_position.z).length()
+		if d < 6.0:
+			total += 1.0 - d / 6.0
+	return total
 
 
 # ---------------------------------------------------------------- cover
@@ -1241,7 +1286,7 @@ func _update_sprint(delta: float, move_dir: Vector3) -> void:
 		and not winded and _stagger <= 0.0 and held_by.is_empty() and not in_cover and not cover_entering
 	running = want_run and stamina > 0.0
 	if running:
-		stamina = maxf(stamina - run_drain * delta, 0.0)
+		stamina = maxf(stamina - run_drain * sheet.stamina_cost_mult * delta, 0.0)
 		_regen_delay = 0.8
 		if stamina <= 0.0:
 			winded = true
@@ -1250,7 +1295,7 @@ func _update_sprint(delta: float, move_dir: Vector3) -> void:
 	else:
 		_regen_delay -= delta
 		if _regen_delay <= 0.0 and _dash_t <= 0.0:
-			stamina = minf(stamina + stamina_regen * delta, max_stamina)
+			stamina = minf(stamina + stamina_regen * sheet.stamina_regen_mult * delta, max_stamina)
 	if winded and stamina >= max_stamina * 0.35:
 		winded = false
 
@@ -1267,7 +1312,7 @@ func _try_dash(move_dir: Vector3) -> void:
 	_dash_dir = move_dir if move_dir.length() > 0.1 else facing
 	_dash_dir = _dash_dir.normalized()
 	_dash_t = dash_time
-	stamina = maxf(stamina - dash_cost, 0.0)
+	stamina = maxf(stamina - dash_cost * sheet.stamina_cost_mult, 0.0)
 	_regen_delay = 0.8
 	if stamina <= 0.0:
 		winded = true
@@ -1303,13 +1348,13 @@ func _barge(door: Door, spd: float, into: Vector3) -> void:
 	var need := door.resistance()
 	if door.barge(power, global_position, into):
 		var hurt := 3.0 + need * 0.2
-		take_damage(hurt, Vector3.ZERO, 0.0)
+		take_damage(hurt, Vector3.ZERO, 0.0, false)
 		velocity = into * spd * 0.55     # keep some momentum through the doorway
 		_stagger = 0.12
 		show_status("BAM! Barged through  (power %d vs %d, -%d HP)" % [roundi(power), roundi(need), roundi(hurt)], 2.0)
 	else:
 		var hurt := 5.0 + need * 0.35
-		take_damage(hurt, -into, 5.0)
+		take_damage(hurt, -into, 5.0, false)
 		_stagger = 0.45
 		show_status("Oof. It held  (power %d vs %d, -%d HP)" % [roundi(power), roundi(need), roundi(hurt)], 2.2)
 
@@ -1427,7 +1472,8 @@ func _blind_fire() -> void:
 		if dir.dot(-n3) < 0.15:
 			dir = (-n3 + d3 * side * 0.4).normalized()   # it can only point past the wall
 		cover_side = side
-	dir = dir.rotated(Vector3.UP, deg_to_rad(randf_range(-blind_fire_spread_deg, blind_fire_spread_deg)))
+	var spread := blind_fire_spread_deg * sheet.spread_mult * clampf(1.0 - 0.02 * sheet.bonus("dexterity"), 0.6, 1.4)
+	dir = dir.rotated(Vector3.UP, deg_to_rad(randf_range(-spread, spread)))
 	_fire_cd = fire_interval * blind_fire_slow
 	_blind_t = 0.3
 	_shoot(dir, from, false)
@@ -1450,8 +1496,9 @@ func _shoot(dir: Vector3, from: Vector3, aimed: bool) -> void:
 	# Fired with the reticle on an enemy: the shot is "aimed" at that enemy.
 	if aimed and reticle_target != null:
 		shot.aimed_at = reticle_target
-		shot.aimed_mult = aimed_mult
-		shot.headshot_chance = headshot_chance
+		# Conditions (shaken, tired, hurt) eat into the bonus, not the base damage.
+		shot.aimed_mult = 1.0 + (aimed_mult - 1.0) * sheet.aim_mult
+		shot.headshot_chance = headshot_chance * sheet.aim_mult
 	shots_fired += 1
 	print("[fire] #%d dir %s mag %d%s" % [shots_fired, dir, mag, "" if aimed else " (blind)"])
 	shot.position = from
@@ -1498,7 +1545,7 @@ func _land_punch() -> void:
 			target = en
 	if target == null or randf() < punch_miss_chance:
 		return
-	var dmg := randf_range(punch_damage_min, punch_damage_max) * _swing_power
+	var dmg := randf_range(punch_damage_min, punch_damage_max) * _swing_power * melee_mult
 	if Vector2(velocity.x, velocity.z).length() < punch_still_speed:
 		dmg *= punch_still_mult
 	target.take_hit(dmg, facing, punch_knock)
@@ -1629,6 +1676,7 @@ func take_grab(e: Enemy, hands: int) -> bool:
 	if not held_by.has(e):
 		held_by.append(e)
 	leave_cover()   # hands on you drag you out of cover
+	sheet.startle()
 	show_status("Grabbed! Shove it off or struggle free", 1.6)
 	return true
 
@@ -1703,10 +1751,13 @@ func _update_held(delta: float, mv: Vector2) -> void:
 		show_status("Broke free!", 0.8)
 
 
-func take_damage(amount: float, dir: Vector3, knock: float) -> void:
+## `fright` off = damage that doesn't scare you (hurting your shoulder on a door you chose to barge).
+func take_damage(amount: float, dir: Vector3, knock: float, fright := true) -> void:
 	if dead or invulnerable:
 		return
 	health -= amount
+	if fright:
+		sheet.hurt(amount / max_health)
 	_hurt_t = 0.15
 	_heal_delay = 5.0
 	if knock > 0.0:
@@ -1751,6 +1802,7 @@ func _respawn() -> void:
 	global_position = spawn_point
 	velocity = Vector3.ZERO
 	_cam_carry = Vector3.ZERO
+	sheet.reset()
 	_reset_vitals()
 	if camera_rig:
 		camera_rig.snap()
