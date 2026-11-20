@@ -78,6 +78,9 @@ var _blind_t := 0.0
 var _vault_t := 0.0
 var _stomp_t := 0.0
 var _stomp_total := 1.0
+var _roll_t := 0.0
+var _roll_total := 0.55
+var _roll_dir := Vector3.ZERO
 
 # ---- its mind
 var mode := "idle"                 # idle, fight, search, return

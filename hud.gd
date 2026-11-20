@@ -30,7 +30,8 @@ Interact (weapon away)  Left-click
 Sprint  Shift: tap = dash, hold = run
 Weapon wheel (HOLD)  Tab, point with the mouse, release
 Reload  R
-Cover  Space: tap = slide into nearest cover / leave it; hold = go to the cover the crosshair marks"""
+Cover  Space: tap = slide into nearest cover / leave it; hold = go to the cover the crosshair marks
+Roll  Space twice quickly, out of cover: rolls the way you are moving"""
 
 const HELP_PAD := """CONTROLLER
 Move  Left stick
@@ -41,7 +42,8 @@ Interact (weapon away)  RT  or  A
 Sprint  L3: tap = dash, hold = run
 Weapon wheel (HOLD)  LB, point with the right stick, release
 Reload  X
-Cover  B: tap = slide into nearest cover / leave it; hold = go to the cover the crosshair marks"""
+Cover  B: tap = slide into nearest cover / leave it; hold = go to the cover the crosshair marks
+Roll  B twice quickly, out of cover: rolls the way you are moving"""
 
 const HELP_TAIL := """
 Doors: walk into them to push them open or shut.

@@ -13,6 +13,7 @@ extends Node3D
 ##             boxing guard or on the gun, and punches, shoves, recoil, reload and bash move them
 ##   cover     squats behind low cover, comes half up to peek and all the way up to aim over it, leans out round
 ##             an end, holds the gun up over (or out round) the cover to fire blind, tucks up to vault
+##   roll      tucks up and goes once over, head first, the way it is travelling
 ##   death     falls onto its back until the respawn
 ##
 ## Raiders use it too (raider_body.gd): animate() takes anyone who carries the same state fields as the Player.
@@ -78,6 +79,7 @@ var _lean := 0.0                    # leaning out round an end: + = to the body'
 var _blind_w := 0.0                 # holding the gun up over, or out round, cover to fire blind
 var _slide_w := 0.0                 # sliding into cover
 var _vault_w := 0.0
+var _roll_w := 0.0                  # tucked up in a roll
 var _look := 0.0
 var _flinch := 0.0
 var _recoil := 0.0
@@ -253,7 +255,9 @@ func animate(p, delta: float) -> void:
 	var knee_base := lerpf(0.08, 0.3, _run_w) * m
 	var knee_lift := lerpf(lerpf(0.55, 0.9, pace), 1.5, _run_w) * m
 	var swing_axis := Vector3(-cos(a), 0.0, sin(a))
-	var crouch := 0.2 * ready_w + 0.12 * _dash_w + 0.07 * tired + 1.15 * _cover_w
+	var roll_w: float = 1.0 if p._roll_t > 0.0 else 0.0
+	_roll_w = _ease(_roll_w, roll_w, 30.0 if roll_w > 0.0 else 12.0, delta)
+	var crouch := 0.2 * ready_w + 0.12 * _dash_w + 0.07 * tired + 1.15 * maxf(_cover_w, _roll_w)
 	var split := (0.2 * _fist_w + 0.12 * _gun_w) * (1.0 - 0.7 * m)  # Ready: left foot forward
 	var th: Array[float] = [0.0, 0.0]
 	for k in 2:
@@ -285,7 +289,7 @@ func animate(p, delta: float) -> void:
 	var lean_axis := Vector3(cos(_dir), 0.0, -sin(_dir))
 	var stance_yaw := -0.5 * _fist_w - 0.38 * _gun_w              # Ready: left shoulder forward
 	var bend := 0.1 * ready_w + 0.14 * tired - 0.022 * b * ba - 0.22 * _flinch - 0.05 * _recoil + 0.14 * shove \
-		+ 0.42 * _cover_w - 0.3 * _slide_w + 0.35 * _vault_w   # hunched behind cover, leaning back in a slide
+		+ 0.42 * _cover_w - 0.3 * _slide_w + 0.35 * _vault_w + 0.75 * _roll_w   # hunched behind cover, leaning back in a slide, curled in a roll
 	_tq[_hips] = _ry(hip_yaw + 0.4 * stance_yaw - 0.09 * sn * m) * _rz(-0.035 * cs * m)
 	_tq[_chest] = _ry(-hip_yaw + 0.6 * stance_yaw + punch_twist + 0.12 * _look) \
 		* Quaternion(lean_axis, lean) * _rx(bend) * _rz(-0.34 * _lean) \
@@ -373,7 +377,17 @@ func animate(p, delta: float) -> void:
 			_tq[i] = _tq[i].slerp(_dead_q[i], _dead_w)
 		_hips_off *= 1.0 - _dead_w
 	rotation = Vector3(-PI * 0.5 * _dead_w, PI, 0.0)
-	position.y = 0.11 * _dead_w
+	position = Vector3(0.0, 0.11 * _dead_w, 0.0)
+	if p._roll_t > 0.0 and not p.dead:
+		# A roll: tucked up (above), the whole body goes once over, head first, the way it is travelling, about a
+		# point at its middle. That way is given in the world; here it is turned into the body's own space.
+		var ru: float = 1.0 - p._roll_t / maxf(p._roll_total, 0.01)
+		var rd: Vector3 = p._roll_dir
+		var dir_m := Vector3(rd.dot(left), 0.0, rd.dot(fwd)).normalized()
+		var over := Basis(Vector3.UP.cross(dir_m).normalized(), TAU * smoothstep(0.0, 1.0, ru))
+		var mid := Vector3(0.0, 0.45, 0.0)
+		var half_turn := Basis(Vector3.UP, PI)
+		transform = Transform3D(half_turn * over, half_turn * (mid - over * mid))
 
 	# ---- onto the skeleton
 	var kk := 1.0 - exp(-pose_sharpness * delta)

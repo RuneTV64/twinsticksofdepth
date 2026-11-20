@@ -218,6 +218,11 @@ document; keep it in step when the rules change).
   stick) or leave it. Hold = go to the cover spot the crosshair marks (cyan ring; read before lock-on shifts the
   crosshair); the crosshair recentres on arrival. Pushing firmly away leaves; a dash or a grab also takes you out.
   Cover + pushing into low cover vaults it (window sills too).
+- Roll (owner, 20 Nov 2026): two quick Cover taps (within 0.28 s) when not in cover roll you 3.2 m the way you are
+  moving, or the way you face if standing still; your facing doesn't change. 0.55 s, 15 stamina. Nothing can grab
+  you during it; you can't attack during it. Not while held, winded, or standing on bodies. The first tap still
+  acts at once (it may start a slide to cover; the second tap drops that and rolls). `player.gd` Roll exports;
+  the tumble is in `player_body.gd` (two moments of it are on the cover pose sheet).
 - Three states (`cover_mode`):
   - hunker: hidden. Shots that cross the cover are stopped. You see only `cover_hunker_sight` 4 m all round (the
     fog closes in, enemies beyond fade).

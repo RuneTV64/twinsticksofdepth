@@ -11,7 +11,7 @@ extends SceneTree
 ## palette colors directly.
 
 const DT := 1.0 / 60.0
-const GAP := 2.3
+const GAP := 2.1
 
 var _frames := 0
 var _shader: Shader
@@ -36,7 +36,8 @@ func _cells(row: int) -> Array:
 		["Blind fire round the end", 2.6, -1, {"cover_blind": true, "weapon": "gun", "cover_lean_dir": Vector3(0.7, 0, 0)}],
 		["Low peek round the end", 1.2, -1, {"cover_crouch": 1.0, "cover_lean_dir": Vector3(0.7, 0, 0)}],
 		["Vault (halfway)", 1.2, -1, {"cover_crouch": 0.7, "_vault_t": 0.2, "lift": 0.75, "over": true}],
-		["Unarmed Ready over it", 1.2, -1, {"armed": true}],
+		["Roll: a quarter over", 0.0, 1, {"_roll_t": 0.39, "_roll_total": 0.55, "_roll_dir": Vector3(1, 0, 0), "nowall": true}],
+		["Roll: three quarters", 0.0, 1, {"_roll_t": 0.16, "_roll_total": 0.55, "_roll_dir": Vector3(1, 0, 0), "nowall": true}],
 	]
 
 
@@ -75,7 +76,8 @@ func _build(row: int) -> void:
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		box.material_override = mat
 		box.position = Vector3(x - (0.9 if lean != Vector3.ZERO else 0.0), h * 0.5, -0.2)
-		world.add_child(box)
+		if h > 0.0:
+			world.add_child(box)
 		var p := Player.new()
 		p.position = Vector3(x, f.get("lift", 0.0), -0.2 if f.get("over", false) else Cover.STANDOFF)
 		world.add_child(p)
@@ -84,7 +86,7 @@ func _build(row: int) -> void:
 		p._body.material.shader = _shader
 		p.facing = Vector3(0, 0, c[2])
 		for k in f:
-			if k != "lift" and k != "over":
+			if k != "lift" and k != "over" and k != "nowall":
 				p.set(k, f[k])
 		for n in 90:
 			p._update_visuals(DT)
