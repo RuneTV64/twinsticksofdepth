@@ -1217,7 +1217,8 @@ func _update_finisher() -> void:
 			best = d
 			finish_target = en
 	if finish_target == null and CorpsePile.it != null:
-		var p = CorpsePile.it.live_near(aim, finisher_aim + 0.1)
+		# Any limb or head sticking out of the pile: there is no telling which are still alive.
+		var p = CorpsePile.it.piece_near(aim, finisher_aim + 0.1)
 		if p != null and _xz(p - global_position).length() <= finisher_reach:
 			finish_pile = p
 
@@ -1251,9 +1252,9 @@ func _start_finisher() -> void:
 				en.hear_noise(global_position)
 		if _finish_on != null:
 			_finish_on.take_hit(_finish_on.hp + 1.0, Vector3.DOWN, 0.0)
+			show_status("Finished it", 0.7)
 		elif CorpsePile.it != null:
-			CorpsePile.it.kill_near(_finish_at, 0.4)
-		show_status("Finished it", 0.7)
+			_pile_result(CorpsePile.it.stomp_at(_finish_at, 1.0))
 		if mag == 0 and reserve > 0:
 			_start_reload()
 		return
@@ -1278,12 +1279,18 @@ func _land_finisher() -> void:
 		else:
 			show_status("Again!", 0.6)
 	elif _finish_at != null and CorpsePile.it != null:
-		# One trapped in the pile: it can't get away, so a blow or two by the same sum.
-		if randf() < _blow_power():
-			CorpsePile.it.kill_near(_finish_at, 0.4)
-			show_status("That one is done", 0.8)
-		else:
-			show_status("Again!", 0.6)
+		_pile_result(CorpsePile.it.stomp_at(_finish_at, _blow_power()))
+
+
+## What a blow on something in the pile turned out to be.
+func _pile_result(what: String) -> void:
+	match what:
+		"killed":
+			show_status("It was alive. Not now.", 1.0)
+		"alive":
+			show_status("It's alive! Again!", 0.8)
+		_:
+			show_status("Only meat.", 0.6)
 
 
 ## Something alive in the corpse pile has hold of your leg (corpse_pile.gd). It stops you for a moment; it may bite.
@@ -1843,7 +1850,10 @@ func _update_interact() -> void:
 
 
 func interact_prompt() -> String:
-	if finish_target != null or finish_pile != null:
+	if finish_target == null and finish_pile != null:
+		return "[%s]  %s it, in case it's alive" % ["RT" if using_pad else "Left-click",
+			"Shoot" if armed and not is_melee() and mag > 0 else ("Stomp" if is_melee() else "Rifle-butt")]
+	if finish_target != null:
 		var btn := "RT" if using_pad else "Left-click"
 		if armed and not is_melee() and mag > 0:
 			return "[%s]  Shoot it in the head (1 round, loud)" % btn

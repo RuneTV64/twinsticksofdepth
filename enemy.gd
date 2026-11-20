@@ -62,12 +62,19 @@ extends CharacterBody3D
 @export var climb_time := 2.2          # s to get over, fresh (longer when stiff, and for a taller climb)
 @export var climb_max_depth := 2.6     # m: nothing deeper than this is climbed
 @export var heap_step := 0.85          # m: how big a step up it can take onto a heap (two bodies)
-@export var heap_density := 12         # this many zombies within 3 m, and one pushing at the front can go under
+@export var heap_boost := 0.3          # m more it can reach when it is on a heap, pushed up from behind
+@export var heap_density := 10         # this many zombies within 3 m, and one pushing at the front can go under
 @export var heap_chance := 0.2         # ... with this chance every half second, once it has pushed for heap_after
 @export var heap_after := 2.0          # s it has to have been pushing first
-@export var heap_max := 4              # live bodies deep in one spot (0.4 m each); one more and the bottom one is crushed
+@export var heap_max := 6              # live bodies deep in one spot (0.24 m each); one more and the bottom one is crushed
+@export var tear_join := 0.2           # chance of losing a limb going under the crowd
+@export var tear_out := 0.3            # chance, for each limb, of losing it dragging itself out of a heap
+@export var tear_over := 0.25          # chance, for each limb, of losing it going over a wall off a heap or pile
+@export var max_loose_pieces := 50     # torn-off pieces lying about at once; past this they aren't left behind
 @export var mill_after := 3.0          # s stuck before it starts shuffling sideways along what stopped it
 @export var mill_speed := 0.5          # m/s
+@export var crush_under := 3           # with this many lying on top of it, a body in a heap can be crushed
+@export var crush_chance := 0.12       # ... with this chance every half second
 @export var crush_hurt := 8.0          # damage to a person right where a zombie goes under or is crushed
 @export var skull := 1.0               # how much stomping its head takes (rot softens it)
 @export var heap_rest := 3.0           # s with no crowd before the one on top drags itself out
@@ -97,9 +104,11 @@ static var _grid_frame := -1
 
 # The heap: fallen and dead zombies by 0.8 m cell, bottom first. Everyone else walks on top of them.
 const HEAP_CELL := 0.8
-const HEAP_LAYER := 0.4
+const HEAP_LAYER := 0.24    # packed: a body lying on bodies adds about this much
 static var _heap := {}
 static var _heap_n := 0     # bodies in heaps anywhere; 0 = no heap work is done at all
+static var _loose := 0      # torn-off pieces lying about now
+static var for_pile := false   # set by the corpse pile while it takes a piece for itself
 
 var hp := 100.0
 var dead := false
@@ -418,6 +427,14 @@ func _let_go() -> void:
 
 
 func _on_piece(slot: String, piece: Node) -> void:
+	# A crush tears off far more than is worth keeping: past a point the pieces just aren't left lying.
+	# (Pieces the corpse pile keeps as part of itself don't count: for_pile.)
+	if not for_pile:
+		if _loose >= max_loose_pieces:
+			piece.queue_free()
+			return
+		_loose += 1
+		piece.tree_exited.connect(func() -> void: _loose = maxi(_loose - 1, 0))
 	if slot == "Head":
 		var h := SeveredHead.new()
 		h.player = player
@@ -605,6 +622,7 @@ func _separation(delta: float) -> Array:
 	var push := Vector3.ZERO
 	var hard := Vector3.ZERO
 	var near := 0
+	var packed := perch > 0.1 or _press_t > 1.0
 	for dx in range(-1, 2):
 		for dz in range(-1, 2):
 			var cell: Array = _grid.get(Vector2i(cx + dx, cz + dz), [])
@@ -614,6 +632,8 @@ func _separation(delta: float) -> Array:
 				if o.state == "heap":
 					continue   # the fallen are underfoot, not in the way
 				var r := personal_space + (0.25 if crawling or o.crawling else 0.0)
+				if packed:
+					r *= 0.5   # on the heap, or jammed against what stopped them, they are on top of each other
 				var d := Vector3(p.x - o.global_position.x, 0.0, p.z - o.global_position.z)
 				var l2 := d.length_squared()
 				if l2 < 1.44:
@@ -625,7 +645,7 @@ func _separation(delta: float) -> Array:
 					l2 = d.length_squared()
 				var l := sqrt(l2)
 				push += d / l * (1.0 - l / r)
-				var g := min_gap + (0.2 if crawling or o.crawling else 0.0)
+				var g := (min_gap + (0.2 if crawling or o.crawling else 0.0)) * (0.45 if packed else 1.0)
 				if l < g:
 					hard += d / l * (g - l) * 0.5 / maxf(delta, 0.001)   # (looked up every other tick: catches up over two)
 	_crowd_n = near
@@ -686,7 +706,7 @@ func _crushed() -> void:
 	var key := _heap_key
 	_leave_heap()
 	_let_go()
-	if CorpsePile.crush(key, get_parent()):
+	if CorpsePile.crush(key, get_parent(), self):
 		_gone()
 
 
@@ -705,7 +725,7 @@ func _join_heap() -> bool:
 	var arr: Array = _heap.get(key, [])
 	if arr.size() >= heap_max:
 		var under: Enemy = arr[0]
-		if not CorpsePile.crush(key, get_parent()):
+		if not CorpsePile.crush(key, get_parent(), under):
 			return false
 		under._leave_heap()
 		under._let_go()
@@ -716,10 +736,12 @@ func _join_heap() -> bool:
 	_heap_key = key
 	_heap_n += 1
 	_in_heap = true
-	# It lands any old way: sprawled at an angle, tipped over the ones under it.
-	facing = facing.rotated(Vector3.UP, randf_range(-1.4, 1.4))
-	_visual.rotation.x = randf_range(-0.22, 0.22)
-	_visual.rotation.z = randf_range(-0.3, 0.3)
+	# It lands any old way: at any angle, on its front, its side or its back, jammed in among the others.
+	facing = facing.rotated(Vector3.UP, randf_range(-PI, PI))
+	_visual.rotation.x = randf_range(-0.5, 0.5)
+	_visual.rotation.z = randf_range(-1.5, 1.5) if randf() < 0.6 else randf_range(-0.3, 0.3)
+	_visual.position.x = randf_range(-0.3, 0.3)
+	_visual.position.z = randf_range(-0.3, 0.3)
 	return true
 
 
@@ -729,6 +751,8 @@ func _leave_heap() -> void:
 	_in_heap = false
 	_visual.rotation.x = 0.0
 	_visual.rotation.z = 0.0
+	_visual.position.x = 0.0
+	_visual.position.z = 0.0
 	_heap_n = maxi(_heap_n - 1, 0)
 	var arr: Array = _heap.get(_heap_key, [])
 	arr.erase(self)
@@ -759,6 +783,8 @@ func _press(delta: float, pressed: bool) -> void:
 		_climb_wait = randf_range(climb_delay.x, climb_delay.y) * (1.0 + body.stiff)
 	_press_t += delta
 	var reach := climb_reach if body.legs() == 2 and not crawling else crawl_reach
+	if perch > 0.3:
+		reach += heap_boost   # shoved up from below by the ones still coming
 	if _press_box != null and _press_t >= _climb_wait and _press_box.top - perch <= reach:
 		if _start_climb():
 			return
@@ -766,7 +792,11 @@ func _press(delta: float, pressed: bool) -> void:
 	_heap_t -= delta
 	if _press_t > heap_after and _heap_t <= 0.0:
 		_heap_t = 0.5
-		if _crowd_n >= 2 and _density() >= heap_density and randf() < heap_chance and _join_heap():
+		if _crowd_n >= 2 and _density() >= heap_density and randf() < heap_chance:
+			if randf() < tear_join:
+				_tear(1.0, 1)   # pulled down by an arm or a leg, and it comes off
+			if not _join_heap():
+				return
 			# Down it goes, under the feet of the rest. Anyone it was reaching for is in the crush too.
 			_let_go()
 			crawling = true
@@ -818,14 +848,32 @@ func _climb_step() -> void:
 		perch = 0.0
 		_set_state("down")
 		_down_t = randf_range(0.8, 2.5)
+		# Hauled up over a heap of clutching bodies, it doesn't come away whole.
+		if _climb_h0 > 0.3:
+			_tear(tear_over, 2)
 		# A long drop can shake a rotten one apart.
 		if _climb_top >= fall_break and randf() < 0.3 + 0.5 * body.rot():
 			_shed_part()
 
 
+## Each limb it still has comes off with `chance`, up to `most` of them: torn away in the press.
+func _tear(chance: float, most: int) -> void:
+	var slots: Array[String] = ["ArmL", "ArmR", "LegL", "LegR"]
+	slots.shuffle()
+	var n := 0
+	for slot in slots:
+		if n >= most:
+			return
+		if body.part(slot) != "Destroyed" and randf() < chance:
+			_lose(slot, Vector3(randf_range(-1.0, 1.0), 1.0, randf_range(-1.0, 1.0)))
+			n += 1
+
+
 ## Lying in the heap. The one on top drags itself out once the crowd has gone.
 func _heap_step(delta: float) -> void:
 	_settle(delta)
+	# Still trying to get where it was going: it claws and kicks where it lies (the body poses from this).
+	velocity = facing * (0.3 + 0.2 * sin(state_t * 2.3 + _sway))
 	_heap_t -= delta
 	if _heap_t > 0.0:
 		return
@@ -833,7 +881,10 @@ func _heap_step(delta: float) -> void:
 	var arr: Array = _heap.get(_heap_key, [])
 	if arr.is_empty() or arr[arr.size() - 1] != self:
 		_quiet_t = 0.0
-		return   # others on top of it
+		# Others on top of it. With enough of them, sooner or later the weight crushes it.
+		if arr.size() - 1 - arr.find(self) >= crush_under and randf() < crush_chance:
+			_crushed()
+		return
 	var crowd := false
 	var cx := floori(global_position.x / CELL)
 	var cz := floori(global_position.z / CELL)
@@ -846,6 +897,7 @@ func _heap_step(delta: float) -> void:
 	if _quiet_t >= heap_rest:
 		_set_state("down")
 		_down_t = randf_range(0.4, 1.2)
+		_tear(tear_out, 2)   # it drags itself out, leaving some of itself behind
 
 
 ## A shambler's mind: where it wants to go this tick, and what it does when it gets there.

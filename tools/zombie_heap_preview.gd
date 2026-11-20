@@ -6,6 +6,7 @@ extends SceneTree
 ## Run from a scratch copy of the game project (copy this file to its root), software OpenGL under xvfb:
 ##   N=40 SECONDS=30 H=2.6 OUT=/tmp/heap.png xvfb-run -a -s "-screen 0 2400x1600x24" godot --rendering-driver opengl3 \
 ##       --resolution 1800x900 -s res://zombie_heap_preview.gd
+## HIDE=1 leaves the zombies out of the picture, to show the corpse pile alone. ZOOM sets the camera's size (m).
 ## H is the wall's height (2.6 = one storey; make it tall to see a horde crush its own into a corpse pile).
 ## Test-only patches for the software renderer: the decay shader outputs its palette colors directly and each
 ## zombie gets a material of its own; and every zombie is shown, though in the game the player (behind the wall)
@@ -82,7 +83,7 @@ func _build() -> void:
 		_zs.append(e)
 	var cam := Camera3D.new()
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
-	cam.size = 11.0
+	cam.size = float(OS.get_environment("ZOOM")) if OS.get_environment("ZOOM") != "" else 11.0
 	world.add_child(cam)
 	cam.position = Vector3(10.0, 9.0, 14.0)
 	cam.look_at(Vector3(0.0, 1.6, 1.0))
@@ -107,6 +108,9 @@ func _process(delta: float) -> bool:
 				over += 1
 			e.set_physics_process(false)
 			e.set_process(false)
+			if OS.get_environment("HIDE") != "":
+				e.visible = false     # HIDE=1: the pile alone, without the zombies on it
+				continue
 			e._alpha = 1.0
 			e._visual.visible = true
 			e.body.visible = true
@@ -126,13 +130,27 @@ func _process(delta: float) -> bool:
 		var pile := CorpsePile.it
 		var top := 0.0
 		if pile != null:
+			# The limbs left sticking out of the pile: the same per-material patch as the zombies.
+			for pe in pile.pieces:
+				if not is_instance_valid(pe["node"]):
+					continue
+				for mi in (pe["node"] as Node).find_children("*", "MeshInstance3D", true, false):
+					var pm := ShaderMaterial.new()
+					pm.shader = _shader
+					pm.set_shader_parameter("anatomy_map", AnatomyMap.texture())
+					for k in ["freshness", "skin_tone", "variant", "hair_color", "look_seed", "decay_seed", "gore", "grime", "neck_blood"]:
+						var v = (mi as MeshInstance3D).get_instance_shader_parameter(k)
+						if v != null:
+							pm.set_shader_parameter(k, v)
+					pm.set_shader_parameter("dissolve", 0.0)
+					(mi as MeshInstance3D).material_override = pm
 			for k in pile.cells:
 				top = maxf(top, pile.cells[k] * CorpsePile.LAYER)
 			var psh: Shader = (pile._mesh.material_override as ShaderMaterial).shader
 			psh.code = psh.code.replace("ALBEDO = pow(c, vec3(2.2));", "ALBEDO = c;")
 		print("after %ss: %d of %d zombies left %s, live heap %d, crushed %d, pile %.1f m, trapped alive %d, over the wall %d" % [
 			OS.get_environment("SECONDS"), left, _zs.size(), st, Enemy._heap_n, pile.total if pile else 0, top,
-			pile.arms.size() if pile else 0, over])
+			pile.trapped() if pile else 0, over])
 		_player.set_physics_process(false)
 		_player._visual.visible = false
 		_player._reticle.visible = false

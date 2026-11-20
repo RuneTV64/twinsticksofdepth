@@ -263,9 +263,9 @@ World War Z but mindless: an accident, not a plan. All of it is in `enemy.gd` (t
   one node for the level, made on the first crush). The pile stays and compounds; it stops at `max_height` 7 m,
   about two and a half storeys (Claude's pick; the owner said 2 to 3). It is one mesh with a gore shader and a
   stain round its foot, rebuilt at most twice a second.
-- Still alive in it: 1 crushed zombie in 8 is trapped alive. An arm sticks out and gropes (a stand-in made of
-  two simple shapes). Within 1 m it has a 35% chance a second to grab whoever is there (player or raider): a 0.7 s
-  stagger, and half the time a 10 damage bite.
+- Still alive in it: 1 crushed zombie in 8 is trapped alive (see Look, below, for what shows). Within 1 m it has a
+  35% chance a second to grab whoever is there (player or raider): a 0.7 s stagger, and half the time a 10 damage
+  bite.
 - People in the press: when a zombie goes under within 1.6 m of the person it was reaching for, that person takes
   8 damage (`take_crush`). Raiders don't walk on piles yet.
 - The player on bodies (`player.gd`, Corpse pile exports): 0.4 speed, no run or dash, stamina drains, an 8% a
@@ -282,8 +282,33 @@ World War Z but mindless: an accident, not a plan. All of it is in `enemy.gd` (t
   zombies, 150 s: 145 crushed into a 3 m pile, 105 left, 10 to 20 trapped alive.
 - Zombies don't look for heaps or ramps; they only ever walk at their prey. The climb and the heap use the crawl
   pose. Nothing is done per tick when there is no heap and no pile.
-- Review pictures: `tools/preview/zombie_heap.png` (40 at one storey, before crushing existed) and
-  `tools/preview/corpse_pile.png` (250 at 9 m), made by `tools/zombie_heap_preview.gd` (N, SECONDS, H).
+- Look (owner, 20 Nov 2026: the first pictures "did not look good at all"; it has to be gnarly, with bones, blood,
+  limbs, ligaments and sinew, built from modular pieces picked at random; and zombies on a heap were too far apart,
+  "a cheer routine"):
+  - `gore_tiles.gd` (`GoreTiles`) draws, by code, a sheet of 24 tiles (40 texels, one per 0.8 m cell): rib cages,
+    long bones, skulls, pelvises, spines, hands, torn limbs with the bone out of the stump, gut, sinew, slabs of
+    meat, skin, fat, pooled blood. Each keeps clear of its own edge, so any fits any. The pile's shader lays pulp
+    under them and picks a tile, a turn and a flip per cell; steep faces are painted from the side. Change the
+    shapes or the colours there (the palette is in both files). Sheet: `tools/preview/gore_tiles.png`.
+  - Real pieces in the pile: a crushed zombie leaves up to three of its own limbs or its head (`ShamblerPiece`,
+    frozen, with its skin and rot) half-buried where it went under; pieces the pile rises over are removed; at
+    most 140 show.
+  - The trapped ones are those pieces (owner: the player must not be able to tell): a live one is an arm (or a
+    head, which only bites) that looks like any other and doesn't move until it grabs. Any piece can be stomped
+    or shot; the game then says whether it was alive.
+  - The pile slumps: a body landing on a spot 3 or more higher than a neighbour slides to the neighbour, so it is a
+    mound, not a pillar. Its mesh points are the cell middles, so the drawn surface is exactly `height_at()`.
+  - Heaps are packed: 0.24 m a body, 6 deep, each sprawled at any angle on front, side or back, clawing where it
+    lies; zombies on bodies scramble on all fours (`zombie_body.gd`: prone when `perch` > 0.3) and crowd to half
+    their usual spacing. A body with 3 or more lying on it has a 12% chance every half second of being crushed.
+  - Torn apart: going under (20%, one limb), dragging itself out of a heap (30% a limb, up to two), and going over
+    a wall off a heap (25% a limb, up to two) cost limbs. Past 50 loose pieces lying about, new ones aren't left.
+  - With these: 24 zombies at one storey, 3 to 6 over in 90 s, 2 or 3 crushed; 250 at 9 m, about 175 crushed into a
+    1.1 m mound that spreads wide, 75 left, 17 trapped alive.
+- Review pictures (software renderer): `tools/preview/zombie_heap.png` (40 at one storey),
+  `corpse_pile.png` (250 at 9 m), `corpse_pile_alone.png` (the same pile with the zombies left out),
+  `gore_tiles.png`; made by `tools/zombie_heap_preview.gd` (N, SECONDS, H, HIDE, ZOOM) and
+  `tools/gore_tiles_preview.gd`.
 - To come (owner): how zombies spawn and how the horde moves; the turning-undead mechanic; the pile's clean-up
   (the maggots, flies and worms lore).
 

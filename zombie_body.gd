@@ -504,7 +504,8 @@ func animate(e: Enemy, delta: float) -> void:
 	if e.dead:
 		vel = Vector3.ZERO
 	var speed := vel.length()
-	var prone := e.crawling and not e.dead
+	# On the ground: a crawler, or one scrambling on all fours over a heap of bodies.
+	var prone := (e.crawling or e.perch > 0.3) and not e.dead
 
 	_move_w = _ease(_move_w, smoothstep(0.05, 0.6, speed), 8.0, delta)
 	_prone_w = _ease(_prone_w, 1.0 if prone else 0.0, 7.0 if prone else 3.0, delta)
