@@ -1,7 +1,9 @@
 # Twin Sticks of Depth
 
-Godot 4 twin-stick zombie game (the owner works in Godot 4.7, Forward+). Targets: PC, maybe consoles later,
-designed for a controller. Forward+ only: no Compatibility renderer, no web or phone builds (owner, 15 Nov 2026). The level is built in code (see README.md);
+Godot 4 twin-stick zombie game (the owner works in Godot 4.7, Forward+). PC only, mouse and keyboard only (owner,
+20 Nov 2026: there is too much to build to keep a controller working too; maybe later). Design and tune new
+controls for mouse and keyboard; don't spend time on controller support. The controller bindings and stick aim
+already in the code can stay, but nothing needs to keep them working. Forward+ only: no Compatibility renderer, no web or phone builds (owner, 15 Nov 2026). The level is built in code (see README.md);
 the character models, shaders and their scripts are in `assets/characters/` and in our claude.ai Artifacts.
 
 ## Working with the owner
