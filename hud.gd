@@ -21,7 +21,7 @@ var _debug: Label
 var _wheel: Control
 var _wheel_labels: Array[Label] = []
 
-const HELP_KM := """MOUSE + KEYBOARD
+const HELP_KEYS := """CONTROLS
 Move  WASD
 Look (weapon away)  Mouse moves the crosshair, camera follows
 Ready (HOLD)  Right mouse button
@@ -44,14 +44,14 @@ and any zombies right beside it. Each shove costs stamina;
 out of stamina = no shoves, bites land until you recover.
 Grabbed: Ready and face it to shove it off, or wiggle the move keys to break free.
 In cover: hunkered = hidden, safe from shots across it, but you see only a short way.
-  Push toward low cover (or along it at an end) and hold = peek: you see, they see you, small chance of a head hit.
-  Ready = pop up or lean out to aim. Attack without Ready = blind fire. Push away = leave.
-  Cover + push toward low cover = vault it.
+  Hold a move key toward low cover (or along it at an end) = peek: you see, they see you, small chance of a head hit.
+  Ready = pop up or lean out to aim. Attack without Ready = blind fire. Hold the move key away from it = leave.
+  Space while moving toward low cover = vault it.
 Stat test keys: 1/2 STR   3/4 END   5/6 WT   7/8 DEX
 Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt   L all on low model
 Finisher: crosshair on a downed zombie's head, close by, then attack. Unarmed = stomp, gun away = rifle butt
   (blows by Strength), gun Ready = one shot to the head.
-Corpse piles can be walked on: slow, bad footing, and what is still alive in them grabs. Cover at a wall = climb it.
+Corpse piles can be walked on: slow, bad footing, and what is still alive in them grabs. Space at a wall = climb it.
 Character page: C. It shows attributes, needs, composure and conditions.
 Cover test: G test gunner at the crosshair   Shift+G remove them
 Raiders: a camp in the south-west of the yard.  T adds one at the crosshair   Shift+T removes those
@@ -344,7 +344,7 @@ func _process(delta: float) -> void:
 		stance += "  - fatigued"
 	_state.text = stance
 	_state.add_theme_color_override("font_color", Color(1.0, 0.75, 0.3) if player.armed else Color.WHITE)
-	_help.text = HELP_KM + "\n" + HELP_TAIL
+	_help.text = HELP_KEYS + "\n" + HELP_TAIL
 
 	_hp.max_value = player.max_health
 	_hp.value = player.health

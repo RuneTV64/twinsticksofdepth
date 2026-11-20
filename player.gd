@@ -1034,7 +1034,7 @@ func _cover_state(delta: float, move_dir: Vector3) -> void:
 			mode = "pop"
 		_peek_t = 0.0
 	else:
-		# Peeking: hold the stick toward low cover to look over it; hold it along the cover, at an open end
+		# Peeking: hold a move key toward low cover to look over it; hold it along the cover, at an open end
 		# where nothing carries on, to look round it.
 		var want_side := 0
 		if absf(along) > 0.6 and absf(into) < 0.6:
