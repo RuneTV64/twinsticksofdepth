@@ -73,6 +73,14 @@ it). The owner said to sketch before building anything; wait for their critique 
   and the like for head protection; food and water.
 - Ammunition and loading weapons as in Zomboid (magazines, rounds), but smoother and far less menu-driven. The
   owner wants to design this together: propose, don't just build.
+- Owner on the sketch (20 Nov 2026): ALT to look behind you is fine as a default key. The drawer uncovers by
+  column, and the drawer's own background is the meter: it fills, and as each column fills the items in it
+  appear. A hurry key fills it faster and makes noise; skill makes searching more efficient. Hurrying and steering
+  with the mouse are combined: the mouse picks which column fills, the hurry key speeds it. Things hidden under
+  other things (layered clutter) is wanted: "exactly what I was thinking". Wording: "some clothes have pockets";
+  storage mostly comes from containers and backpacks, pockets take small items.
+- Open question from the owner: how do you empty the chamber without firing, and take rounds out of a magazine?
+  Claude proposed a "make safe" key and dragging rounds out of the gun or magazine in the inventory; not agreed yet.
 - Claude's earlier layout, which the owner answered against: items are records (weight, condition, category);
   container contents are rolled when first opened; time is applied on opening (spoiling, picked over by others);
   nothing respawns in a cupboard; keepsakes unlock starting builds.
