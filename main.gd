@@ -29,6 +29,7 @@ var fog: Node3D
 # Crowd test (F5 / F6 / F7): extra shamblers to find out how many the game can take, and where the time goes.
 const CROWD_STEP := 50
 var _crowd: Array[Enemy] = []
+var _raiders: Array[Raider] = []   # added with T
 var _perf: Label
 var _perf_t := 0.0
 var _perf_frames := 0
@@ -100,6 +101,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_L:   # (not F8: that's the Godot editor's Stop Running Project)
 				ZombieBody.force_low = not ZombieBody.force_low
 				player.show_status("All zombies on the low model: %s" % ("ON" if ZombieBody.force_low else "OFF"), 1.5)
+			KEY_T:   # a raider at the crosshair; Shift+T removes the ones added this way
+				if event.shift_pressed:
+					for r in _raiders:
+						if is_instance_valid(r):
+							r.queue_free()
+					_raiders.clear()
+					player.show_status("Test raiders removed", 1.5)
+				else:
+					var at := player.global_position + player.reticle_offset
+					if player.reticle_offset.length() < 3.0:
+						at = player.global_position + player.facing * 10.0
+					_raiders.append(_raider(Vector3(at.x, 0.05, at.z)))
+					player.show_status("Raider added (Shift+T removes them)", 1.5)
 			KEY_G:   # cover test: something that shoots at you
 				if event.shift_pressed:
 					for g in get_tree().get_nodes_in_group("gunners"):
@@ -347,6 +361,7 @@ func _build_level() -> void:
 	_sign(Vector3(20, 3.0, 0), "Shamblers")
 	_sign(Vector3(0, 3.4, -38), "Cul-de-sac ahead: ammo is in some of the houses")
 
+	_build_raider_camp()
 	_build_culdesac()
 
 
@@ -549,6 +564,34 @@ func _box(pos: Vector3, size: Vector3, col: Color) -> StaticBody3D:
 	add_child(b)
 	Cover.add_box(b, pos, size)   # anything solid standing on the ground is cover (cover.gd)
 	return b
+
+
+## Raiders' camp, in the south-west corner of the yard: three raiders on watch among things to hide behind.
+func _build_raider_camp() -> void:
+	var crate := Color(0.45, 0.36, 0.25)
+	var wall_col := Color(0.5, 0.48, 0.44)
+	_box(Vector3(-26, 0.55, 20), Vector3(4.0, 1.1, 0.5), wall_col)     # a low wall facing the yard
+	_box(Vector3(-19, 0.55, 23), Vector3(0.5, 1.1, 3.5), wall_col)     # and one on the east side
+	_box(Vector3(-30, 0.6, 24), Vector3(1.2, 1.2, 1.2), crate)
+	_box(Vector3(-23, 0.6, 27), Vector3(1.2, 1.2, 1.2), crate)
+	_box(Vector3(-27, 1.3, 30), Vector3(3.0, 2.6, 0.4), wall_col)      # a standing wall to lean round
+	_box(Vector3(-33, 1.0, 29), Vector3(1.0, 2.0, 1.0), wall_col)
+	# Cover on the way in, for you.
+	_box(Vector3(-17, 0.6, 14), Vector3(1.2, 1.2, 1.2), crate)
+	_box(Vector3(-24, 0.55, 12), Vector3(3.0, 1.1, 0.5), wall_col)
+	_box(Vector3(-11, 1.0, 20), Vector3(1.0, 2.0, 1.0), wall_col)
+	for p in [Vector3(-26, 0.05, 23), Vector3(-22, 0.05, 25), Vector3(-30, 0.05, 27)]:
+		_raider(p)
+	_sign(Vector3(-25, 3.2, 21), "Raiders: they use cover and shoot back")
+
+
+func _raider(pos: Vector3) -> Raider:
+	var r := Raider.new()
+	r.position = pos
+	r.facing = Vector3(0.6, 0.0, -0.8).normalized()   # watching the yard
+	add_child(r)
+	r.player = player
+	return r
 
 
 func _enemy(kind: String, pos: Vector3) -> void:

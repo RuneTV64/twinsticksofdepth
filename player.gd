@@ -768,7 +768,7 @@ func _lock_pull(point: Vector3, radius: float) -> Vector3:
 		off.y = 0.0
 		var d := off.distance_to(point)
 		var score := d * lock_on_hold if en == prev else d
-		if score >= best or d >= r or not can_see(en.global_position):
+		if score >= best or d >= r or en._alpha < 0.5 or not can_see(en.global_position):
 			continue
 		best = score
 		best_d = d
@@ -1209,8 +1209,8 @@ func _update_line_of_fire() -> void:
 	var best_t := 2.0
 	for e in get_tree().get_nodes_in_group("enemies"):
 		var en := e as Enemy
-		if en == null or en.dead:
-			continue
+		if en == null or en.dead or (en.kind == "raider" and en._alpha < 0.5):
+			continue   # (a raider hidden behind cover doesn't turn the reticle red)
 		var t := Projectile.segment_hit(from, to, en.global_position, Projectile.HIT_RADIUS)
 		if t >= 0.0 and t < best_t:
 			best_t = t

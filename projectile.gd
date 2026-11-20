@@ -79,6 +79,23 @@ func _physics_process(delta: float) -> void:
 		_impact(from.lerp(to, best_t))
 		queue_free()
 		return
+	if best_e != null and best_e.has_method("cover_result"):
+		# A raider behind cover gets the same rule as the player: hunkered, the cover stops it; peeking, only
+		# the head shows, so a hit there kills.
+		var cov: String = best_e.call("cover_result", origin)
+		if cov == "cover":
+			_report("stopped by %s's cover" % best_e.kind)
+			_impact(from.lerp(to, best_t))
+			queue_free()
+			return
+		if cov == "head":
+			best_e.take_headshot(dir, knock * 2.0)
+			_report("HEAD HIT on a peeking %s" % best_e.kind)
+			if is_instance_valid(shooter):
+				shooter.show_status("HEADSHOT!", 1.0)
+			_impact(from.lerp(to, best_t))
+			queue_free()
+			return
 	if best_e != null:
 		if best_e == aimed_at and randf() < headshot_chance:
 			best_e.take_headshot(dir, knock * 2.0)   # one-hit kill; may take the head off

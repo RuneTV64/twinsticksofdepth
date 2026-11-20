@@ -4,6 +4,7 @@ extends Node3D
 
 @export var amount := 8
 @export var respawn_time := 150.0   # slow: a looted spot is worth coming back to much later, not farming
+@export var one_time := false       # dropped ammo (off a dead raider): gone for good once taken
 
 var _active := true
 var _t := 0.0
@@ -71,3 +72,5 @@ func interact(p: Player) -> void:
 	_active = false
 	visible = false
 	_t = respawn_time
+	if one_time:
+		queue_free()

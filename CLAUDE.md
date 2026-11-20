@@ -196,7 +196,7 @@ changes, update both, and keep them the same files.
   `lock_on_radius` 1.6 m of a living enemy the player can see is drawn onto it (dead centre inside `lock_on_core`
   0.5 m, fading to nothing at the radius, so it never sticks) and follows it. Stick: shifts where the tilt points,
   only while tilted. Mouse: settles on once the mouse rests (`lock_on_mouse_radius` 1 m). Exports in the Lock-on group.
-- Debug keys: G adds a test gunner at the crosshair (Shift+G removes them): a stand-in raider for the cover rules.
+- Debug keys: G adds a test gunner at the crosshair (Shift+G removes them); T adds a raider (Shift+T removes those).
 - Debug keys: F1 help, C character page, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
@@ -235,8 +235,7 @@ document; keep it in step when the rules change).
   where it last saw you. They don't climb low cover yet.
 - Poses are in `player_body.gd` (squat, peek, lean, gun up for blind fire, vault). Review sheet:
   `tools/preview/cover_poses.png`, made by `tools/cover_pose_preview.gd`.
-- Not built yet: raider AI using cover (the faces and rules are ready for it), zombies climbing low cover, cover
-  protecting anyone but the player.
+- Not built yet: zombies climbing low cover. (Raiders use cover and are protected by it: see Raiders.)
 
 ## Character sheet (built 20 Nov 2026, in review; untested on the owner's PC)
 
@@ -263,6 +262,38 @@ a list of "the human experience as stats" the owner brought; the picks below are
   `tools/preview/character_page.png`.
 - Not built: picked traits (good and bad, at character creation), skills and XP, food and drink, sleep, the clock,
   body temperature, caffeine and other consumables, soreness, clothing and footwear effects.
+
+## Raiders (built 20 Nov 2026, in review; untested on the owner's PC)
+
+The owner asked for raiders made from the existing player model and skin layers, with AI.
+
+- `raider.gd` (`Raider extends Enemy`, kind "raider"): being an Enemy means the player's shots, punches, shoves,
+  bash, lock-on and composure threat all work on them unchanged. It overrides everything zombie about Enemy.
+- Body: `raider_body.gd` (`RaiderBody extends PlayerBody`): the MaleBody_Muscular mid model from
+  `assets/characters/` (it has the rest positions) with `body_living.gdshader`, one shared material, a look rolled
+  per raider with `LivingBody.roll_look()`. `player_body.gd`'s `animate()` now takes anyone with the Player's state
+  fields, so raiders have every player pose, cover included. They carry the same box gun. Nothing else marks them
+  as raiders yet (no clothes exist): they look like the player with a different skin.
+- Each has a `CharacterSheet` with attributes rolled 8 to 12: CON sets health (60 at 10), END speed, DEX aim;
+  being hurt drops composure and spoils their aim for a while.
+- AI (`mode`): idle (on watch, sees 26 m in a 150 degree cone, 4 m all round; comes to gunshots), fight, search
+  (goes to where it last saw or heard you, looks about, goes home), return.
+- Fighting: `_pick_cover()` finds cover between it and you within 12 m, with a clear straight walk there and a
+  clear line to you once popped out; then it cycles hunker (reloads) -> peek -> pop out, aim 0.55 s, 1 to 3 shots
+  -> hunker. No cover: fights in the open, sidestepping. Within 1.5 m it clubs you (your guard shoves it off).
+  Lost you for 4 s: two blind shots at where you were, then a flank (cover your own cover doesn't shield you
+  from), and after 12 s it comes looking.
+- Cover is the same rule both ways (`Raider.cover_result()`, read by `projectile.gd`): hunkered, your shot across
+  its cover is stopped; peeking, 15% it hits, and that is a kill; popped out, a normal hit. A hunkered raider can't
+  see you and isn't drawn (it pops in and out of view; there is no fade on the living shader).
+- Shots: 12 damage, 5 degrees either side at DEX 10. Three raiders took a player standing in the open at 14 m
+  from 100 to 4 health in 10 s (cloud run). Dead raiders drop a one-time ammo pickup and respawn after 120 s
+  (test-level stand-in).
+- Level: a raider camp in the south-west of the yard (three raiders, low walls, crates, a standing wall), with
+  cover on the way in. T adds a raider at the crosshair, Shift+T removes those.
+- Limits: straight-line movement only (no path finding in the game); raiders and zombies ignore each other;
+  raiders don't vault, don't use windows on purpose, and don't talk to each other beyond not sharing a spot.
+- Review sheet: `tools/preview/raiders.png`, made by `tools/raider_preview.gd`.
 
 ## Character shaders and models: how they are built
 

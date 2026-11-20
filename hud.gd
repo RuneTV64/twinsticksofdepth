@@ -61,6 +61,7 @@ Stat test keys: 1/2 STR   3/4 END   5/6 WT   7/8 DEX
 Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt   L all on low model
 Character page: C (pad: Back). It shows attributes, needs, composure and conditions.
 Cover test: G test gunner at the crosshair   Shift+G remove them
+Raiders: a camp in the south-west of the yard.  T adds one at the crosshair   Shift+T removes those
 F1 hide help    Esc free mouse"""
 
 

@@ -15,6 +15,8 @@ extends Node3D
 ##             an end, holds the gun up over (or out round) the cover to fire blind, tucks up to vault
 ##   death     falls onto its back until the respawn
 ##
+## Raiders use it too (raider_body.gd): animate() takes anyone who carries the same state fields as the Player.
+##
 ## Model space: +Z is forward, +X is the body's left, feet at the origin. This node sits inside
 ## the Player's visual (which faces -Z), turned half a turn.
 
@@ -88,23 +90,21 @@ var _was_dead := false
 
 func _ready() -> void:
 	rotation.y = PI
-	var packed := load(MODEL_PATH) as PackedScene
+	var packed := _model_scene()
 	if packed == null:
-		push_error("PlayerBody: can't load %s" % MODEL_PATH)
+		push_error("PlayerBody: can't load its model")
 		return
 	var model := packed.instantiate()
 	add_child(model)
 	var skels := model.find_children("*", "Skeleton3D", true, false)
 	var meshes := model.find_children("*", "MeshInstance3D", true, false)
 	if skels.is_empty() or meshes.is_empty():
-		push_error("PlayerBody: %s has no skeleton or mesh" % MODEL_PATH)
+		push_error("PlayerBody: its model has no skeleton or mesh")
 		return
 	_skel = skels[0]
 	_mesh = meshes[0]
 
-	material = ShaderMaterial.new()
-	material.shader = load(SHADER_PATH)
-	material.set_shader_parameter("pixel_size", pixel_size)
+	material = _make_material()
 	_aim_light_at_sun.call_deferred()
 	_mesh.material_override = material
 	# The shader reads per-vertex detail data, so never let the far-away simplified versions in.
@@ -144,6 +144,18 @@ func _ready() -> void:
 	_ankle_y = _global(_leg[0][2]).origin.y
 
 
+## Which model, and which skin. Other bodies built on this one (raiders) override these.
+func _model_scene() -> PackedScene:
+	return load(MODEL_PATH) as PackedScene
+
+
+func _make_material() -> ShaderMaterial:
+	var mat := ShaderMaterial.new()
+	mat.shader = load(SHADER_PATH)
+	mat.set_shader_parameter("pixel_size", pixel_size)
+	return mat
+
+
 func _bone(bone_name: String) -> int:
 	var i := _skel.find_bone(bone_name)
 	if i < 0:
@@ -164,7 +176,8 @@ func reach() -> void:
 
 
 # ====================================================================== the pose
-func animate(p: Player, delta: float) -> void:
+## p is the Player, or anything else with the same state fields (a Raider).
+func animate(p, delta: float) -> void:
 	if _skel == null:
 		return
 	_t += delta
@@ -175,14 +188,14 @@ func animate(p: Player, delta: float) -> void:
 		_tq[i] = Quaternion.IDENTITY
 
 	# ---- what the controller is doing
-	var fwd := p.facing
+	var fwd: Vector3 = p.facing
 	var left := Vector3.UP.cross(fwd)
 	var vel := Vector3(p.velocity.x, 0.0, p.velocity.z)
 	if p.dead:
 		vel = Vector3.ZERO
 	var speed := vel.length()
-	var tired := p.fatigue()
-	var melee := p.is_melee()
+	var tired: float = p.fatigue()
+	var melee: bool = p.is_melee()
 	var pace := clampf(speed / maxf(p.walk_speed, 0.1), 0.0, 1.0)
 	var run_t := clampf((speed - p.walk_speed) / maxf(p.run_speed - p.walk_speed, 0.1), 0.0, 1.0)
 
@@ -190,7 +203,7 @@ func animate(p: Player, delta: float) -> void:
 	_run_w = _ease(_run_w, run_t, 10.0, delta)
 	_dash_w = _ease(_dash_w, 1.0 if p._dash_t > 0.0 else 0.0, 45.0 if p._dash_t > 0.0 else 14.0, delta)
 	_fist_w = _ease(_fist_w, 1.0 if p.armed and melee else 0.0, 16.0, delta)
-	var blind := not melee and (p.cover_blind or p._blind_t > 0.0)
+	var blind: bool = not melee and (p.cover_blind or p._blind_t > 0.0)
 	_gun_w = _ease(_gun_w, 1.0 if (p.armed or blind) and not melee else 0.0, 16.0, delta)
 	_cover_w = _ease(_cover_w, p.cover_crouch, 13.0, delta)
 	_lean = _ease(_lean, p.cover_lean_dir.dot(left), 12.0, delta)
@@ -222,12 +235,12 @@ func animate(p: Player, delta: float) -> void:
 	var pull := 0.0
 	var ext := 0.0
 	if p._swing_t > 0.0 and p._swing_total > 0.0:
-		var el := p._swing_total - p._swing_t
+		var el: float = p._swing_total - p._swing_t
 		if el < p._swing_windup:
 			pull = el / maxf(p._swing_windup, 0.001)
 		else:
 			ext = 1.0 - smoothstep(0.3, 1.0, (el - p._swing_windup) / maxf(p._swing_total - p._swing_windup, 0.01))
-	var shove := smoothstep(0.0, 0.12, p._block_t) if melee else 0.0
+	var shove: float = smoothstep(0.0, 0.12, p._block_t) if melee else 0.0
 	var punch_twist := (0.5 * ext - 0.15 * pull) if _punch_side == 1 else (-0.22 * ext + 0.08 * pull)
 
 	# ---- legs: step along the direction of travel
@@ -285,7 +298,7 @@ func animate(p: Player, delta: float) -> void:
 	if p._reload_t > 0.0 and not melee:
 		reload_u = 1.0 - clampf(p._reload_t / maxf(p.reload_time, 0.01), 0.0, 1.0)
 		reload_w = smoothstep(0.0, 0.12, reload_u) * (1.0 - smoothstep(0.85, 1.0, reload_u))
-	var bash := smoothstep(0.25, 0.5, p._bash_cd) if not melee else 0.0
+	var bash: float = smoothstep(0.25, 0.5, p._bash_cd) if not melee else 0.0
 	var gun_o := Vector3(cg.origin.x * 0.5 - 0.17, cg.origin.y + 0.11 - 0.05 * reload_w,
 		cg.origin.z * 0.5 + 0.42 - 0.08 * _recoil + 0.28 * bash)
 	# Blind fire: the gun goes up over the cover (when squatting behind it) or out round its end.
