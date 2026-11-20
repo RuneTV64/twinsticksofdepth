@@ -37,6 +37,11 @@ static func apply() -> void:
 	_action("reload", 0.5)
 	_key("reload", KEY_R)
 
+	# HOLD: the camera lets go of you and follows the crosshair further out.
+	_action("free_look", 0.5)
+	_key("free_look", KEY_F)
+	_mouse("free_look", MOUSE_BUTTON_MIDDLE)
+
 	# Look up from what your hands are doing (treating a wound; searching, later).
 	_action("look_up", 0.5)
 	_key("look_up", KEY_ALT)

@@ -24,7 +24,9 @@ var _wheel_labels: Array[Label] = []
 
 const HELP_KEYS := """CONTROLS
 Move  WASD
-Look (weapon away)  Mouse moves the crosshair, camera follows
+Look (weapon away)  Mouse moves the crosshair as far as you can see; the camera follows
+Camera in and out  Mouse wheel
+Free look (HOLD)  F or middle mouse button: the camera leaves you and follows the crosshair further out
 Ready (HOLD)  Right mouse button
 Attack (while Ready)  Left-click
 Interact (weapon away)  Left-click

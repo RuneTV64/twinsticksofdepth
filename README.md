@@ -23,6 +23,8 @@ Mouse and keyboard only. There is no controller support.
 | Roll (out of cover) | Space twice quickly |
 | Weapon wheel (hold) | Tab |
 | Reload | R |
+| Camera in and out | Mouse wheel |
+| Free look (hold): the camera follows the crosshair further out | F or middle mouse button |
 | Character page | C |
 | Treat wounds (sit down to it) | H; keys 1 to 7 or a click pick a tool; hold Alt to look up |
 

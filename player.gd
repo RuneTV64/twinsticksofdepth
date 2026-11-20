@@ -50,7 +50,14 @@ var barge_min_speed := 5.3
 @export var backpedal_mult := 0.75      # Ready: speed when moving directly away from aim
 @export var draw_time := 0.12         # Ready pressed -> can attack
 @export var sprint_tap_time := 0.22     # release Sprint before this = dash, hold past it = run
-@export var reticle_range := 10.0       # how far the reticle can roam, in both stances
+@export var reticle_range := 16.0       # how far the reticle can roam, in both stances
+## Free look (hold F or the middle mouse button): the camera lets go of you and goes with the crosshair, which
+## can roam this far. You still only see what your eyes can (the fog of war doesn't lift).
+@export var free_look_range := 30.0
+var free_look := false
+@export var cam_lead_max := Vector2(11.0, 6.0)   # m (east-west, north-south) the camera may lead by at the default zoom
+@export var look_cam_lead := 0.5        # weapon away: how much of the way to the crosshair the camera goes
+@export var reticle_edge := 0.06        # the crosshair stays this share of the screen in from its edges
 # Gear adds to the base range per stance. Set these when equipment changes (they can change
 # at any time; the reticle is re-clamped every frame).
 var look_range_bonus := 0.0             # weapon away: e.g. binoculars
@@ -504,11 +511,37 @@ func camera_focus() -> Vector3:
 
 ## Where the current stance wants the camera, relative to you.
 func _cam_offset() -> Vector3:
-	if armed:
-		return reticle_offset * ready_cam_lead
-	if reticle_visible:
+	if free_look:
 		return reticle_offset
-	return Vector3.ZERO
+	if not armed and not reticle_visible:
+		return Vector3.ZERO
+	# The camera goes part of the way to the crosshair, and never so far that you leave the screen.
+	var o := reticle_offset * (ready_cam_lead if armed else look_cam_lead)
+	var k := camera_rig.distance / 18.0 if camera_rig else 1.0
+	o.x = clampf(o.x, -cam_lead_max.x * k, cam_lead_max.x * k)
+	o.z = clampf(o.z, -cam_lead_max.y * k, cam_lead_max.y * k)
+	return o
+
+
+## Keep the crosshair on the screen: at the edge it stops and pushes the view along (the camera follows it), so
+## it can go as far as you can see, however far in the camera is. Scroll out to see, and reach, further at once.
+func _keep_reticle_on_screen() -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null or reticle_offset.length() < 0.5:
+		return
+	var vp := get_viewport().get_visible_rect().size
+	var box := Rect2(vp * reticle_edge, vp * (1.0 - 2.0 * reticle_edge))
+	if box.has_point(cam.unproject_position(global_position + reticle_offset)):
+		return
+	var lo := 0.0
+	var hi := 1.0
+	for i in 7:
+		var mid := (lo + hi) * 0.5
+		if box.has_point(cam.unproject_position(global_position + reticle_offset * mid)):
+			lo = mid
+		else:
+			hi = mid
+	reticle_offset *= lo
 
 
 func show_status(text: String, dur := 1.6) -> void:
@@ -602,6 +635,9 @@ func _input(event: InputEvent) -> void:
 		_lmb_event = l
 		_rmb_event = (mask & MOUSE_BUTTON_MASK_RIGHT) != 0
 	if event is InputEventMouseButton:
+		if event.pressed and camera_rig and not treating and not wheel_open \
+				and (event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN):
+			camera_rig.zoom(-1 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1)
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed and not _lmb_event:
 				_lmb_edge = true
@@ -614,8 +650,11 @@ func _input(event: InputEvent) -> void:
 			_wheel_vec = (_wheel_vec + event.relative).limit_length(WHEEL_MOUSE_RADIUS)
 		elif Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not dead and not treating:
 			var rel: Vector2 = event.relative
-			reticle_offset += Vector3(rel.x, 0.0, rel.y) * mouse_sens
+			# The same hand movement covers the same share of the screen however far out the camera is.
+			var far := camera_rig.distance / 18.0 if camera_rig else 1.0
+			reticle_offset += Vector3(rel.x, 0.0, rel.y) * mouse_sens * far
 			reticle_offset = reticle_offset.limit_length(current_reticle_range())
+			_keep_reticle_on_screen()
 			_mouse_idle = 0.0
 
 
@@ -805,6 +844,9 @@ func _update_stance() -> void:
 
 
 func _update_aim(delta: float) -> void:
+	free_look = Input.is_action_pressed("free_look") and not dead and not treating and not wheel_open
+	if free_look:
+		_mouse_idle = 0.0       # it stays out there while you hold it
 	if armed:
 		_mouse_lock(delta)
 		reticle_offset = reticle_offset.limit_length(current_reticle_range())
@@ -877,6 +919,8 @@ func _mouse_lock(delta: float) -> void:
 ## Max reticle distance right now: the shared base plus whatever the current stance's gear adds.
 ## Ready with a melee weapon keeps the (hidden) look point close, so turning stays quick.
 func current_reticle_range() -> float:
+	if free_look:
+		return free_look_range
 	if armed and is_melee():
 		return melee_look_range
 	return maxf(reticle_range + (aim_range_bonus if armed else look_range_bonus), 0.5)

@@ -23,6 +23,15 @@ the character models, shaders and their scripts are in `assets/characters/` and 
 
 - The camera never turns (owner, 20 Nov 2026): it stays locked looking north, and only pans. No rotation of any
   kind, snapped or free. Code may go on assuming a fixed view (lighting, mouse-to-world mapping).
+- In and out, and further (owner, 20 Nov 2026; untested on the owner's PC). The mouse wheel moves the camera
+  between 9 and 42 m from what it looks at (`camera_rig.gd` `zoom()`, 18 m by default; the angle never
+  changes). The crosshair roams 16 m (`reticle_range`, was 10) and is kept on the screen: at the edge it stops
+  and the view follows it. The camera leads toward it by half (0.45 Ready), never so far that the player leaves
+  the screen (`cam_lead_max`). Mouse travel scales with the zoom, so the same hand movement covers the same
+  share of the screen. Free look: hold F or the middle mouse button and the camera lets go of the player and
+  goes with the crosshair, out to `free_look_range` 30 m (owner: decent, not too generous); let go and it
+  comes back. Sight is unchanged: the fog of war doesn't lift. Zoomed right out, every zombie is on the low
+  model (the detail swap is by distance from the camera).
 - Cutaway (built 20 Nov 2026, untested on the owner's PC): whatever stands between the camera and the player is cut
   open, with a dithered edge, so the player is never hidden behind a wall or a tall building. The feet of walls
   (up to 0.95 m) stay. `cutaway.gdshaderinc` has the test (`cutaway_hidden(world_pos, FRAGCOORD.xy)`); any spatial
