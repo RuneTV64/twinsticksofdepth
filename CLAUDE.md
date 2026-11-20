@@ -291,8 +291,18 @@ The owner asked for raiders made from the existing player model and skin layers,
   (test-level stand-in).
 - Level: a raider camp in the south-west of the yard (three raiders, low walls, crates, a standing wall), with
   cover on the way in. T adds a raider at the crosshair, Shift+T removes those.
-- Limits: straight-line movement only (no path finding in the game); raiders and zombies ignore each other;
-  raiders don't vault, don't use windows on purpose, and don't talk to each other beyond not sharing a spot.
+- Raiders and zombies fight (owner, 20 Nov 2026). Zombies: `Enemy.prey` is whoever they are after, the nearest
+  living person noticed (the player or a raider), picked twice a second in `_pick_prey()`; they grab, hold, bite and
+  lunge at a raider through the same calls as at the player (`take_grab`, `take_bite`, `take_attack`...). Raiders:
+  a zombie in sight within 11 m is shot at (slower and 1.6 times wilder than their fire at you, 6% headshots);
+  within 6 m it comes before the fight with you; under 4 m they back away, at arm's length they club it (often
+  knocking it down); held, they club a holder off every 1.1 s. Zombies near a raider wear its composure down like
+  the player's. Raider gunfire draws zombies within 30 m. Raider and gunner shots hit zombies in the way, never
+  raiders. Cloud runs: three raiders at the camp killed 12 zombies in 29 s unhurt (the camp's walls held the zombies
+  off, since zombies can't climb); one raider in the open against 4 was grabbed and bitten to under half health.
+  A raider killed by zombies does not turn into one yet.
+- Limits: straight-line movement only (no path finding in the game); raiders don't vault, don't use windows on
+  purpose, and don't talk to each other beyond not sharing a spot.
 - Review sheet: `tools/preview/raiders.png`, made by `tools/raider_preview.gd`.
 
 ## Character shaders and models: how they are built

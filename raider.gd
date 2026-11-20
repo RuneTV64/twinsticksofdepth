@@ -13,6 +13,9 @@ extends Enemy
 ##   lost you fires blind at where it last saw you, then moves to cover with an angle past yours (a flank). If
 ##            that fails it comes looking.
 ##   search   walks to where it last saw or heard you, looks about, then goes home.
+##   zombies  it shoots any zombie it can see within reach, backing off as they close and clubbing them at arm's
+##            length; a zombie right on it comes before the fight with you. Zombies go for raiders as they go for
+##            you: they grab, hold and bite, and the raider knocks them off. Its gunfire draws more of them.
 ## Movement is in straight lines: there is no path finding in the game yet, so cover is only picked when the way
 ## to it is clear.
 ##
@@ -40,6 +43,12 @@ extends Enemy
 @export var melee_range := 1.5
 @export var melee_damage := 8.0
 @export var melee_gap := 1.1
+@export var zombie_sense := 11.0        # m: it deals with zombies it can see this close
+@export var zombie_urgent := 6.0        # m: this close, a zombie comes before the fight with you
+@export var shot_noise_range := 30.0    # m: zombies this close hear its shots and come
+@export var zombie_wild := 1.6          # its spread at zombies is this many times its spread at you
+@export var zombie_shot_slow := 1.6     # and its shots this many times further apart
+@export var fend_off_chance := 0.3      # chance it knocks a grabbing zombie away before the hands close
 @export var respawn_after := 120.0      # s; 0 = never (test level stand-in)
 @export var drops_ammo := Vector2i(2, 5)
 
@@ -97,6 +106,10 @@ var _look_dir := Vector3(0, 0, -1)
 var _strafe := 1.0
 var _sheet_t := 0.0
 var _weapon_mat: StandardMaterial3D
+var held_by: Array[Enemy] = []     # zombies that have hold of it
+var _zed: Enemy = null             # the zombie it is dealing with
+var _zed_t := 0.0
+var _zed_threat := 0.0             # how much zombie is right on it (for composure, as the player's)
 
 
 func fatigue() -> float:
@@ -213,12 +226,35 @@ func _physics_process(delta: float) -> void:
 	# The sheet's slow clock (composure: being hurt spoils his aim for a while).
 	_sheet_t += delta
 	if _sheet_t >= 0.25:
-		sheet.tick(_sheet_t, 0.0, false, in_cover and cover_mode == "hunker", hp / max_hp, false, 0.8)
+		sheet.tick(_sheet_t, _zed_threat, not held_by.is_empty(), in_cover and cover_mode == "hunker", hp / max_hp, false, 0.8)
 		_sheet_t = 0.0
+
+	# Zombies near enough to matter, looked for a few times a second.
+	_zed_t -= delta
+	if _zed_t <= 0.0:
+		_zed_t = 0.3
+		var was := _zed
+		_zed = _nearest_zombie()
+		if _zed != was:
+			_aim_t = 0.0   # a new one to line up on
+	for e: Enemy in held_by.duplicate():
+		if not is_instance_valid(e) or e.dead:
+			held_by.erase(e)
 
 	var want := Vector3.ZERO
 	cover_blind = false
-	if _stagger <= 0.0:
+	var zd := INF
+	if _zed != null and is_instance_valid(_zed) and not _zed.dead:
+		zd = _xz(_zed.global_position - global_position).length()
+	else:
+		_zed = null
+	if _stagger > 0.0:
+		pass
+	elif not held_by.is_empty():
+		_break_free(delta)
+	elif _zed != null and (zd < zombie_urgent or mode != "fight" or not sees):
+		want = _fight_zombie(delta, zd)
+	else:
 		match mode:
 			"idle":
 				_watch(delta)
@@ -301,6 +337,11 @@ func cover_result(from: Vector3) -> String:
 
 # ---------------------------------------------------------------- what happens to it
 func take_hit(dmg: float, dir: Vector3, knock: float) -> void:
+	_damage(dmg, dir, knock, true)
+
+
+## by_player: it came from you (so it knows roughly where you are). Zombie bites don't tell it that.
+func _damage(dmg: float, dir: Vector3, knock: float, by_player: bool) -> void:
 	if dead:
 		return
 	hp -= dmg
@@ -311,6 +352,8 @@ func take_hit(dmg: float, dir: Vector3, knock: float) -> void:
 	sheet.hurt(dmg / max_hp)
 	if hp <= 0.0:
 		_die()
+		return
+	if not by_player:
 		return
 	# It knows roughly where that came from.
 	if not sees and player != null:
@@ -358,6 +401,7 @@ func _die() -> void:
 	dead = true
 	hp = 0.0
 	collision_layer = 0
+	held_by.clear()
 	_drop_cover()
 	armed = false
 	_label.visible = false
@@ -390,6 +434,114 @@ func _alert() -> void:
 	_blind_left = 2
 
 
+# ---------------------------------------------------------------- zombies
+## What a zombie does to a raider, through the same calls it makes on the player.
+func take_grab(e: Enemy, hands: int) -> bool:
+	if dead or hands <= 0:
+		return false
+	if randf() < fend_off_chance:
+		var away := e.global_position - global_position
+		away.y = 0.0
+		e.shove(away.normalized(), 7.0)
+		_bash_cd = 0.5
+		return false
+	if not held_by.has(e):
+		held_by.append(e)
+	_drop_cover()   # hands on it drag it out of cover
+	sheet.startle()
+	return true
+
+
+func release_grab(e: Enemy) -> void:
+	held_by.erase(e)
+
+
+func is_held_by(e: Enemy) -> bool:
+	return held_by.has(e)
+
+
+func loosen_grip(_amount: float) -> void:
+	pass
+
+
+func take_bite(amount: float, dir: Vector3, _e: Enemy) -> void:
+	_damage(amount, dir, 1.0, false)
+
+
+func take_attack(amount: float, dir: Vector3, knock: float, _attacker: Enemy = null) -> void:
+	_damage(amount, dir, knock, false)
+
+
+## The nearest living zombie it can see within zombie_sense, or null.
+func _nearest_zombie() -> Enemy:
+	var best: Enemy = null
+	var best_d := zombie_sense
+	_zed_threat = 0.0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		var en := e as Enemy
+		if en == null or en.dead or en.kind != "shambler":
+			continue
+		var d := _xz(en.global_position - global_position).length()
+		if d < 6.0:
+			_zed_threat += 1.0 - d / 6.0
+		if d < best_d:
+			best_d = d
+			best = en
+	if best == null:
+		return null
+	var eye := Vector3.UP * 1.2
+	if not Projectile.wall_hit(get_world_3d().direct_space_state, global_position + eye,
+			best.global_position + eye, [get_rid()]).is_empty():
+		return null
+	return best
+
+
+## Held: it can't go anywhere. Every so often it clubs one of them off.
+func _break_free(delta: float) -> void:
+	armed = true
+	var e: Enemy = held_by[0]
+	var to := e.global_position - global_position
+	to.y = 0.0
+	_turn(to, 12.0, delta)
+	if _melee_cd <= 0.0:
+		_melee_cd = melee_gap
+		_bash_cd = 0.5
+		held_by.erase(e)
+		e.take_hit(melee_damage, to.normalized(), 7.0)
+		e.shove(to.normalized(), 8.0)
+
+
+## A zombie to deal with: shoot it as it comes, back away when it gets close, club it at arm's length.
+func _fight_zombie(delta: float, dist: float) -> Vector3:
+	armed = true
+	if in_cover or cover_face != null:
+		_drop_cover()   # cover means nothing to a zombie
+	var to := _zed.global_position - global_position
+	to.y = 0.0
+	var d := to / maxf(dist, 0.01)
+	_turn(d, 12.0, delta)
+	if dist < melee_range:
+		if _melee_cd <= 0.0:
+			_melee_cd = melee_gap
+			_bash_cd = 0.5
+			_zed.take_hit(melee_damage, d, 7.0)
+			_zed.shove(d, 6.0)
+		return -d * walk_speed * 0.6
+	if mag <= 0:
+		if _reload_t <= 0.0:
+			_reload_t = reload_time
+	elif _reload_t <= 0.0 and _shot_cd <= 0.0 and facing.dot(d) > 0.95:
+		# Hurried shots at something lurching toward it: slower and wilder than its shooting at you from cover.
+		_aim_t += delta
+		if _aim_t >= aim_time:
+			_fire(_zed.global_position, zombie_wild, _zed)
+			_shot_cd = shot_gap * zombie_shot_slow
+	# Give ground as it closes, unless there is a wall at its back.
+	if dist < 4.0:
+		return -d * walk_speed * 0.6
+	return Vector3.ZERO
+
+
 # ---------------------------------------------------------------- on watch, searching, going home
 func _turn(to: Vector3, rate: float, delta: float) -> void:
 	to.y = 0.0
@@ -403,6 +555,9 @@ func _turn(to: Vector3, rate: float, delta: float) -> void:
 
 func _watch(delta: float) -> void:
 	armed = false
+	if _xz(home - global_position).length() > 2.0:
+		mode = "return"   # a zombie fight took it off its post
+		return
 	_look_t -= delta
 	if _look_t <= 0.0:
 		_look_t = randf_range(2.5, 6.0)
@@ -614,7 +769,7 @@ func _open_fight(delta: float, d: Vector3) -> Vector3:
 	return Vector3(-d.z, 0.0, d.x) * _strafe * walk_speed * 0.8
 
 
-func _fire(at: Vector3, wild: float) -> void:
+func _fire(at: Vector3, wild: float, zombie: Enemy = null) -> void:
 	var to := at - global_position
 	to.y = 0.0
 	if to.length() < 0.3:
@@ -630,6 +785,15 @@ func _fire(at: Vector3, wild: float) -> void:
 	shot.knock = 1.0
 	shot.targets_player = true
 	shot.exclude = [get_rid()]
+	if zombie != null:
+		# At a zombie: a small chance of a headshot, as you have.
+		shot.aimed_at = zombie
+		shot.headshot_chance = 0.06
+	# Its gunfire carries: zombies within earshot come to it.
+	for e in get_tree().get_nodes_in_group("enemies"):
+		var en := e as Enemy
+		if en != null and en.kind == "shambler" and en.global_position.distance_to(global_position) <= shot_noise_range:
+			en.hear_noise(global_position)
 	shot.position = global_position + Vector3(0.0, 1.15, 0.0) + shot.dir * 0.5
 	get_parent().add_child(shot)
 

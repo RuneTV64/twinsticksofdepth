@@ -16,7 +16,7 @@ var shooter: Player
 var aimed_at: Enemy = null      # enemy under the reticle when fired; bonuses apply only to it
 var aimed_mult := 1.0
 var headshot_chance := 0.0
-var targets_player := false     # fired at the player (a raider, the test gunner): it can hit the player, not zombies
+var targets_player := false     # fired by a raider or the test gunner: it can hit the player and zombies, not raiders
 var origin := Vector3.ZERO      # where it was fired from: cover is judged from here
 var _travel := 0.0
 
@@ -53,15 +53,15 @@ func _physics_process(delta: float) -> void:
 			if t >= 0.0:
 				best_t = t
 				best_p = pl
-	else:
-		for e in get_tree().get_nodes_in_group("enemies"):
-			var en := e as Enemy
-			if en == null or en.dead:
-				continue
-			var t := segment_hit(from, to, en.global_position, HIT_RADIUS)
-			if t >= 0.0 and t < best_t:
-				best_t = t
-				best_e = en
+	for e in get_tree().get_nodes_in_group("enemies"):
+		var en := e as Enemy
+		if en == null or en.dead or (targets_player and en.kind != "shambler"):
+			continue
+		var t := segment_hit(from, to, en.global_position, HIT_RADIUS)
+		if t >= 0.0 and t < best_t:
+			best_t = t
+			best_e = en
+			best_p = null
 	# 2) Walls / doors: physics ray. Shots pass over low cover (see wall_hit).
 	var hit := wall_hit(get_world_3d().direct_space_state, from, to, exclude)
 	if not hit.is_empty():

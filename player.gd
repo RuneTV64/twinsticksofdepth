@@ -94,7 +94,7 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var cover_pop_out := 0.5        # m past the end when leaning out to aim
 @export var cover_lean_speed := 6.0     # m/s leaning out and back
 @export var cover_hunker_sight := 4.0   # m: how far you see all round while hunkered
-@export var cover_hidden_aggro := 0.35  # zombies you are hidden from notice you at this much of their range
+# (Zombies notice someone hidden behind cover at Enemy.HIDDEN_NOTICE of their usual range.)
 @export var cover_peek_hit_chance := 0.15   # chance a shot crossing your cover hits while you peek
 @export var head_hit_fraction := 0.75   # a head hit on you takes this much of full health
 @export var blind_fire_spread_deg := 14.0   # blind fire goes this far either side of the crosshair

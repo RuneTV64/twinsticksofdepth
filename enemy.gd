@@ -75,6 +75,11 @@ var hp := 100.0
 var dead := false
 var home := Vector3.ZERO
 var player: Player
+## Who a zombie is after right now: the player or a raider, whichever living person it has noticed nearest.
+## (Anything with the player's grab / bite / attack methods will do.)
+var prey = null
+var _held = null         # whoever it has hold of
+var _prey_t := 0.0
 
 # Read by zombie_body.gd to pose the body.
 var facing := Vector3(0, 0, -1)
@@ -190,8 +195,8 @@ func take_hit(dmg: float, dir: Vector3, knock: float) -> void:
 	if kind != "shambler":
 		return
 	# Hitting one that has hold of you helps you get loose.
-	if (state == "hold" or state == "bite") and player != null:
-		player.loosen_grip(0.5)
+	if (state == "hold" or state == "bite") and _held != null and is_instance_valid(_held):
+		_held.loosen_grip(0.5)
 	if state == "reach" or state == "lunge_wind":
 		_set_state("walk")
 		_cd = maxf(_cd, 0.6)
@@ -345,6 +350,9 @@ func _shed_part() -> void:
 
 
 func _let_go() -> void:
+	if _held != null and is_instance_valid(_held):
+		_held.release_grab(self)
+	_held = null
 	if player != null:
 		player.release_grab(self)
 
@@ -510,6 +518,33 @@ func _separation(delta: float) -> Array:
 
 
 ## A shambler's mind: where it wants to go this tick, and what it does when it gets there.
+const HIDDEN_NOTICE := 0.35   # someone hunkered behind cover is noticed at this much of the usual range
+
+
+## Pick who to go for: the nearest living person it has noticed, you or a raider. With no one noticed it keeps
+## the player in mind (it still comes to noises), as before raiders existed.
+func _pick_prey() -> void:
+	var best = null
+	var best_d := INF
+	if player != null and not player.dead:
+		var dp := Vector2(player.global_position.x - global_position.x, player.global_position.z - global_position.z).length()
+		var notice := aggro_range * (HIDDEN_NOTICE if player.in_cover and player.hidden_from(global_position) else 1.0)
+		if dp < notice:
+			best = player
+			best_d = dp
+	for r in get_tree().get_nodes_in_group("raiders"):
+		if r.dead:
+			continue
+		var dr := Vector2(r.global_position.x - global_position.x, r.global_position.z - global_position.z).length()
+		var notice_r := aggro_range * (HIDDEN_NOTICE if r.hidden_from(global_position) else 1.0)
+		if dr < notice_r and dr < best_d:
+			best = r
+			best_d = dr
+	if best == null and player != null and not player.dead:
+		best = player
+	prey = best
+
+
 func _think(delta: float) -> Vector3:
 	# How decayed he is was worked out once, by the body (ZombieBody.refresh), not here every tick.
 	var stiff := body.stiff
@@ -524,27 +559,35 @@ func _think(delta: float) -> Vector3:
 		if randf() < body.shed_chance:
 			_shed_part()
 
-	if player == null or player.dead:
+	# Who it is after is looked up twice a second, and only while it is free to change its mind.
+	_prey_t -= delta
+	if _prey_t <= 0.0 and (state == "walk" or state == "down"):
+		_prey_t = 0.5
+		_pick_prey()
+	if prey != null and not is_instance_valid(prey):
+		prey = null
+	if prey == null or prey.dead:
+		_prey_t = 0.0
 		if state != "down" and state != "getup":
 			_let_go()
 			_set_state("walk")
 		return Vector3.ZERO
 
-	var to := player.global_position - global_position
+	var to: Vector3 = prey.global_position - global_position
 	to.y = 0.0
 	var dist := to.length()
 	var d := to / dist if dist > 0.01 else facing
 	# Hunkered behind cover, out of its sight, it only notices you from much closer. One that was already after
 	# you goes to where it last saw you.
 	var notice := aggro_range
-	if player.in_cover and player.hidden_from(global_position):
-		notice *= player.cover_hidden_aggro
+	if prey.in_cover and prey.hidden_from(global_position):
+		notice *= HIDDEN_NOTICE
 	chasing = dist < notice
 	if _was_chasing and not chasing:
-		hear_noise(player.global_position)
+		hear_noise(prey.global_position)
 	_was_chasing = chasing
 	# Upright it goes for your chest; on the floor, for your legs.
-	target = player.global_position + Vector3.UP * (0.25 if crawling else 1.25)
+	target = prey.global_position + Vector3.UP * (0.25 if crawling else 1.25)
 
 	match state:
 		"down":
@@ -561,7 +604,8 @@ func _think(delta: float) -> Vector3:
 		"reach":
 			facing = d
 			if state_t >= grab_windup * (1.0 + 0.8 * stiff):
-				if dist < grab_range + 0.3 and player.take_grab(self, body.hands()):
+				if dist < grab_range + 0.3 and prey.take_grab(self, body.hands()):
+					_held = prey
 					_set_state("hold")
 					_bite_cd = bite_first * (1.3 if body.hands() == 1 else 1.0) * (1.0 + 0.5 * stiff)
 				else:
@@ -569,7 +613,7 @@ func _think(delta: float) -> Vector3:
 					_set_state("walk")
 			return d * speed * 0.2
 		"hold", "bite":
-			if not player.is_held_by(self) or dist > 2.0:
+			if not prey.is_held_by(self) or dist > 2.0:
 				_let_go()
 				_cd = grab_cooldown
 				_set_state("walk")
@@ -578,7 +622,7 @@ func _think(delta: float) -> Vector3:
 			if state == "bite":
 				if not _bit and state_t >= bite_time * 0.5:
 					_bit = true
-					player.take_bite(bite_damage, d, self)
+					prey.take_bite(bite_damage, d, self)
 				if state_t >= bite_time:
 					_set_state("hold")
 					_bite_cd = bite_interval * (1.0 + 0.5 * stiff)
@@ -600,7 +644,7 @@ func _think(delta: float) -> Vector3:
 			var throw := lunge_speed * (0.45 if crawling else 1.0) * lerpf(1.0, 0.7, body.rot_amt)
 			if not _bit and dist < 0.95 and d.dot(facing) > 0.3:
 				_bit = true
-				player.take_attack(bite_damage, d, 4.0, self)   # your guard shoves it off
+				prey.take_attack(bite_damage, d, 4.0, self)   # your guard shoves it off
 			if state_t >= lunge_time:
 				_cd = lunge_cooldown
 				_set_state("walk")
