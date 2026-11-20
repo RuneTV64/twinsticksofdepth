@@ -27,6 +27,7 @@ Mouse and keyboard only. There is no controller support. The view is turned 45 d
 | Throw a rock or bottle (pick them up; choose Throw on the wheel) | Hold Ready, left-click; from cover, just left-click |
 | Quiet take-down (behind a raider who hasn't noticed you) | Weapon raised, left-click on him |
 | Time of day (a stand-in for the clock): day, dusk, night, dawn | N |
+| Torch on and off (it is in the tool box by the spawn) | E |
 | Camera in and out | Mouse wheel |
 | Free look (hold): the camera follows the crosshair further out | F or middle mouse button |
 | Character page | C |

@@ -350,6 +350,12 @@ var held_by: Array[Enemy] = []   # zombies that have hold of you
 ## How you are standing: 0 on your feet, 1 crouched, 2 flat on the ground. Lower is slower, quieter and harder
 ## to see, and your own eyes are lower too.
 var posture := 0
+## A torch (items.gd "torch") switched on: a beam where you face. You see by it; it shows you to everyone.
+var torch_on := false
+var _torch_light: SpotLight3D
+@export var torch_range := 16.0          # m the beam reaches
+@export var torch_angle_deg := 24.0      # half its width
+@export var torch_seen := 1.5            # carrying a light in the dark, you are seen from this much further than by day
 var _lit_t := 0.0                # your own muzzle flash is still showing you up
 var prone_w := 0.0               # for the body: 1 = lying flat
 ## Prone, you lie along prone_dir (head that way) and crawl on your front. With a gun raised you stay put:
@@ -759,6 +765,7 @@ func _physics_process(delta: float) -> void:
 			return
 
 	_update_wheel()
+	_update_torch()
 	_update_posture()
 	_update_stance()
 	_update_aim(delta)
@@ -2389,12 +2396,44 @@ func seen_mult() -> float:
 	var m: float = [1.0, crouch_seen, prone_seen][posture]
 	if posture > 0 and TallGrass.at(global_position):
 		m *= grass_crouch_seen if posture == 1 else grass_prone_seen      # down in tall grass
-	return m * lerpf(dark_seen, 1.0, light_on_you())
+	m *= lerpf(dark_seen, 1.0, light_on_you())
+	if torch_on:
+		m *= lerpf(torch_seen, 1.0, Daylight.level)     # a light in the dark carries; by day it makes no odds
+	return m
 
 
 ## How lit you are, 0 to 1: the daylight or a lamp where you stand, or your own gun going off.
 func light_on_you() -> float:
-	return 1.0 if _lit_t > 0.0 else Daylight.at(global_position)
+	return 1.0 if _lit_t > 0.0 or torch_on else Daylight.at(global_position)
+
+
+## The torch: E switches it on and off, if you carry one. Dying or losing it puts it out.
+func _update_torch() -> void:
+	if Input.is_action_just_pressed("torch") and not dead:
+		if inv.has("torch"):
+			torch_on = not torch_on
+			show_status("Torch on: you see by it, and it shows you." if torch_on else "Torch off.", 1.4)
+		else:
+			show_status("You have no torch.", 1.0)
+	if torch_on and (dead or not inv.has("torch")):
+		torch_on = false
+	Daylight.beam_on = torch_on
+	if torch_on:
+		Daylight.beam_pos = global_position
+		Daylight.beam_dir = facing
+		Daylight.beam_range = torch_range
+		Daylight.beam_cos = cos(deg_to_rad(torch_angle_deg))
+	if _torch_light == null:
+		_torch_light = SpotLight3D.new()
+		_torch_light.light_color = Color(1.0, 0.95, 0.82)
+		_torch_light.light_energy = 3.0
+		_torch_light.spot_range = torch_range
+		_torch_light.spot_angle = torch_angle_deg
+		_torch_light.position = Vector3(0.0, 1.2, 0.0)
+		_torch_light.rotation.x = deg_to_rad(-8.0)       # tipped down a little, so it falls on the ground ahead
+		_visual.add_child(_torch_light)
+	if _torch_light.visible != torch_on:
+		_torch_light.visible = torch_on
 
 
 ## How far your footsteps carry right now (0 = silent: standing still).

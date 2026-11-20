@@ -43,6 +43,10 @@ static func apply() -> void:
 	_action("prone", 0.5)
 	_key("prone", KEY_X)
 
+	# The torch, on and off.
+	_action("torch", 0.5)
+	_key("torch", KEY_E)
+
 	# HOLD: the camera lets go of you and follows the crosshair further out.
 	_action("free_look", 0.5)
 	_key("free_look", KEY_F)

@@ -61,6 +61,8 @@ uniform float dark;              // 0 day .. 1 the dead of night
 uniform float dark_max;          // how black full dark is drawn
 uniform float night_sight;       // share of your sight the daylight leaves you
 uniform vec4 lamps[LAMP_COUNT];  // xyz = where, w = radius (0 = unused)
+uniform vec4 beam;               // a carried torch: xy = where (x, z), zw = which way (x, z); see Daylight
+uniform vec3 beam_shape;         // x = range (0 = off), y = cos of half its angle, z = the glow round the holder
 
 void vertex() {
 	// Cover the whole screen whatever the camera is doing.
@@ -91,6 +93,15 @@ void fragment() {
 			float lr = lamps[li].w;
 			if (lr > 0.0) {
 				lit = max(lit, 1.0 - smoothstep(lr * 0.35, lr, length(world.xz - lamps[li].xz)));
+			}
+		}
+		if (beam_shape.x > 0.0) {
+			vec2 brel = world.xz - beam.xy;
+			float bd = length(brel);
+			lit = max(lit, 1.0 - smoothstep(beam_shape.z * 0.5, beam_shape.z, bd));
+			if (bd > 0.01 && bd < beam_shape.x) {
+				float along = dot(brel, beam.zw) / bd;
+				lit = max(lit, smoothstep(beam_shape.y, beam_shape.y + 0.04, along) * (1.0 - smoothstep(beam_shape.x * 0.6, beam_shape.x, bd)));
 			}
 		}
 		night = dark * (1.0 - lit);
@@ -166,6 +177,8 @@ func _process(delta: float) -> void:
 	_mat.set_shader_parameter("dark", 1.0 - Daylight.level)
 	_mat.set_shader_parameter("dark_max", dark_max)
 	_mat.set_shader_parameter("night_sight", Daylight.sight_share())
+	_mat.set_shader_parameter("beam", Vector4(Daylight.beam_pos.x, Daylight.beam_pos.z, Daylight.beam_dir.x, Daylight.beam_dir.z))
+	_mat.set_shader_parameter("beam_shape", Vector3(Daylight.beam_range if Daylight.beam_on else 0.0, Daylight.beam_cos, Daylight.BEAM_GLOW))
 	if _lamps_sent != Daylight.lamps.size():
 		# (Lamps don't move: sent when one is added.)
 		_lamps_sent = Daylight.lamps.size()

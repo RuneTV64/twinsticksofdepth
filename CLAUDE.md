@@ -697,7 +697,16 @@ with crouching and going prone.
     real warm `OmniLight3D` for the look. The level's sun and sky are not dimmed.
   - Cloud run at night: standing in the dark, a raider on watch first saw the player at 5 m; standing in the
     lamp's light, at 12 m (the furthest tried).
-  - Not built: a torch or anything the player carries that gives light, raiders carrying lights, light from
+  - The torch (owner, 20 Nov 2026; untested on the owner's PC): an item (`torch`, in the tool box by the
+    spawn). E switches it on and off (`Player._update_torch()`, `torch_on`). It throws a beam where you face:
+    16 m long, 24 degrees either side, fading over its last 40%, with 2.2 m of light round your feet
+    (`Daylight.beam_*`, one carried beam for the whole level). What stands in the beam counts as lit, so you
+    see it at night from as far as by day, and the screen isn't darkened there. Carrying it lit, you count as
+    fully lit and, at night, are seen from 1.5 times the daytime distance (`torch_seen`: a raider from 27 m, a
+    zombie from 18 m); by day it makes no difference. A real `SpotLight3D` on the player gives the look. No
+    batteries, it doesn't need a free hand, and lying down the beam's drawn light follows the body rather than
+    the aim.
+  - Not built: raiders carrying lights, light from
     windows or indoors versus outdoors, moonlight by phase, shadows cast by walls counting as dark, at most 8
     lamps drawn (`LAMP_MAX`), zombies and raiders being hard for you to see for any reason but distance.
 

@@ -20,6 +20,15 @@ static var time_i := 0
 ## [{"pos": Vector3, "radius": float}]: fires, lamps. At most LAMP_MAX are drawn (the first ones).
 static var lamps: Array[Dictionary] = []
 
+## A torch somebody is carrying: a beam of light from `beam_pos` along `beam_dir` (flat), `beam_range` long and
+## `beam_cos` wide (the cosine of half its angle), with a small pool of light round whoever holds it.
+static var beam_on := false
+static var beam_pos := Vector3.ZERO
+static var beam_dir := Vector3.FORWARD
+static var beam_range := 16.0
+static var beam_cos := 0.92
+const BEAM_GLOW := 2.2            # m of light round the holder
+
 @export var change_time := 4.0        # s for the light to change when the time of day is stepped
 @export var night_light := 0.08       # how light open ground is in the dead of night (starlight)
 
@@ -29,6 +38,7 @@ static func reset() -> void:
 	want = 1.0
 	time_i = 0
 	lamps.clear()
+	beam_on = false
 
 
 func _ready() -> void:
@@ -69,6 +79,13 @@ static func lamp_light(pos: Vector3) -> float:
 		var r: float = l["radius"]
 		if d < r:
 			best = maxf(best, 1.0 - smoothstep(r * 0.35, r, d))
+	if beam_on:
+		var rel := Vector2(pos.x - beam_pos.x, pos.z - beam_pos.z)
+		var bd := rel.length()
+		best = maxf(best, 1.0 - smoothstep(BEAM_GLOW * 0.5, BEAM_GLOW, bd))
+		if bd > 0.01 and bd < beam_range:
+			var along := rel.dot(Vector2(beam_dir.x, beam_dir.z)) / bd
+			best = maxf(best, smoothstep(beam_cos, beam_cos + 0.04, along) * (1.0 - smoothstep(beam_range * 0.6, beam_range, bd)))
 	return best
 
 

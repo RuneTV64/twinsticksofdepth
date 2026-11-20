@@ -31,6 +31,7 @@ Throw  Pick up rocks and bottles, choose Throw on the Tab wheel, hold Ready, lef
 Take-down  Weapon raised, right behind a raider who hasn't noticed you, crosshair on him: left-click.
 Light and dark  N steps the time of day (day, dusk, night, dawn). In the dark you are seen from less far and see
   less far; a fire or lamp lights whoever stands in it; a gunshot shows you up for a moment.
+Torch  E switches it on and off (it is in the tool box). A beam where you face: you see by it, and it shows you.
 Crouch  Ctrl (again to stand)      Prone  X (again to get up)
   Prone with a gun raised: you stay put and the crosshair reaches further. Aim behind you and you roll onto your back.
 Free look (HOLD)  F or middle mouse button: the camera leaves you and follows the crosshair further out
@@ -398,7 +399,7 @@ func _process(delta: float) -> void:
 			stance += " in tall grass"
 	if Daylight.level < 0.999:
 		var lt := player.light_on_you()
-		stance += "   [%s: %s]" % [Daylight.time_name(), "in the dark" if lt < 0.25 else ("in shadow" if lt < 0.6 else "lit up")]
+		stance += "   [%s: %s]" % [Daylight.time_name(), "torch on, lit up" if player.torch_on else ("in the dark" if lt < 0.25 else ("in shadow" if lt < 0.6 else "lit up"))]
 	if player.running:
 		stance += "  - running"
 	if player.cover_entering:
