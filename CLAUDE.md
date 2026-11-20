@@ -192,6 +192,10 @@ changes, update both, and keep them the same files.
   grasping fingers; the head turns toward its target. Springs run only in view within 14 m (`springs` to switch
   off): about +38% per posing there. Motion clips: `source/zombie_anim_clip.gd` + `zombie_anim_gif.py`
   (before/after GIFs in `preview/zombie_motion_*.gif`); stills can't show motion.
+- Lock-on (sticky aim, 20 Nov 2026, untested on the owner's PC): `player.gd` `_lock_pull()`. A crosshair within
+  `lock_on_radius` 1.6 m of a living enemy the player can see is drawn onto it (dead centre inside `lock_on_core`
+  0.5 m, fading to nothing at the radius, so it never sticks) and follows it. Stick: shifts where the tilt points,
+  only while tilted. Mouse: settles on once the mouse rests (`lock_on_mouse_radius` 1 m). Exports in the Lock-on group.
 - Debug keys: F1 help, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.

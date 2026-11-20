@@ -40,6 +40,7 @@ const HELP_TAIL := """
 Doors: walk into them to push them open or shut.
 Run or dash into a shut one to barge it (it hurts).
 Aim: a red reticle on an enemy = aimed shot (more damage, headshot chance)
+Lock-on: a crosshair brought near an enemy is drawn onto it; push the stick on to move off.
 Unarmed + Ready: attack = punch (weak; a bit harder standing still).
 Hold Ready and face a zombie: when it gets within reach you shove it back,
 and any zombies right beside it. Each shove costs stamina;

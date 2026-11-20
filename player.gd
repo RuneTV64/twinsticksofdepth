@@ -52,6 +52,19 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var look_return_sharpness := 6.0  # weapon away: how fast an idle mouse crosshair floats home
 @export var mouse_sens := 0.022         # world meters per mouse pixel
 @export var mouse_idle_hide := 1.2      # weapon away: idle mouse crosshair starts floating home after this
+@export_group("Lock-on")
+# Sticky aim: a crosshair brought near an enemy you can see is drawn onto it and follows it.
+# The pull fades out with distance, so pushing the stick (or moving the mouse) takes it off again.
+@export var lock_on := true
+@export var lock_on_radius := 1.6       # m: the pull starts when the crosshair comes this close to an enemy
+@export var lock_on_core := 0.5         # m: inside this the crosshair sits dead centre on the enemy
+@export var lock_on_strength := 1.0     # 0..1: how far toward the enemy it is drawn (1 = centres)
+@export var lock_on_sharpness := 8.0    # how quickly the pull takes hold and lets go (lower = softer)
+@export var lock_on_hold := 0.75        # < 1: the enemy already locked wins ties with its neighbours
+@export var lock_on_mouse := true       # mouse: the crosshair settles onto a nearby enemy once the mouse rests
+@export var lock_on_mouse_radius := 1.0 # m: the mouse's pull radius (a mouse is precise; keep it small)
+@export var lock_on_mouse_settle := 0.1 # s the mouse must be still before the pull acts
+@export_group("")
 @export var interact_range := 1.9
 @export var max_health := 100.0
 
@@ -167,6 +180,8 @@ var reticle_offset := Vector3.ZERO
 var reticle_visible := false
 var reticle_on_enemy := false
 var reticle_target: Enemy = null   # the enemy under the reticle (Ready only counts as "aimed")
+var lock_target: Enemy = null      # the enemy the crosshair is being drawn onto (lock-on), or null
+var _lock_shift := Vector3.ZERO    # stick: how far lock-on is moving the crosshair off where the stick asks
 var aimed_mult := 1.5              # derived: damage multiplier for a shot aimed at its target
 var headshot_chance := 0.13        # derived: chance an aimed hit is a one-shot kill
 var interact_target: Node = null
@@ -562,7 +577,10 @@ func _update_aim(delta: float) -> void:
 			# Same rule as weapon away: tilt = distance, so easing off the stick floats the
 			# reticle back toward you. Tracks tighter than the look crosshair to stay snappy.
 			var target := _stick_reticle_target(stick)
+			target += _stick_lock_shift(target, stick.length() > 0.05, delta)
 			reticle_offset = reticle_offset.lerp(target, 1.0 - exp(-aim_follow_sharpness * delta))
+		else:
+			_mouse_lock(delta)
 		reticle_offset = reticle_offset.limit_length(current_reticle_range())
 		reticle_visible = true
 	else:
@@ -571,13 +589,17 @@ func _update_aim(delta: float) -> void:
 			# The crosshair tracks the stick: tilt = distance, so easing off the stick floats
 			# it back toward you and letting go floats it all the way home. No snapping.
 			var target := _stick_reticle_target(stick)
-			reticle_offset = reticle_offset.lerp(target, 1.0 - exp(-look_follow_sharpness * delta))
 			returning = stick.length() <= 0.05
+			target += _stick_lock_shift(target, not returning, delta)
+			reticle_offset = reticle_offset.lerp(target, 1.0 - exp(-look_follow_sharpness * delta))
 		else:
 			# Mouse: it stays where you put it, then floats home once the mouse has been idle.
 			returning = _mouse_idle >= mouse_idle_hide
 			if returning:
 				reticle_offset = reticle_offset.lerp(Vector3.ZERO, 1.0 - exp(-look_return_sharpness * delta))
+				lock_target = null
+			else:
+				_mouse_lock(delta)
 		reticle_offset = reticle_offset.limit_length(current_reticle_range())
 		# Hidden only once it has actually arrived back on you.
 		if returning and reticle_offset.length() < 0.2:
@@ -586,6 +608,63 @@ func _update_aim(delta: float) -> void:
 		else:
 			reticle_visible = true
 
+
+# ---------------------------------------------------------------- lock-on (sticky aim)
+## How far lock-on wants to move a crosshair at `point` (relative to you): toward the nearest
+## living enemy you can see within `radius` of it. Full pull inside the core, fading to nothing at
+## the radius, so the crosshair never gets stuck: move it away and the pull lets go smoothly.
+## Sets lock_target.
+func _lock_pull(point: Vector3, radius: float) -> Vector3:
+	var prev := lock_target
+	lock_target = null
+	if not lock_on or dead or wheel_open or radius <= 0.0:
+		return Vector3.ZERO
+	# A short reach (melee Ready) gets a smaller pull, or it would cover everything around you.
+	var r := minf(radius, current_reticle_range() * 0.4)
+	var core := minf(lock_on_core, r * 0.5)
+	var best := r
+	var best_d := r
+	var best_off := Vector3.ZERO
+	for e in get_tree().get_nodes_in_group("enemies"):
+		var en := e as Enemy
+		if en == null or en.dead:
+			continue
+		var off := en.global_position - global_position
+		off.y = 0.0
+		var d := off.distance_to(point)
+		var score := d * lock_on_hold if en == prev else d
+		if score >= best or d >= r or not can_see(en.global_position):
+			continue
+		best = score
+		best_d = d
+		best_off = off
+		lock_target = en
+	if lock_target == null:
+		return Vector3.ZERO
+	var pull := (1.0 - smoothstep(core, r, best_d)) * clampf(lock_on_strength, 0.0, 1.0)
+	return (best_off - point) * pull
+
+
+## Stick: the crosshair goes where the tilt says, so lock-on shifts that spot, easing in and out.
+## Only while the stick is tilted: a stick at rest never aims for you.
+func _stick_lock_shift(target: Vector3, tilted: bool, delta: float) -> Vector3:
+	var want := Vector3.ZERO
+	if tilted:
+		want = _lock_pull(target, lock_on_radius)
+	else:
+		lock_target = null
+	_lock_shift = _lock_shift.lerp(want, 1.0 - exp(-lock_on_sharpness * delta))
+	return _lock_shift
+
+
+## Mouse: it has full control while it moves. Once it rests near an enemy, the crosshair settles
+## onto that enemy and follows it.
+func _mouse_lock(delta: float) -> void:
+	_lock_shift = Vector3.ZERO
+	if not lock_on_mouse or _mouse_idle < lock_on_mouse_settle:
+		lock_target = null
+		return
+	reticle_offset += _lock_pull(reticle_offset, lock_on_mouse_radius) * (1.0 - exp(-lock_on_sharpness * delta))
 
 
 ## Where the stick is asking the reticle to be: direction straight from the stick, distance
