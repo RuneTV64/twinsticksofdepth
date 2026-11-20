@@ -35,7 +35,7 @@ Roll  Space twice quickly, out of cover: rolls the way you are moving"""
 
 const HELP_TAIL := """
 Doors: click them (weapon away) to open or shut them.
-Run or dash into a shut one to barge it (it hurts).
+A strong character (Strength 13) can bash a shut one in by dashing at it (it hurts). Doors stop zombies and raiders.
 Aim: a red reticle on an enemy = aimed shot (more damage, headshot chance)
 Lock-on: a crosshair resting near an enemy settles onto it; move the mouse to take it off.
 Unarmed + Ready: attack = punch (weak; a bit harder standing still).

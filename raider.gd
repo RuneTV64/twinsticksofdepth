@@ -316,8 +316,7 @@ func _physics_process(delta: float) -> void:
 			continue
 		var n := get_slide_collision(i).get_normal()
 		if col.has_meta("door"):
-			var door: Door = col.get_meta("door")
-			door.push(global_position, -Vector3(n.x, 0.0, n.z).normalized(), walk_speed)
+			pass   # a shut door stops it (owner, 20 Nov 2026)
 		elif col is StaticBody3D and absf(n.y) < 0.5 and going != Vector3.ZERO and going.dot(-n) > 0.6 \
 				and not in_cover and _detour_t <= 0.0:
 			_get_past(Cover.box_of(col), Vector3(n.x, 0.0, n.z).normalized(), going)

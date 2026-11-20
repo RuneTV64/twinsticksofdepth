@@ -3,10 +3,11 @@ extends Node3D
 ## Hinged door. This node sits on the hinge; the panel runs along local +X.
 ## The collision body is a child of the hinge, so it swings with the door you see.
 ##  - Click it (interact, weapon away) to open or close it. Walking into it does nothing for the player
-##    (owner, 20 Nov 2026). Zombies and raiders still shoulder it open as they walk into it.
-##  - Run or dash into a shut door to barge it. Power = (STR + WT) x speed. If the power beats
+##    (owner, 20 Nov 2026). A shut door stops zombies and raiders.
+##  - Bashing: a character strong enough (Player.can_bash) dashes into a shut door. Running into it does
+##    nothing. Power = (STR + WT) x speed. If the power beats
 ##    the door's toughness it slams open, but it still hurts. If not, you bounce off and hurt more.
-##  - Locked doors won't open to a click. Barge them; every failed barge weakens them a bit.
+##  - Locked doors won't open to a click. Bash them; every failed bash weakens them a bit.
 
 @export var width := 1.6
 @export var height := 2.3
@@ -134,13 +135,14 @@ func interact_point() -> Vector3:
 
 func prompt_text(_p: Player) -> String:
 	if locked and is_shut():
-		return "Locked (barge it: run or dash into it)"
+		return "Locked (bash it: dash into it)" if _p.can_bash() else "Locked (you aren't strong enough to bash it in)"
 	return "Open door" if is_shut() else "Close door"
 
 
 func interact(p: Player) -> void:
 	if locked and is_shut():
-		p.show_status("Locked tight. Run or dash into it to barge it open.", 2.0)
+		p.show_status("Locked tight. Dash into it to bash it in." if p.can_bash()
+			else "Locked tight, and you aren't strong enough to bash it in.", 2.0)
 		return
 	_push_vel = 0.0
 	_has_target = true

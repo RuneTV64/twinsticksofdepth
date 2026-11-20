@@ -7,7 +7,7 @@ You switch between two stances so that exploring and fighting use different cont
 
 - **Weapon away (default):** you face the way you walk. The mouse moves a crosshair, and the camera pans to keep it centered. Your facing doesn't change. When you let go, the camera comes back to you and the crosshair hides. The attack button works as **Interact**. Hold Sprint to run.
 - **Ready (HOLD):** the reticle appears on you and you move it out from there. The mouse sets your facing once the reticle is off you, and the camera leans toward where you aim. The attack button **attacks**. You move slower and can't run, but you can still dash.
-- **Doors:** click a door (weapon away) to open or shut it. Run or dash into a shut door to barge it. The camera angle never rotates; it only pans.
+- **Doors:** click a door (weapon away) to open or shut it. A character with Strength 13 or more can bash a shut door in by dashing at it; running into one does nothing. Shut doors stop zombies and raiders. The camera angle never rotates; it only pans.
 
 ## Controls
 Mouse and keyboard only. There is no controller support.
@@ -31,7 +31,7 @@ F1 hides the help text. Esc frees the mouse, and clicking captures it again. Key
 - **Ammo crate** next to spawn. It's the first interaction: put your weapon away, walk up and interact. Crates respawn.
 - **Dummies** to the west. They heal after 3 seconds and respawn fast.
 - **Shamblers** to the east, plus two inside the house. They're slow and walk straight at you, and they shove doors open just like you do. Each one is a different person, dead for a different time, with different parts missing (see Zombies).
-- **House:** the south door is a normal door. The east door is heavy and locked: a run won't open it, but a dash will. Every failed barge weakens it.
+- **House:** the south door is a normal door. The east door is heavy and locked: only a bash opens it (Strength 13, dash into it). Every failed bash weakens it.
 - When your ammo is completely gone, attacking does a short bash.
 
 ## Zombies

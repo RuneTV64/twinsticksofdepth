@@ -10,7 +10,7 @@ extends CharacterBody3D
 ##    pops you out to aim; attack without Ready fires blind. See the Cover section below and cover.gd.
 ##  READY (hold right-click / Q): the mouse sets facing, the camera
 ##    leads toward the aim point. Attack button attacks. Slower, no running (dash still works).
-## Doors: click one (weapon away) to open or close it; run or dash into a shut one to barge it.
+## Doors: click one (weapon away) to open or close it. A strong character can bash a shut one in by dashing at it.
 
 # ---------- Stats ----------
 # The character sheet (character_sheet.gd) holds the attributes, needs, composure and conditions. There is no
@@ -155,6 +155,7 @@ var reload_time := 1.1
 @export var shot_cam_kick := 0.3        # meters the camera jolts back per shot
 @export var shot_noise_range := 30.0    # meters; enemies this close hear a shot and come looking
 @export var barge_noise_range := 14.0   # ... a door barged
+@export var bash_strength := 13.0       # Strength needed to bash a door in (stands in for the ability to come)
 @export var stomp_noise_range := 5.0    # ... a skull stomped or clubbed
 @export var bash_damage := 12.0
 
@@ -1554,10 +1555,17 @@ func _handle_collisions(pre_vel: Vector3) -> void:
 			continue
 		into = into.normalized()
 		var spd := pre_vel.dot(into)
-		if spd >= barge_min_speed and _barge_cd <= 0.0 and door.is_shut():
+		# Only a bash opens a door by force: a dash into it, by someone strong enough. Running into one does
+		# nothing. (Bashing is to become an ability strong characters unlock or learn; Strength stands in for it.)
+		if _dash_t > 0.0 and can_bash() and spd >= barge_min_speed and _barge_cd <= 0.0 and door.is_shut():
 			_barge(door, spd, into)
 			return
 		# (Walking into a door no longer pushes it: you open and close doors by clicking them. Owner, 20 Nov 2026.)
+
+
+## Can this character bash a door in? A stand-in for the ability: Strength of bash_strength or more.
+func can_bash() -> bool:
+	return strength >= bash_strength
 
 
 func _barge(door: Door, spd: float, into: Vector3) -> void:

@@ -152,9 +152,10 @@ Built so far (20 Nov 2026, untested on the owner's PC): the foundation only.
   `shambler_hp`, how much of a blow reaches the skull 0.55 to 1.4 (so a fresh one takes 3 stomps at Strength 10
   and a rotted one 2), and how easily it is knocked over 0.3 to 1.8 times `knockdown_chance`. Raiders were left
   as they were: the owner said dying easily is fair while everyone is naked.
-- Doors open and close on a click (interact, weapon away). Walking into one does nothing for the player. Running
-  or dashing into a shut one still barges it. Zombies and raiders still shoulder doors open by walking into them;
-  the owner hasn't said whether that should change.
+- Doors open and close on a click (interact, weapon away). Walking or running into one does nothing. Only a bash
+  opens one by force: a dash into it by a character strong enough. Bashing is to be an ability strong characters
+  unlock or learn; until abilities exist `Player.can_bash()` is Strength 13 or more (`bash_strength`). A shut door
+  stops zombies and raiders: they press on it like a wall.
 - Still to settle (owner): what clicking on things does with the weapon Ready and with it away.
 
 ## Naming: zombies and shamblers

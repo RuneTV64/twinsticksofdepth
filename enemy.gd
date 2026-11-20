@@ -618,8 +618,10 @@ func _tick(delta: float) -> void:
 				continue
 			var n := get_slide_collision(i).get_normal()
 			if col.has_meta("door"):
-				var door: Door = col.get_meta("door")
-				door.push(global_position, -Vector3(n.x, 0.0, n.z).normalized(), move_speed)
+				# A shut door stops it (owner, 20 Nov 2026). It presses on it like on a wall.
+				if kind == "shambler" and going.dot(-n) > 0.5:
+					pressed = true
+					_press_n = Vector3(n.x, 0.0, n.z).normalized()
 			elif kind == "shambler" and col is StaticBody3D and absf(n.y) < 0.5 and going.dot(-n) > 0.5:
 				pressed = true
 				_press_box = Cover.box_of(col)
