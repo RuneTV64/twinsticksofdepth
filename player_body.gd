@@ -263,6 +263,8 @@ func animate(p, delta: float) -> void:
 	var rising: float = clampf(p._roll_rec_t / 0.45, 0.0, 1.0)
 	var crouch := 0.2 * ready_w + 0.12 * _dash_w + 0.07 * tired + 1.15 * maxf(_cover_w, maxf(_roll_w, 0.85 * rising))
 	var split := (0.2 * _fist_w + 0.12 * _gun_w) * (1.0 - 0.7 * m)  # Ready: left foot forward
+	crouch *= 1.0 - _prone_w      # flat on the ground the legs lie straight
+	split *= 1.0 - _prone_w
 	var th: Array[float] = [0.0, 0.0]
 	for k in 2:
 		var sgn := 1.0 if k == 0 else -1.0
@@ -296,7 +298,10 @@ func animate(p, delta: float) -> void:
 		+ 0.42 * _cover_w - 0.3 * _slide_w + 0.35 * _vault_w + 0.75 * _roll_w + 0.35 * rising   # hunched behind cover, leaning back in a slide, curled in a roll
 	_tq[_hips] = _ry(hip_yaw + 0.4 * stance_yaw - 0.09 * sn * m) * _rz(-0.035 * cs * m)
 	if _prone_w > 0.001:
-		_tq[_hips] = _rx(1.5 * _prone_w) * _tq[_hips]
+		# Flat on the front. Rolling onto the back (to shoot behind) turns the body over along its length; the
+		# head stays where it was.
+		var over: float = p.prone_back * PI
+		_tq[_hips] = _rz(over) * _rx(1.57 * _prone_w) * _tq[_hips]
 	_tq[_chest] = _ry(-hip_yaw + 0.6 * stance_yaw + punch_twist + 0.12 * _look) \
 		* Quaternion(lean_axis, lean) * _rx(bend) * _rz(-0.34 * _lean) \
 		* _ry(0.19 * sn * m * (1.0 + 0.6 * _run_w)) * _rz(0.035 * cs * m + 0.014 * sw)

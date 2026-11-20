@@ -630,8 +630,16 @@ with crouching and going prone.
 - Cloud runs, raider on watch, player standing still: facing you at 12 m, seen in 1.1 s; back turned, never.
   Crouched: not seen at 12 m, seen in 1.7 s at 9 m. Prone: not seen at 9 m, seen in about 1.8 s at 6 m. A raider
   on watch looks about, so walking up behind one is a gamble on when it turns.
+- Prone with a gun (owner, 20 Nov 2026: "we as humans can't really crawl on our backs"). You lie along
+  `prone_dir` (head that way) and crawl on your front with the weapon away. Gun raised, you stay put: aiming
+  ahead of you, you stay on your stomach and shoot; aiming behind you (more than `back_beyond_deg` 110 round
+  from where your head points) you roll onto your back, head where it was, and shoot past your feet; aim within
+  `front_within_deg` 80 again, or lower the gun, and you roll back over. Rolling takes `roll_over_time` 0.5 s
+  and you can't fire during it. Aiming a gun from the ground, the crosshair roams 6 m further
+  (`prone_aim_reach`, 22 m in all).
 - Poses: the crouch reuses the cover squat. Prone is a stand-in: the whole body tipped flat, face down, arms at
-  its sides (`player_body.gd` `_prone_w`); it needs a real crawl. Sheet: `tools/preview/stances.png`
+  its sides, turned over along its length for the back (`player_body.gd` `_prone_w`, `Player.prone_back`); the
+  arms and gun don't point where you aim. It needs a real crawl and real aiming poses. Sheet: `tools/preview/stances.png`
   (`tools/cover_pose_preview.gd` ROW=2).
 - Not built: anything shown to the player about how close a raider is to noticing; quiet take-downs; raiders
   crouching or going prone; light and dark; zombies hearing footsteps; raiders telling each other.

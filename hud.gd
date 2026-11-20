@@ -27,6 +27,7 @@ Move  WASD
 Look (weapon away)  Mouse moves the crosshair as far as you can see; the camera follows
 Camera in and out  Mouse wheel
 Crouch  Ctrl (again to stand)      Prone  X (again to get up)
+  Prone with a gun raised: you stay put and the crosshair reaches further. Aim behind you and you roll onto your back.
 Free look (HOLD)  F or middle mouse button: the camera leaves you and follows the crosshair further out
 Ready (HOLD)  Right mouse button
 Attack (while Ready)  Left-click
@@ -387,7 +388,7 @@ func _process(delta: float) -> void:
 		else:
 			stance += "  - guarding"
 	if player.posture > 0:
-		stance += "  - CROUCHED" if player.posture == 1 else "  - PRONE"
+		stance += "  - CROUCHED" if player.posture == 1 else ("  - PRONE" if player.prone_back < 0.5 else "  - ON YOUR BACK")
 	if player.running:
 		stance += "  - running"
 	if player.cover_entering:

@@ -69,6 +69,7 @@ var run_speed := 4.4
 var reticle_visible := false
 var reticle_offset := Vector3.ZERO
 var cover_crouch := 0.0
+var prone_back := 0.0
 var prone_w := 0.0                 # (the body reads it; raiders don't go prone yet)
 var cover_lean_dir := Vector3.ZERO
 var cover_blind := false

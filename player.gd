@@ -348,6 +348,17 @@ var held_by: Array[Enemy] = []   # zombies that have hold of you
 ## to see, and your own eyes are lower too.
 var posture := 0
 var prone_w := 0.0               # for the body: 1 = lying flat
+## Prone, you lie along prone_dir (head that way) and crawl on your front. With a gun raised you stay put:
+## aiming ahead of you, you stay on your stomach; aiming behind you, you roll onto your back, head where it was,
+## and shoot down past your feet. Aim ahead again (or lower the gun) and you roll back over. Nobody crawls on
+## their back. prone_back: 0 = on your front, 1 = on your back.
+var prone_back := 0.0
+var prone_dir := Vector3.FORWARD
+var _on_back := false
+@export var roll_over_time := 0.5        # s to roll from front to back, or back again
+@export var back_beyond_deg := 110.0     # aiming further round than this from where your head points: onto your back
+@export var front_within_deg := 80.0     # ... and nearer than this: back onto your stomach
+@export var prone_aim_reach := 6.0       # m further the crosshair roams while aiming a gun from the ground
 @export_group("Stealth")
 @export var crouch_speed := 0.55         # of walking speed
 @export var prone_speed := 0.25
@@ -767,6 +778,8 @@ func _physics_process(delta: float) -> void:
 		var tired := fatigue()
 		spd *= lerpf(1.0, fatigue_min_speed, tired)
 		spd *= held_speed() * sheet.speed_mult * [1.0, crouch_speed, prone_speed][posture]
+		if posture == 2 and ((armed and not is_melee()) or prone_back > 0.0):
+			spd = 0.0           # aiming from the ground, on your back, or rolling over: you aren't going anywhere
 		if perch > 0.25:
 			spd *= pile_speed   # wading over bodies
 			if move_dir.length() > 0.1:
@@ -961,7 +974,8 @@ func current_reticle_range() -> float:
 		return free_look_range
 	if armed and is_melee():
 		return melee_look_range
-	return maxf(reticle_range + (aim_range_bonus if armed else look_range_bonus), 0.5)
+	var steady := prone_aim_reach if posture == 2 and armed else 0.0    # braced on the ground, you aim further
+	return maxf(reticle_range + (aim_range_bonus if armed else look_range_bonus) + steady, 0.5)
 
 
 func muzzle_position() -> Vector3:
@@ -1836,8 +1850,8 @@ func _update_combat() -> void:
 				elif reserve > 0:
 					_start_reload()
 	elif armed:
-		if _draw_t > 0.0 or _stagger > 0.0 or _reload_t > 0.0:
-			return
+		if _draw_t > 0.0 or _stagger > 0.0 or _reload_t > 0.0 or (posture == 2 and not is_melee() and prone_back > 0.02 and prone_back < 0.98):
+			return   # (prone: not while you are rolling over)
 		if is_melee():
 			# Ready unarmed: zombies that get within reach are shoved back on their own;
 			# attack punches.
@@ -2306,6 +2320,20 @@ func _update_posture() -> void:
 			or not held_by.is_empty() or running or dead or perch > 0.25:
 		posture = 0
 	prone_w = 1.0 if posture == 2 else 0.0
+	if posture != 2:
+		prone_back = 0.0
+		_on_back = false
+		prone_dir = facing
+		return
+	if not armed or is_melee():
+		_on_back = false
+		if prone_back <= 0.0:
+			prone_dir = facing      # crawling: you point the way you go
+	else:
+		var aim := reticle_offset if reticle_offset.length() > 0.5 else prone_dir
+		var ang := rad_to_deg(prone_dir.angle_to(Vector3(aim.x, 0.0, aim.z).normalized()))
+		_on_back = ang > (front_within_deg if _on_back else back_beyond_deg)
+	prone_back = move_toward(prone_back, 1.0 if _on_back else 0.0, get_physics_process_delta_time() / maxf(roll_over_time, 0.05))
 
 
 ## How far off you can be seen, as a share of the watcher's usual range.
@@ -2410,7 +2438,8 @@ func _reset_vitals() -> void:
 
 # ---------------------------------------------------------------- visuals
 func _update_visuals(delta: float) -> void:
-	_visual.rotation.y = atan2(-facing.x, -facing.z)
+	var lie := prone_dir if posture == 2 else facing     # flat on the ground the body lies where it lay; only the aim turns
+	_visual.rotation.y = atan2(-lie.x, -lie.z)
 	# The body poses itself from our state: stance, speed, punches, shoves, reload, hits, death.
 	_body.animate(self, delta)
 	_weapon_mat.emission_energy_multiplier = 4.0 if _flash_t > 0.0 else 0.0

@@ -37,7 +37,9 @@ func _cells(row: int) -> Array:
 			["Crouched, gun Ready", 0.0, 1, {"cover_crouch": 0.75, "armed": true, "weapon": "gun", "nowall": true}],
 			["Prone", 0.0, 1, {"prone_w": 1.0, "nowall": true}],
 			["Prone, crawling", 0.0, 1, {"prone_w": 1.0, "velocity": Vector3(0.5, 0, 0), "nowall": true}],
-			["Prone, gun Ready", 0.0, 1, {"prone_w": 1.0, "armed": true, "weapon": "gun", "nowall": true}],
+			["Prone, gun Ready, aiming ahead", 0.0, 1, {"prone_w": 1.0, "armed": true, "weapon": "gun", "nowall": true}],
+			["Rolling over (halfway)", 0.0, 1, {"prone_w": 1.0, "prone_back": 0.5, "armed": true, "weapon": "gun", "nowall": true}],
+			["Aiming behind: on your back", 0.0, 1, {"prone_w": 1.0, "prone_back": 1.0, "armed": true, "weapon": "gun", "nowall": true}],
 		]
 	return [
 		["Back to the wall", 2.6, 1, {}],
