@@ -237,6 +237,25 @@ stand-ins until the game has a clock (`body_health.gd`, "the bite").
 
 ## Small rules the owner has set (20 Nov 2026)
 
+- The mind goes with the body (owner: zombies follow tracks too, but "the more they rot they lose the ability
+  to follow tracks, they move slower and they generally just follow movement and noise... the brain is
+  deteriorating as they decompose. Essentially fresh walkers should be more dangerous than long decayed ones").
+  Built the same day, untested on the owner's PC. `ZombieBody.wits`: 1 until a quarter rotted, 0 from about
+  two thirds, worked out once in `refresh()` like the rest of its decay.
+  - Tracks (`Enemy._read_tracks()`, looked at every 0.8 s by one that isn't chasing): with wits of 0.3 or
+    more it takes up your prints from `track_nose` 4.5 m times its wits, no older than `track_fresh` 200 s
+    times its wits, and goes along the trail a few prints at a time (`Ground.trail_ahead()`). At each step it
+    may lose the thread, with a chance of 1 minus its wits. Where the trail ends it carries on the way it was
+    going. Crawlers don't track. It needs no light (raiders do).
+  - Speed (`walk_mult`): 1.2 fresh down to 0.6 rotted (was 1.0 to 0.65).
+  - Movement (`_still_factor()`): a rotted one notices someone standing quite still from only `still_notice`
+    0.35 of its range (4.2 m instead of 12); a fresh one sees you either way. Noise works on all of them.
+  - Cloud run, 12 zombies beside the start of a 26 m trail in snow, the player standing still at its end:
+    fresh, 8 took it up and 8 reached the player within 45 s; half rotted, 10 and 10; long rotted, none took
+    it up and none moved more than a few metres.
+  - With the earlier rules (fresh ones have more health, harder skulls, are harder to knock over and get
+    straight back up) a fresh zombie is now the dangerous one on every count.
+
 - Zombies linger when you look away: one that leaves your view stays drawn for `linger_time` 1.2 s (you remember
   where it was) and then fades over 0.9 s; it has moved on by then. Fading in is still quick. (`enemy.gd`.)
 - Zombies are tougher the fresher they are, on three counts (`enemy.gd`, Toughness): health 1.7 to 0.85 times

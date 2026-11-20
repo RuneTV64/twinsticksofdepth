@@ -262,6 +262,19 @@ func trail_near(pos: Vector3, radius: float, after: int, max_age: float) -> int:
 	return best
 
 
+## The print furthest along the trail from print `n` that is still within `reach` metres of it: where someone
+## following the trail goes next. Returns `n` itself when the trail ends there.
+func trail_ahead(n: int, reach: float) -> int:
+	var i := n - trail_first
+	if i < 0 or i >= trail.size():
+		return n
+	var from: Vector3 = trail[i]["p"]
+	var j := i
+	while j + 1 < trail.size() and (trail[j + 1]["p"] as Vector3).distance_to(from) <= reach:
+		j += 1
+	return j + trail_first
+
+
 ## Where print number `n` is, or null if it has gone.
 func trail_point(n: int):
 	var i := n - trail_first

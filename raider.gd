@@ -124,10 +124,8 @@ var _torch_light: SpotLight3D
 ## Reading tracks: a raider who comes on your prints follows them, print by print, toward the newest.
 @export var track_sight := 5.0          # m: how near a print has to be for him to see it (and in front of him, and lit)
 @export var track_age := 240.0          # s: older prints he takes for stale and leaves alone
+# (tracking, _trail_n and _trail_done are the Enemy's own: the print he is walking to, the newest he has been to.)
 @export var track_light := 0.3          # how lit the ground has to be to read it (his torch does it at night)
-var tracking := false
-var _trail_n := -1                 # the print he is walking to
-var _trail_done := -1              # the newest print he has already been to: he doesn't go back over them
 var _mark: Label3D
 var _mark_t := 0.0                 # s the "!" stays up
 @export var shout_range := 14.0    # m: how far its shout carries when it sees you (other raiders, and zombies)

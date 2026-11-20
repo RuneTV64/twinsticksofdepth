@@ -353,7 +353,10 @@ var bloat_amt := 0.0    # swollen with gas (the Bloated stage)
 var drag := 0.2         # how badly the bad leg drags
 var frail := 0.0        # dried out, falling apart
 var stiff := 0.0        # rigor or dried stiffness: jerky, short-stepped
-var walk_mult := 1.0    # his walking speed against a fresh zombie's
+var walk_mult := 1.0    # his walking speed against an ordinary zombie's: quicker fresh, slower rotted
+## What is left of his mind, 1 freshly turned .. 0 long rotted. A fresh one can follow a trail and knows you when
+## he sees you; a rotted one only goes after what moves and what makes a noise.
+var wits := 1.0
 var crawl_mult := 1.0   # his crawling speed against a fresh zombie's (before counting hands)
 var shed_chance := 0.0  # chance, each fall_apart_every, that a part just comes off
 var _parts := {}
@@ -409,7 +412,8 @@ func refresh() -> void:
 	drag = 0.2 + 0.8 * smoothstep(0.35, 0.85, rot_amt)
 	frail = smoothstep(0.75, 1.0, rot_amt)
 	stiff = clampf(rigor_amt + 0.6 * frail, 0.0, 1.0)
-	walk_mult = lerpf(1.0, 0.65, smoothstep(0.35, 0.9, rot_amt)) * (1.0 - 0.15 * rigor_amt)
+	walk_mult = lerpf(1.2, 0.6, smoothstep(0.15, 0.9, rot_amt)) * (1.0 - 0.15 * rigor_amt)
+	wits = 1.0 - smoothstep(0.25, 0.65, rot_amt)
 	crawl_mult = lerpf(1.0, 0.6, rot_amt)
 	shed_chance = 0.6 * frail
 	_spring_tune()

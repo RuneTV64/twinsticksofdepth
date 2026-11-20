@@ -190,6 +190,16 @@ var hurt_t := 0.0
 var hit_dir := Vector3.ZERO
 var body: ZombieBody
 ## Things it has on it (item Dictionaries): they fall where it dies.
+## The mind goes with the body (owner, 20 Nov 2026): a fresh zombie can follow your tracks and knows you when it
+## sees you; the more it rots the less it can, until it only goes after what moves and what makes a noise.
+## (`body.wits`, 1 fresh .. 0 rotted. It is also quicker fresh and slower rotted: `body.walk_mult`.)
+@export var track_nose := 4.5        # m a fresh one finds your prints from (times its wits)
+@export var track_fresh := 200.0       # s old a print can be for a fresh one to take it up (times its wits)
+@export var still_notice := 0.35     # a rotted one notices someone standing still from only this much of its range
+var tracking := false
+var _trail_n := -1
+var _trail_done := -1
+var _track_t := 0.0
 var _step_from := Vector3.ZERO     # where its last footprint went down (soft ground and snow take tracks)
 var _step_side := 1
 var _ground_slow := 1.0            # what the ground underfoot does to its speed (mud); looked up at each footfall
@@ -1098,6 +1108,38 @@ const HIDDEN_NOTICE := 0.35   # someone hunkered behind cover is noticed at this
 ## With nothing in its head, it looks about once a second for another zombie that is going somewhere, and falls
 ## in behind the nearest one it can see. It only follows one with more purpose than its own, so chains never loop
 ## and die away down their length.
+## Following your tracks, if it still has the wits to. It takes up a trail it comes on, goes along it a few
+## prints at a time toward the newest, and at each step may lose the thread, more easily the more it has rotted.
+## Where the trail ends it carries on the way it was going, as it does after any sound.
+func _read_tracks() -> void:
+	if Ground.it == null or body == null or body.wits < 0.3 or crawling:
+		tracking = false
+		return
+	var g := Ground.it
+	if tracking:
+		var at = g.trail_point(_trail_n)
+		if at == null:
+			tracking = false
+			return
+		if _xz2(at - global_position) > 1.6:
+			hear_noise(at)                # still on its way to that print
+			return
+		_trail_done = _trail_n
+		var next := g.trail_ahead(_trail_n, 3.5)
+		if next <= _trail_n or randf() > body.wits:
+			tracking = false              # the trail ends, or it loses the thread
+			return
+		_trail_n = next
+		hear_noise(g.trail_point(next))
+		return
+	var n := g.trail_near(global_position, track_nose * body.wits, _trail_done, track_fresh * body.wits)
+	if n < 0:
+		return
+	tracking = true
+	_trail_n = n
+	hear_noise(g.trail_point(n))
+
+
 func _look_about(delta: float) -> void:
 	_follow_t -= delta
 	if _follow_t > 0.0:
@@ -1146,6 +1188,14 @@ func _look_about(delta: float) -> void:
 
 ## Pick who to go for: the nearest living person it has noticed, you or a raider. With no one noticed it keeps
 ## the player in mind (it still comes to noises), as before raiders existed.
+## A rotted zombie goes by movement: someone standing quite still it only notices from close to. A fresh one
+## knows a person when it sees one.
+func _still_factor() -> float:
+	if body == null or player == null or Vector2(player.velocity.x, player.velocity.z).length() > 0.4:
+		return 1.0
+	return lerpf(still_notice, 1.0, body.wits)
+
+
 static func _xz2(v: Vector3) -> float:
 	return Vector2(v.x, v.z).length()
 
@@ -1156,7 +1206,7 @@ func _pick_prey() -> void:
 	if player != null and not player.dead:
 		var dp := Vector2(player.global_position.x - global_position.x, player.global_position.z - global_position.z).length()
 		var notice := aggro_range * (HIDDEN_NOTICE if player.in_cover and player.hidden_from(global_position) else 1.0) \
-			* player.seen_mult()   # crouched or flat, it has to be nearer to notice you
+			* player.seen_mult() * _still_factor()   # crouched or flat, it has to be nearer to notice you
 		if dp < notice:
 			best = player
 			best_d = dp
@@ -1216,7 +1266,7 @@ func _think(delta: float) -> Vector3:
 	if prey.in_cover and prey.hidden_from(global_position):
 		notice *= HIDDEN_NOTICE
 	if prey == player:
-		notice *= player.seen_mult()
+		notice *= player.seen_mult() * _still_factor()
 	chasing = dist < notice
 	if _was_chasing and not chasing:
 		hear_noise(prey.global_position)
@@ -1327,6 +1377,10 @@ func _think(delta: float) -> Vector3:
 		_drive = maxf(_drive, chase_memory)
 		_lead = null
 	else:
+		_track_t -= delta
+		if _track_t <= 0.0:
+			_track_t = 0.8
+			_read_tracks()
 		if _drive <= 0.0:
 			_look_about(delta)
 		if _drive > 0.0:
