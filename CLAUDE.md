@@ -309,6 +309,9 @@ World War Z but mindless: an accident, not a plan. All of it is in `enemy.gd` (t
   `corpse_pile.png` (250 at 9 m), `corpse_pile_alone.png` (the same pile with the zombies left out),
   `gore_tiles.png`; made by `tools/zombie_heap_preview.gd` (N, SECONDS, H, HIDE, ZOOM) and
   `tools/gore_tiles_preview.gd`.
+- Owner on the pile's look (20 Nov 2026): "good enough for now", but it reads as a pile of skeletons. When it is
+  next worked on: far more meat, guts and organs than bone, ooze and rot fluids, and a mix of states, since some
+  bodies went in freshly turned and some long rotted (the tiles only vary bone colour and a few flesh colours now).
 - To come (owner): how zombies spawn and how the horde moves; the turning-undead mechanic; the pile's clean-up
   (the maggots, flies and worms lore).
 
