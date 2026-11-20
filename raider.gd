@@ -81,6 +81,7 @@ var _stomp_total := 1.0
 var _roll_t := 0.0
 var _roll_total := 0.55
 var _roll_dir := Vector3.ZERO
+var _roll_rec_t := 0.0
 
 # ---- its mind
 var mode := "idle"                 # idle, fight, search, return

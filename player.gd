@@ -106,11 +106,15 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var vault_cost := 6.0           # stamina
 @export_group("Roll")
 # Double-tap Cover when not in cover: a roll the way you are moving (or the way you face, standing still),
-# whichever way you are facing; your facing doesn't change. Nothing can get hold of you while you roll.
+# whichever way you were facing. You turn into it, go over in a burst, and come up facing the way you rolled;
+# then there is a moment getting back to your feet before you can move, turn to your aim or attack. An ordinary
+# person's roll, not a superhero's: it takes a lot out of you. Nothing can get hold of you while you are going
+# over; while you are getting up, anything can.
 @export var roll_window := 0.28         # s between the two taps
-@export var roll_time := 0.55           # s the roll lasts
+@export var roll_time := 0.55           # s going over
 @export var roll_distance := 3.2        # m it covers
-@export var roll_cost := 15.0           # stamina
+@export var roll_recover := 0.45        # s getting back to your feet afterwards
+@export var roll_cost := 32.0           # stamina: a third of an ordinary person's
 @export_group("Corpse pile")
 # Heaps of fallen zombies and the crushed pile under them can be walked on (Enemy.heap_height). It is slow, the
 # footing is bad, and the ones still alive in it grab at you. From high enough on it you can get over a wall.
@@ -298,6 +302,7 @@ var finish_pile = null             # ... or where a trapped one in the corpse pi
 var _roll_t := 0.0                 # > 0 while rolling (the body reads these three)
 var _roll_total := 0.55
 var _roll_dir := Vector3.ZERO
+var _roll_rec_t := 0.0             # > 0 while getting back up after a roll
 var _tap_t := 99.0                 # s since the last Cover tap made out of cover
 var _stomp_t := 0.0                # > 0 while a finishing blow is under way (the body reads these)
 var _stomp_total := 1.0
@@ -634,9 +639,15 @@ func _physics_process(delta: float) -> void:
 
 	var horiz := Vector3(velocity.x, 0.0, velocity.z)
 	if _roll_t > 0.0:
-		# Fast off the mark, slowing as you come up out of it; the whole roll covers roll_distance.
+		# A burst: it picks up speed going over, and dies away as you come out of it. About roll_distance in all.
 		var ru := 1.0 - _roll_t / maxf(_roll_total, 0.01)
-		horiz = _roll_dir * (roll_distance / maxf(_roll_total, 0.01)) * (1.4 - 0.8 * ru)
+		var burst := smoothstep(0.0, 0.25, ru) * (1.0 - 0.75 * smoothstep(0.7, 1.0, ru))
+		horiz = _roll_dir * (roll_distance / maxf(_roll_total, 0.01)) * 1.3 * burst
+		if _roll_t - delta <= 0.0:
+			_roll_rec_t = roll_recover
+	elif _roll_rec_t > 0.0:
+		# Getting back to your feet: no going anywhere yet.
+		horiz = horiz.move_toward(Vector3.ZERO, decel * delta)
 	elif (in_cover or cover_entering) and _dash_t <= 0.0 and _stagger <= 0.0:
 		horiz = _cover_velocity(delta, move_dir)
 	elif _dash_t > 0.0:
@@ -705,6 +716,7 @@ func _tick_timers(delta: float) -> void:
 	_blind_t -= delta
 	_stomp_t -= delta
 	_roll_t -= delta
+	_roll_rec_t -= delta
 	_tap_t += delta
 	_cam_carry = _cam_carry.lerp(Vector3.ZERO, 1.0 - exp(-cam_stance_sharpness * delta))
 	_hurt_t -= delta
@@ -1199,7 +1211,7 @@ func _try_vault() -> void:
 
 ## A roll along the ground, the way you are moving (or facing, if you aren't moving).
 func _start_roll(move_dir: Vector3) -> void:
-	if _roll_t > 0.0 or _vault_t > 0.0 or dead:
+	if _roll_t > 0.0 or _roll_rec_t > 0.0 or _vault_t > 0.0 or dead:
 		return
 	if not held_by.is_empty():
 		show_status("Held! Shove it off or struggle", 0.8)
@@ -1207,9 +1219,9 @@ func _start_roll(move_dir: Vector3) -> void:
 	if perch > 0.25:
 		show_status("No footing to roll on this", 0.8)
 		return
-	if winded or _stagger > 0.0 or stamina < roll_cost * 0.5:
-		if winded:
-			show_status("Too winded to roll", 0.8)
+	if winded or _stagger > 0.0 or stamina < roll_cost * 0.6:
+		if winded or stamina < roll_cost * 0.6:
+			show_status("Too tired to roll", 0.8)
 		return
 	_roll_dir = (move_dir if move_dir.length() > 0.1 else facing).normalized()
 	status_t = 0.0   # (the first tap may have said there was no cover in reach)
@@ -1218,7 +1230,7 @@ func _start_roll(move_dir: Vector3) -> void:
 	_dash_t = 0.0
 	running = false
 	stamina = maxf(stamina - roll_cost, 0.0)
-	_regen_delay = 0.8
+	_regen_delay = 1.2
 	if stamina <= 0.0:
 		winded = true
 
@@ -1478,8 +1490,10 @@ func _update_line_of_fire() -> void:
 
 
 func _update_facing(delta: float, move_dir: Vector3) -> void:
-	if _roll_t > 0.0:
-		return   # a roll doesn't turn you
+	if _roll_t > 0.0 or _roll_rec_t > 0.0:
+		# You turn into the roll and come up facing the way you went; only then do you turn to where you aim.
+		facing = _turn_toward(facing, _roll_dir, 26.0 * delta)
+		return
 	var want := Vector3.ZERO
 	var rate := turn_speed
 	if _vault_t > 0.0:
@@ -1653,7 +1667,7 @@ func _update_combat() -> void:
 		return
 	# A finishing blow under way lands when its windup runs out; a new one starts on the attack button when the
 	# crosshair is on a downed zombie's head. It comes before anything else the button does.
-	if _roll_t > 0.0:
+	if _roll_t > 0.0 or _roll_rec_t > 0.0:
 		cover_blind = false
 		return   # hands are busy
 	_update_finisher()

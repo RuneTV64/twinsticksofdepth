@@ -257,7 +257,9 @@ func animate(p, delta: float) -> void:
 	var swing_axis := Vector3(-cos(a), 0.0, sin(a))
 	var roll_w: float = 1.0 if p._roll_t > 0.0 else 0.0
 	_roll_w = _ease(_roll_w, roll_w, 30.0 if roll_w > 0.0 else 12.0, delta)
-	var crouch := 0.2 * ready_w + 0.12 * _dash_w + 0.07 * tired + 1.15 * maxf(_cover_w, _roll_w)
+	# Coming up out of a roll: from a crouch back to standing over the recovery.
+	var rising: float = clampf(p._roll_rec_t / 0.45, 0.0, 1.0)
+	var crouch := 0.2 * ready_w + 0.12 * _dash_w + 0.07 * tired + 1.15 * maxf(_cover_w, maxf(_roll_w, 0.85 * rising))
 	var split := (0.2 * _fist_w + 0.12 * _gun_w) * (1.0 - 0.7 * m)  # Ready: left foot forward
 	var th: Array[float] = [0.0, 0.0]
 	for k in 2:
@@ -289,7 +291,7 @@ func animate(p, delta: float) -> void:
 	var lean_axis := Vector3(cos(_dir), 0.0, -sin(_dir))
 	var stance_yaw := -0.5 * _fist_w - 0.38 * _gun_w              # Ready: left shoulder forward
 	var bend := 0.1 * ready_w + 0.14 * tired - 0.022 * b * ba - 0.22 * _flinch - 0.05 * _recoil + 0.14 * shove \
-		+ 0.42 * _cover_w - 0.3 * _slide_w + 0.35 * _vault_w + 0.75 * _roll_w   # hunched behind cover, leaning back in a slide, curled in a roll
+		+ 0.42 * _cover_w - 0.3 * _slide_w + 0.35 * _vault_w + 0.75 * _roll_w + 0.35 * rising   # hunched behind cover, leaning back in a slide, curled in a roll
 	_tq[_hips] = _ry(hip_yaw + 0.4 * stance_yaw - 0.09 * sn * m) * _rz(-0.035 * cs * m)
 	_tq[_chest] = _ry(-hip_yaw + 0.6 * stance_yaw + punch_twist + 0.12 * _look) \
 		* Quaternion(lean_axis, lean) * _rx(bend) * _rz(-0.34 * _lean) \
