@@ -53,8 +53,18 @@ extends CharacterBody3D
 @export var lunge_cooldown := 2.2
 @export var crawl_speed := 0.45        # m/s, fresh; slower as it rots
 @export var knockdown_chance := 0.2    # a hard knock (shot, bash, shove) drops it to crawl
-@export var down_time := Vector2(4.0, 9.0)   # s a knocked-down zombie crawls before it gets up
+@export var down_time := Vector2(4.0, 9.0)   # s one that crawls first keeps crawling before it gets up
 @export var getup_time := 1.3
+## Going down (owner, 20 Nov 2026). Knocked over, a zombie lies stunned for a moment, on its front or its back by
+## which way the blow sent it. Then, with both legs: most get straight back up, the fresher the likelier; the
+## rest crawl at you for a while first. Getting up can fail, more often the more rotted it is, and after
+## `give_up_after` failures it gives up and crawls (for a long while) before trying again. One with a leg gone
+## can never get up: it is a crawler for good.
+@export var stun_time := Vector2(0.8, 2.4)        # s lying still after going down (longer the more rotted)
+@export var getup_first := Vector2(0.85, 0.55)    # chance it gets straight up: fresh .. rotted
+@export var getup_fail := Vector2(0.05, 0.35)     # chance a get-up fails and it goes down again: fresh .. rotted
+@export var give_up_after := 2                    # failed get-ups before it gives up and crawls
+@export var roll_time := 0.8                      # s to roll from its back onto its front
 @export var limb_chance := 0.12        # chance a hit that doesn't kill takes an arm or leg off (rotted parts 2x)
 @export var decap_chance := 0.35       # chance a headshot takes the head off (otherwise it just drops)
 @export var corpse_time := 30.0        # s a dead zombie lies there before it fades (stand-in for the clean-up lore)
@@ -200,6 +210,13 @@ var _noise_t := 0.0              # > 0 while it is still drawn to that spot
 var _bite_cd := 0.0
 var _bit := false
 var _down_t := 0.0
+## Lying on its back (face up, head pointing away from the way it faces). On its front otherwise.
+var on_back := false
+var roll_u := 0.0                  # rolling from back to front: 0 on its back .. 1 over
+var _down_phase := "crawl"         # in state "down": "stun" lying still, "roll" turning over, "crawl" crawling at you
+var _stun_t := 0.0
+var _then_up := false              # once it has done lying (and rolling), it gets up; otherwise it crawls first
+var _getup_tries := 0
 var _apart_t := 0.0
 var _pace := 1.0                 # this zombie's own speed, rolled with it
 var _soft := Vector3.ZERO        # last push from the crowd around it
@@ -316,7 +333,7 @@ func take_hit(dmg: float, dir: Vector3, knock: float) -> void:
 					_lose(limbs[i], dir * 2.5 + Vector3.UP * 1.5)
 					break
 	if knock >= 3.0 and randf() < knockdown_chance * lerpf(topple_by_rot.x, topple_by_rot.y, body.rot()):
-		_knock_down()
+		_knock_down(dir)
 
 
 ## A headshot: always a kill. Sometimes the head comes right off (otherwise it's the pierced-brain death, which
@@ -387,7 +404,7 @@ func shove(dir: Vector3, force: float) -> void:
 		_let_go()
 		_set_state("walk")
 	if randf() < knockdown_chance * 0.5 * lerpf(topple_by_rot.x, topple_by_rot.y, body.rot()):
-		_knock_down()
+		_knock_down(dir)
 
 
 ## Its feet leave prints in soft ground and snow, like anyone's; crawling, a swathe.
@@ -404,11 +421,20 @@ func _leave_tracks() -> void:
 			Ground.it.stamp(global_position, moved, _step_side, crawling)
 
 
+# Into "getup" without losing which way up it is lying (_set_state("down") resets that; this doesn't).
+func _set_getup() -> void:
+	state = "getup"
+	state_t = 0.0
+
+
 ## Just turned: it starts on the ground and gets up.
 func rise_from_death() -> void:
 	crawling = true
 	_set_state("down")
-	_down_t = 4.0
+	on_back = true
+	_down_phase = "stun"
+	_stun_t = 3.0
+	_then_up = true
 
 
 func _die() -> void:
@@ -428,7 +454,13 @@ func _die() -> void:
 		_join_heap()
 	_label.visible = false
 	if body != null:
+		# A body that was on its feet falls the way the blow sent it: on its back as often as on its front.
+		if not crawling and state != "getup":
+			var fell := Vector3(hit_dir.x, 0.0, hit_dir.z)
+			on_back = fell.normalized().dot(facing) < -0.25 if fell.length() > 0.01 else randf() < 0.4
+		var lying_back := on_back
 		_set_state("walk")
+		on_back = lying_back
 		crawling = false
 		_corpse_t = corpse_time
 		# With a horde keeping count, the dead stay dead; without one (a bare test scene) they come back.
@@ -458,19 +490,39 @@ func _respawn() -> void:
 
 
 func _set_state(s: String) -> void:
+	if s == "down":
+		# (Whoever puts it down this way means "on its front, crawling": _knock_down sets the rest itself.)
+		_down_phase = "crawl"
+		on_back = false
+		roll_u = 0.0
 	if state == "heap" and s != "heap" and not dead:
 		_leave_heap()
 	state = s
 	state_t = 0.0
 
 
-func _knock_down() -> void:
+## `push` is the way the blow sent it (zero = it just went over): backward and it lands on its back, forward or
+## sideways on its front.
+func _knock_down(push := Vector3.ZERO) -> void:
 	if dead or state == "down" or state == "climb" or state == "heap":
 		return
 	_let_go()
+	var was_up := not crawling
 	crawling = true
 	_set_state("down")
-	_down_t = randf_range(down_time.x, down_time.y) * (1.0 + body.rot())
+	var rot := body.rot()
+	push.y = 0.0
+	# Only one that was on its feet can go over backward; a crawler knocked flat stays on its front.
+	on_back = was_up and push.length() > 0.01 and push.normalized().dot(facing) < -0.25
+	roll_u = 0.0
+	_down_phase = "stun"
+	_stun_t = randf_range(stun_time.x, stun_time.y) * (1.0 + 0.6 * rot)
+	_down_t = randf_range(down_time.x, down_time.y) * (1.0 + rot)
+	# What it does when it has lain there: get up, or crawl first. (With a leg gone it can only crawl.)
+	_then_up = body.legs() == 2 and _getup_tries < give_up_after and randf() < lerpf(getup_first.x, getup_first.y, rot)
+	if _getup_tries >= give_up_after:
+		_getup_tries = 0                  # it has given up for now: a long crawl, then it will try again
+		_down_t *= 2.0
 	# Going over hard can shake a rotten one apart.
 	if randf() < 0.5 * smoothstep(0.6, 1.0, body.rot()):
 		_shed_part()
@@ -751,7 +803,7 @@ static func heap_height(p: Vector3) -> float:
 ## Where to aim at it: its middle, or its head when it is on the ground (for finishers).
 func aim_point() -> Vector3:
 	if body != null and not dead and (crawling or state == "down" or state == "heap"):
-		return global_position + facing * 0.7
+		return global_position + facing * (-0.7 if on_back else 0.7)      # on its back its head lies the other way
 	return global_position
 
 
@@ -770,7 +822,9 @@ func part_points() -> Dictionary:
 		if kind == "shambler" and body != null and (body.part(slot) == "Destroyed" or (slot == "Head" and not body.has_head())):
 			continue
 		var s: Array = spots[slot]
-		out[slot] = at + facing * float(s[0]) + right * float(s[1]) + Vector3(0.0, float(s[2]), 0.0)
+		# On its back it lies the other way round: head behind, and left and right as you look down on it swapped.
+		var flip := -1.0 if down and on_back else 1.0
+		out[slot] = at + facing * float(s[0]) * flip + right * float(s[1]) + Vector3(0.0, float(s[2]), 0.0)
 	return out
 
 
@@ -791,7 +845,7 @@ func take_part_hit(part: String, dmg: float, dir: Vector3, knock: float) -> void
 	if randf() < 0.3 + 0.4 * body.rot():
 		_lose(part, dir * 3.0 + Vector3.UP * 1.5)
 	elif part.begins_with("Leg") and randf() < 0.5:
-		_knock_down()
+		_knock_down(dir)
 
 
 ## A stomp or a blow on a downed one that isn't on its head: it hurts it, no more.
@@ -1172,15 +1226,47 @@ func _think(delta: float) -> Vector3:
 
 	match state:
 		"down":
-			# Knocked down: crawls at you for a while, then gets back up if it has the legs for it.
+			if _down_phase == "stun":
+				# Lying where it fell.
+				_stun_t -= delta
+				if _stun_t > 0.0:
+					return Vector3.ZERO
+				if _then_up and body.legs() == 2:
+					crawling = false
+					_set_getup()           # from its back it sits straight up; no need to roll over first
+				elif on_back:
+					_down_phase = "roll"
+				else:
+					_down_phase = "crawl"
+				return Vector3.ZERO
+			if _down_phase == "roll":
+				# Turning over onto its front. It ends up lying the other way round, so it then has to turn to you.
+				roll_u = minf(roll_u + delta / maxf(roll_time * (1.0 + stiff), 0.1), 1.0)
+				if roll_u >= 1.0:
+					on_back = false
+					roll_u = 0.0
+					facing = -facing
+					body.rolled_over()
+					_down_phase = "crawl"
+				return Vector3.ZERO
+			# Crawling at you for a while; then it gets back up, if it has the legs for it.
 			_down_t -= delta
 			if _down_t <= 0.0 and body.legs() == 2:
 				crawling = false
-				_set_state("getup")
+				_set_getup()
 				return Vector3.ZERO
 		"getup":
-			if state_t >= getup_time * (1.0 + stiff):
-				_set_state("walk")
+			if state_t >= getup_time * (1.0 + stiff) * (1.3 if on_back else 1.0):
+				on_back = false
+				if randf() < lerpf(getup_fail.x, getup_fail.y, body.rot()):
+					# It doesn't make it: over it goes again, the way it was leaning.
+					_getup_tries += 1
+					_set_state("walk")
+					crawling = false
+					_knock_down(facing if randf() < 0.7 else -facing)
+				else:
+					_getup_tries = 0
+					_set_state("walk")
 			return Vector3.ZERO
 		"reach":
 			facing = d

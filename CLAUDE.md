@@ -354,8 +354,23 @@ changes, update both, and keep them the same files.
 - Abilities: **crawl, grab, bite.** Grab, then bite: a zombie with at least one hand grabs and holds the player
   (slowed; two hands nearly root), then bites until the player shoves it off (Ready, facing it) or struggles free
   (wiggling the move input); two hands hold harder than one. Zombies with no hands can't grab; they lunge and bite.
-- Crawl: zombies missing a leg always crawl. Any zombie can be knocked down to crawl (hard hits, shoves) and gets
-  back up. (Crawling under obstacles waits for low obstacles in the level.)
+- Crawl: zombies missing a leg always crawl. Any zombie can be knocked down (hard hits, shoves). (Crawling
+  under obstacles waits for low obstacles in the level.)
+- Going down (owner, 20 Nov 2026: they always fell on their stomachs, and most intact ones should get back up
+  before giving up and crawling; untested on the owner's PC). `Enemy._knock_down(push)`: one on its feet sent
+  backward lands on its back (`on_back`: face up, head away from the way it faces), otherwise on its front; a
+  body killed on its feet falls the same way. It lies stunned (`stun_time` 0.8 to 2.4 s, longer rotted). Then,
+  with both legs, it mostly gets straight up (`getup_first` 85% fresh to 55% rotted; from its back it sits
+  up); otherwise it crawls at you first for `down_time` (rolling onto its front if need be: `roll_time` 0.8 s,
+  after which it lies the other way round and turns to you). A get-up can fail (`getup_fail` 5% fresh to 35%
+  rotted) and over it goes again; after `give_up_after` 2 failures it gives up and crawls for twice as long
+  before trying again. A leg gone means a crawler for good. Finishers, part aiming and `aim_point()` know which
+  way round it lies. Cloud run, 32 each: fresh, 26 got straight up and all 32 were standing within 30 s (4.7 s
+  on average); rotted, 17 straight up, 7 failed get-ups, 22 standing within 30 s (10.1 s). Poses
+  (`zombie_body.gd` `_back_w`): the back fall pivots at the feet and sprawls like the dead. Sheet:
+  `tools/preview/zombie_falls.png`, made by `tools/zombie_fall_preview.gd` (a copy of the asset's animation
+  harness with a "falls" sheet; the approved asset's own harness was left alone). `zombie_body.gd` is the
+  game's script, not part of the approved model.
 - Heads: a headshot kills and sometimes takes the head off (decapitation is the stand-in until the pierced-brain
   death has its look). A severed head is still alive and can still bite (`severed_head.gd`): a very low chance,
   by accident, when the player steps right by it.

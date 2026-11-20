@@ -102,6 +102,7 @@ var _phase := 0.0
 var _crawl_phase := 0.0
 var _move_w := 0.0
 var _prone_w := 0.0
+var _back_w := 0.0              # lying on its back (Enemy.on_back): it falls straight over backward, face up
 var _reach_w := [0.0, 0.0]
 var _grip_w := 0.0
 var _bite_w := 0.0
@@ -509,6 +510,11 @@ func animate(e: Enemy, delta: float) -> void:
 
 	_move_w = _ease(_move_w, smoothstep(0.05, 0.6, speed), 8.0, delta)
 	_prone_w = _ease(_prone_w, 1.0 if prone else 0.0, 7.0 if prone else 3.0, delta)
+	# Which way up: decided as it goes down, and held while it gets up again (so it rises the way it lay).
+	if e.on_back and _prone_w < 0.3:
+		_back_w = 1.0
+	elif not e.on_back and (_prone_w < 0.05 or e.state == "walk" and prone):
+		_back_w = 0.0
 	_dead_w = _ease(_dead_w, 1.0 if e.dead else 0.0, 6.0, delta)
 	if not e.dead and _dead_w < 0.02:
 		_dead_w = 0.0
@@ -563,7 +569,13 @@ func animate(e: Enemy, delta: float) -> void:
 	var fall := smoothstep(0.0, 1.0, maxf(_prone_w, _dead_w))
 	var u := clampf(fall / 0.45, 0.0, 1.0)              # 0..1: dropping to the knees
 	var v := clampf((fall - 0.45) / 0.55, 0.0, 1.0)     # 0..1: from kneeling to flat on the floor
-	var kneel := u * (1.0 - v)
+	var kneel := u * (1.0 - v) * (1.0 - _back_w)       # (onto its back it doesn't kneel: it goes straight over)
+	if _back_w > 0.5 and fall > 0.001:
+		# On its back: sprawled, arms flung out, as the dead lie. Turning over, it gathers itself to crawl.
+		var sprawl: float = fall * (1.0 - 0.7 * e.roll_u) * (1.0 - _dead_w)
+		for i in _n:
+			_tq[i] = _tq[i].slerp(_dead_q[i], sprawl)
+		_hips_off *= 1.0 - sprawl
 	if kneel > 0.001:
 		for k in 2:
 			var ks := 1.0 if k == 0 else -1.0
@@ -601,6 +613,13 @@ func animate(e: Enemy, delta: float) -> void:
 	_cur_off = _cur_off.lerp(_hips_off, kk)
 	_skel.set_bone_pose_position(_hips, _rest_o[_hips] + _cur_off)
 
+	if _back_w > 0.5:
+		# Over backward: it pivots at the feet and lands face up, its head away from the way it was facing.
+		# Rolling over (roll_u) turns it along its own length onto its front, where it lies.
+		var bf := smoothstep(0.0, 1.0, fall)
+		basis = Basis(Vector3.UP, PI) * Basis(Vector3.RIGHT, -PI * 0.5 * bf) * Basis(Vector3.UP, PI * smoothstep(0.0, 1.0, e.roll_u))
+		position = Vector3.ZERO.lerp(Vector3(0.0, CRAWL_HEIGHT, -CRAWL_FORWARD), bf)
+		return
 	var pitch := PI * 0.5 * smoothstep(0.0, 1.0, v)
 	rotation = Vector3(pitch, PI, 0.0)
 	# Placed from the pose on screen, so the knees and feet meet the floor exactly.
@@ -618,6 +637,13 @@ func animate(e: Enemy, delta: float) -> void:
 		knee.x = 0.0
 		pos += flip * knee - flip * Basis(Vector3.RIGHT, pitch) * knee
 	position = pos.lerp(Vector3(0.0, CRAWL_HEIGHT, CRAWL_FORWARD), smoothstep(0.55, 1.0, v))
+
+
+## The Enemy has finished rolling from its back onto its front (and turned its facing round to match): from here
+## it is lying on its front in the ordinary way, in the same place.
+func rolled_over() -> void:
+	_back_w = 0.0
+	_prone_w = 1.0
 
 
 # ---------------------------------------------------------------------- upright: the shamble
