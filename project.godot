@@ -41,6 +41,14 @@ grass_push={
 "type": "vec4",
 "value": Vector4(0, -1000, 0, 0)
 }
+grass_push_map={
+"type": "sampler2D",
+"value": ""
+}
+grass_push_rect={
+"type": "vec4",
+"value": Vector4(0, 0, 1, 1)
+}
 cutaway_focus={
 "type": "vec3",
 "value": Vector3(0, -1000, 0)

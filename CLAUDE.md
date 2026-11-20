@@ -841,8 +841,16 @@ then grasses, as a second batch. Everything is in `assets/ground/` (its README h
   `assets/ground/preview/dirt_seasons.png`, `dirt_scene_seasons.png`, `grass_seasons.png`,
   `grass_scene_seasons.png`.
 - Unchecked: everything on Forward+ (colours, the stepped light, shadows on the ground: the cloud renderer drew
-  none, cost). Zoomed right out a texel is about a pixel and may shimmer. Zombies and raiders don't part the
-  grass.
+  none, cost). Zoomed right out a texel is about a pixel and may shimmer.
+- Zombies and raiders part the grass too (owner, 20 Nov 2026; untested on the owner's PC). `grass_push.gd`
+  (`GrassPush`, one node in the level): 10 times a second it marks every living enemy near the player on a
+  small map (64 by 64, a texel to 0.5 m, centred on the player and moved in whole texels) and hands it to the
+  grass shader as the project-wide texture `grass_push_map` (with `grass_push_rect`). A blade leans downhill
+  on the map and is pressed down where it is marked, so a horde costs the shader no more than one zombie.
+  Crawlers mark a wider spot. The player's own parting stays exact and separate (`grass_push`). Nothing is
+  sent while nobody is near. Checked in the cloud by rendering the same tall grass with and without two
+  figures in it (the pictures differ where they stand) and by the map filling in the level; the look in motion
+  is for the owner's PC. Beyond 16 m from the player nobody parts the grass.
 - Also in the Ground Assets artifact (see Where game design assets live).
 
 ## Character sheet (built 20 Nov 2026, in review; untested on the owner's PC)

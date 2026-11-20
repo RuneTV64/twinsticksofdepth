@@ -12,6 +12,10 @@ render_mode cull_disabled, world_vertex_coords;
 
 // Whoever is pushing through the grass: xyz = where they are, w = how wide a swathe they part (0 = nobody).
 global uniform vec4 grass_push;
+// Everyone else who is in it (zombies, raiders): a map of where they stand, drawn by grass_push.gd. r = how
+// hard the grass is pushed there; the rect is what the map covers on the ground (x, z, width, depth).
+global uniform sampler2D grass_push_map : filter_linear, repeat_disable;
+global uniform vec4 grass_push_rect;
 
 uniform float straw_bias = 0.0;        // how much more of it is straw than the season alone would make
 uniform float sway = 0.12;             // m the tips move in the wind, for a blade a metre tall
@@ -41,6 +45,22 @@ void vertex() {
 		if (f > 0.0) {
 			lean += (d > 0.01 ? away / d : vec2(1.0, 0.0)) * f * h * tall * 0.75;
 			VERTEX.y = root.y + (VERTEX.y - root.y) * (1.0 - 0.72 * f);
+		}
+	}
+	// And round everyone else: away from where the map is marked hardest (downhill on it), and pressed down.
+	vec2 muv = (root.xz - grass_push_rect.xy) / grass_push_rect.zw;
+	if (muv.x > 0.02 && muv.y > 0.02 && muv.x < 0.98 && muv.y < 0.98) {
+		float here = textureLod(grass_push_map, muv, 0.0).r;
+		if (here > 0.02) {
+			vec2 px = vec2(1.0) / vec2(textureSize(grass_push_map, 0));
+			vec2 slope = vec2(
+				textureLod(grass_push_map, muv + vec2(px.x, 0.0), 0.0).r - textureLod(grass_push_map, muv - vec2(px.x, 0.0), 0.0).r,
+				textureLod(grass_push_map, muv + vec2(0.0, px.y), 0.0).r - textureLod(grass_push_map, muv - vec2(0.0, px.y), 0.0).r);
+			float f = smoothstep(0.02, 0.6, here);
+			if (length(slope) > 0.001) {
+				VERTEX.xz -= normalize(slope) * f * h * tall * 0.6;
+			}
+			VERTEX.y = root.y + (VERTEX.y - root.y) * (1.0 - 0.6 * f);
 		}
 	}
 	VERTEX.xz += lean;

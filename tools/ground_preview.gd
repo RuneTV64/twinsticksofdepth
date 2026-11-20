@@ -105,6 +105,13 @@ func _scene(world: Node3D, sun: DirectionalLight3D) -> void:
 				if gm.shader.resource_path != "":
 					gm.shader = _patched("res://assets/ground/grass_blades.gdshader")
 		RenderingServer.global_shader_parameter_set("grass_push", Vector4(-14.5, 0, -3, 1.1))
+		# Others in the grass: three walking through the meadow, one in the tall grass (grass_push.gd).
+		GrassPush.extra = [Vector3(8, 0, -12), Vector3(11, 0, -10.5), Vector3(14, 0, -13), Vector3(-12.5, 0, -1.5), Vector3(-12.5, 0, -4.6)]
+		if OS.get_environment("NOPUSH") != "":
+			GrassPush.extra = []       # (to compare: the same picture with nobody else in the grass)
+		var gp := GrassPush.new()
+		world.add_child(gp)
+		gp._process(1.0)
 	# Something to cast shadows: a crate and a wall.
 	for b in [[Vector3(3, 0.6, 0.5), Vector3(1.2, 1.2, 1.2)], [Vector3(-4, 1.3, -2.5), Vector3(4.0, 2.6, 0.4)]]:
 		var m := MeshInstance3D.new()

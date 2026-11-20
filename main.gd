@@ -336,6 +336,9 @@ func _build_environment() -> void:
 	ground.blob("rough", Vector2(-18, 14), 6.0)
 	ground.rect("rough", Rect2(5, 7, 11, 9))
 	ground.apply()
+	var push := GrassPush.new()          # zombies and raiders part the standing grass too
+	push.player = player
+	add_child(push)
 	_grow_grass.call_deferred(ground)      # once the level's walls and crates are in, so nothing grows inside them
 	# The old plain ground, kept to fall back on (B) if the new shader misbehaves on some machine.
 	var sh := Shader.new()

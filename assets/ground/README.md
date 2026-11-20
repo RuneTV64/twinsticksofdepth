@@ -101,6 +101,7 @@ One kind on its own (a patch, an earth floor): a `ShaderMaterial` with `dirt.gds
 | `grass.gdshader` | one kind of painted grass on its own |
 | `grass_blades.gdshader` | standing grass: sway, seasons, parting round the player |
 | `grass_blades.gd` | `GrassBlades`: makes the tuft meshes and scatters them |
+| `grass_push.gd` | `GrassPush`: the map of who else is pushing through the grass |
 | `ground.gdshader` | a whole level's ground from a painted map |
 | `ground.gd` | `Ground`: builds the slab and paints the map |
 | `seasons.gd` | `Seasons`: the time of year and the weather |
@@ -111,8 +112,8 @@ One kind on its own (a patch, an earth floor): a `ShaderMaterial` with `dirt.gds
 
 - Forward+ on Godot 4.7: colours, the stepped light, shadows falling on it (the cloud renderer drew none), cost.
 - Zoomed right out a texel is about a screen pixel, so fine detail may shimmer.
-- Standing grass: no shadows cast, nothing but the player parts it (zombies and raiders walk through it
-  unmoved), and its cost with tens of thousands of tufts is unmeasured.
+- Standing grass casts no shadows, and its cost with tens of thousands of tufts is unmeasured. Zombies and
+  raiders part it within 16 m of the player (`grass_push.gd`), not beyond.
 - Raiders follow the player's prints (`Ground.trail`, read by `raider.gd`), and so do zombies fresh enough to
   have the wits for it (`enemy.gd`). Tracks don't fade
   with time, grass takes none, and the ground makes no difference to footstep noise.
