@@ -26,6 +26,7 @@ const HELP_KEYS := """CONTROLS
 Move  WASD
 Look (weapon away)  Mouse moves the crosshair as far as you can see; the camera follows
 Camera in and out  Mouse wheel
+Crouch  Ctrl (again to stand)      Prone  X (again to get up)
 Free look (HOLD)  F or middle mouse button: the camera leaves you and follows the crosshair further out
 Ready (HOLD)  Right mouse button
 Attack (while Ready)  Left-click
@@ -385,6 +386,8 @@ func _process(delta: float) -> void:
 			stance += "  - SPENT"
 		else:
 			stance += "  - guarding"
+	if player.posture > 0:
+		stance += "  - CROUCHED" if player.posture == 1 else "  - PRONE"
 	if player.running:
 		stance += "  - running"
 	if player.cover_entering:

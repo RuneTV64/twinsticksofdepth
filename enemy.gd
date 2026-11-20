@@ -1077,7 +1077,8 @@ func _pick_prey() -> void:
 	var best_d := INF
 	if player != null and not player.dead:
 		var dp := Vector2(player.global_position.x - global_position.x, player.global_position.z - global_position.z).length()
-		var notice := aggro_range * (HIDDEN_NOTICE if player.in_cover and player.hidden_from(global_position) else 1.0)
+		var notice := aggro_range * (HIDDEN_NOTICE if player.in_cover and player.hidden_from(global_position) else 1.0) \
+			* player.seen_mult()   # crouched or flat, it has to be nearer to notice you
 		if dp < notice:
 			best = player
 			best_d = dp
@@ -1131,6 +1132,8 @@ func _think(delta: float) -> Vector3:
 	var notice := aggro_range
 	if prey.in_cover and prey.hidden_from(global_position):
 		notice *= HIDDEN_NOTICE
+	if prey == player:
+		notice *= player.seen_mult()
 	chasing = dist < notice
 	if _was_chasing and not chasing:
 		hear_noise(prey.global_position)

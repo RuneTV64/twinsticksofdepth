@@ -74,6 +74,7 @@ var _dash_w := 0.0
 var _fist_w := 0.0
 var _gun_w := 0.0
 var _dead_w := 0.0
+var _prone_w := 0.0                 # 1 = flat on the ground, face down (a stand-in: the whole body tipped over)
 var _cover_w := 0.0                 # how far down behind cover (0 standing .. 1 squatting)
 var _lean := 0.0                    # leaning out round an end: + = to the body's left
 var _blind_w := 0.0                 # holding the gun up over, or out round, cover to fire blind
@@ -208,6 +209,7 @@ func animate(p, delta: float) -> void:
 	var blind: bool = not melee and (p.cover_blind or p._blind_t > 0.0)
 	_gun_w = _ease(_gun_w, 1.0 if (p.armed or blind) and not melee else 0.0, 16.0, delta)
 	_cover_w = _ease(_cover_w, p.cover_crouch, 13.0, delta)
+	_prone_w = _ease(_prone_w, p.prone_w, 7.0, delta)
 	_lean = _ease(_lean, p.cover_lean_dir.dot(left), 12.0, delta)
 	_blind_w = _ease(_blind_w, 1.0 if blind else 0.0, 16.0, delta)
 	_slide_w = _ease(_slide_w, 1.0 if p.cover_entering else 0.0, 18.0, delta)
@@ -293,6 +295,8 @@ func animate(p, delta: float) -> void:
 	var bend := 0.1 * ready_w + 0.14 * tired - 0.022 * b * ba - 0.22 * _flinch - 0.05 * _recoil + 0.14 * shove \
 		+ 0.42 * _cover_w - 0.3 * _slide_w + 0.35 * _vault_w + 0.75 * _roll_w + 0.35 * rising   # hunched behind cover, leaning back in a slide, curled in a roll
 	_tq[_hips] = _ry(hip_yaw + 0.4 * stance_yaw - 0.09 * sn * m) * _rz(-0.035 * cs * m)
+	if _prone_w > 0.001:
+		_tq[_hips] = _rx(1.5 * _prone_w) * _tq[_hips]
 	_tq[_chest] = _ry(-hip_yaw + 0.6 * stance_yaw + punch_twist + 0.12 * _look) \
 		* Quaternion(lean_axis, lean) * _rx(bend) * _rz(-0.34 * _lean) \
 		* _ry(0.19 * sn * m * (1.0 + 0.6 * _run_w)) * _rz(0.035 * cs * m + 0.014 * sw)

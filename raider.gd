@@ -27,7 +27,11 @@ extends Enemy
 @export var raider_hp := 60.0           # at Constitution 10
 @export var sight := 18.0               # m. Lowered from 26 (owner, 20 Nov 2026): they shot you from further than you could look
 @export var sight_fov_deg := 150.0      # on watch: how wide in front it notices you
-@export var close_sense := 4.0          # m: on watch, it notices you this close whichever way it faces
+@export var fight_fov_deg := 240.0      # in a fight it is looking about for you, but still not behind itself
+@export var close_sense := 4.0          # (no longer used: it has no eyes in the back of its head; it hears footsteps)
+## Noticing takes time: this long at arm's length, this long at the edge of its sight; longer the lower you are.
+@export var notice_time := Vector2(0.25, 1.6)
+@export var notice_fade := 3.0          # s for a half-formed suspicion to go
 @export var shot_damage := 12.0
 @export var spread_deg := 5.0           # at Dexterity 10, calm: its shots go this far either side of you
 @export var aim_time := 0.55            # s popped out before the first shot
@@ -65,6 +69,7 @@ var run_speed := 4.4
 var reticle_visible := false
 var reticle_offset := Vector3.ZERO
 var cover_crouch := 0.0
+var prone_w := 0.0                 # (the body reads it; raiders don't go prone yet)
 var cover_lean_dir := Vector3.ZERO
 var cover_blind := false
 var cover_entering := false
@@ -106,6 +111,8 @@ var _shot_cd := 0.0
 var _blind_left := 0
 var _unseen_t := 99.0
 var _see_t := 0.0
+var notice := 0.0                  # 0 nothing .. 1 it has seen you
+var _steps_t := 0.0
 var _cover_cd := 0.0
 var _cover_timeout := 0.0
 var _u := 0.0
@@ -251,7 +258,32 @@ func _physics_process(delta: float) -> void:
 	_unseen_t += delta
 	if _see_t <= 0.0:
 		_see_t = 0.2
-		sees = _can_see_player()
+		var in_view := _can_see_player()
+		var d_p := _xz(player.global_position - global_position).length()
+		if mode == "fight":
+			sees = in_view
+			notice = 1.0 if in_view else notice
+		else:
+			# On watch or searching: a glimpse isn't knowing. It builds, faster close up, slower the lower you are;
+			# a half-formed one turns its head your way.
+			if in_view:
+				var t: float = lerpf(notice_time.x, notice_time.y, clampf(d_p / sight, 0.0, 1.0)) * [1.0, 1.8, 2.5][player.posture]
+				if player.running:
+					t *= 0.6
+				notice = minf(notice + 0.2 / t, 1.0)
+				if notice >= 0.25 and notice < 1.0:
+					var to_p := player.global_position - global_position
+					to_p.y = 0.0
+					_turn(to_p.normalized(), 6.0, 0.2)
+			else:
+				notice = maxf(notice - 0.2 / notice_fade, 0.0)
+			sees = notice >= 1.0
+		# Footsteps: it hears what it can't see, and goes to look. It learns where the sound was, no more.
+		_steps_t -= 0.2
+		var nr: float = player.noise_radius()
+		if not sees and not player.dead and nr > 0.0 and d_p <= nr and _steps_t <= 0.0:
+			_steps_t = 1.0
+			hear_noise(player.global_position, true)
 		if sees:
 			last_seen = player.global_position
 			_unseen_t = 0.0
@@ -348,9 +380,12 @@ func _can_see_player() -> bool:
 	var to := player.global_position - global_position
 	to.y = 0.0
 	var d := to.length()
-	if d > sight or player.hidden_from(global_position) or hidden_from(player.global_position):
+	if d > sight * player.seen_mult() or player.hidden_from(global_position) or hidden_from(player.global_position) \
+			or player.low_hidden_from(global_position):
 		return false
-	if mode != "fight" and d > close_sense and facing.dot(to / maxf(d, 0.01)) < cos(deg_to_rad(sight_fov_deg) * 0.5):
+	# It sees only what is in front of it. (What is behind it, it has to hear.)
+	var fov := fight_fov_deg if mode == "fight" else sight_fov_deg
+	if d > 0.8 and facing.dot(to / maxf(d, 0.01)) < cos(deg_to_rad(fov) * 0.5):
 		return false
 	var eye := Vector3.UP * 1.5
 	return Projectile.wall_hit(get_world_3d().direct_space_state, global_position + eye,
@@ -398,9 +433,12 @@ func _damage(dmg: float, dir: Vector3, knock: float, by_player: bool) -> void:
 		return
 	if not by_player:
 		return
-	# It knows roughly where that came from.
+	# It knows which way that came from, not where you are: somewhere back along the shot.
 	if not sees and player != null:
-		last_seen = player.global_position
+		var back := Vector3(-dir.x, 0.0, -dir.z)
+		if back.length() > 0.01:
+			var far := minf(_xz(player.global_position - global_position).length(), 9.0) * randf_range(0.6, 1.0)
+			last_seen = global_position + back.normalized().rotated(Vector3.UP, randf_range(-0.3, 0.3)) * far
 		_unseen_t = minf(_unseen_t, lose_time * 0.5)
 	if mode != "fight":
 		_alert()

@@ -606,6 +606,36 @@ The owner asked for this before items exist, because items will make noise and c
   goes round anything else toward the nearer end (`_get_past`). There is still no path finding.
 - Zombies do none of that: no searching, no flanking, no going round. They only remember a direction.
 
+## Stealth: what raiders know, crouching and prone (built 20 Nov 2026, in review; untested on the owner's PC)
+
+The owner: raiders must not be automatically aware of things they cannot see; that opens the game to stealth,
+with crouching and going prone.
+
+- Raiders know only what they see or hear (`raider.gd`). Sight is a cone in front of them always: 150 degrees on
+  watch or searching, 240 in a fight (`fight_fov_deg`). The old all-round sense within 4 m is gone. Seeing isn't
+  instant unless they are already fighting you: `notice` builds from 0 to 1 while you are in view, in 0.25 s at
+  arm's length up to 1.6 s at the edge of their sight (`notice_time`), 1.8 times longer if you are crouched and
+  2.5 times if prone, quicker if you run; from 0.25 they turn their head your way; out of view it fades in 3 s.
+  Shot from where they can't see, they learn which way it came from, not where you are (a point back along the
+  shot, up to 9 m, off by up to 17 degrees). A shove still tells them exactly: you are touching them.
+- Footsteps (`Player.noise_radius()`): running, dashing or rolling 10 m; walking 4.5 m; crouched 1.5 m; crawling
+  0.8 m; standing still, nothing. A raider who hears them goes to look at where the sound was (once a second).
+  Zombies don't hear footsteps yet.
+- Crouch is Ctrl and prone is X; each key gets you down and up again (`Player.posture` 0, 1, 2). Speed 0.55 and
+  0.25 of walking. You are seen from 0.65 and 0.4 of the usual distance (`seen_mult()`): by raiders, and
+  zombies notice you from that much nearer too. Crouched within 1.3 m behind low cover, or prone within 2.6 m, it
+  hides you from the far side without the cover button (`low_hidden_from()`). Your own eyes drop to 0.6 m and
+  0.3 m, so low cover blocks your view. Prone: no punches, no guard, no dash, roll or run. Cover, a dash, a
+  roll, a vault, running, being grabbed and standing on bodies put you back on your feet.
+- Cloud runs, raider on watch, player standing still: facing you at 12 m, seen in 1.1 s; back turned, never.
+  Crouched: not seen at 12 m, seen in 1.7 s at 9 m. Prone: not seen at 9 m, seen in about 1.8 s at 6 m. A raider
+  on watch looks about, so walking up behind one is a gamble on when it turns.
+- Poses: the crouch reuses the cover squat. Prone is a stand-in: the whole body tipped flat, face down, arms at
+  its sides (`player_body.gd` `_prone_w`); it needs a real crawl. Sheet: `tools/preview/stances.png`
+  (`tools/cover_pose_preview.gd` ROW=2).
+- Not built: anything shown to the player about how close a raider is to noticing; quiet take-downs; raiders
+  crouching or going prone; light and dark; zombies hearing footsteps; raiders telling each other.
+
 ## Character sheet (built 20 Nov 2026, in review; untested on the owner's PC)
 
 The owner wants stats that cross The Sims with a zombie RPG: like Zomboid, with its own flavor. First version, from
@@ -645,7 +675,7 @@ The owner asked for raiders made from the existing player model and skin layers,
   as raiders yet (no clothes exist): they look like the player with a different skin.
 - Each has a `CharacterSheet` with attributes rolled 8 to 12: CON sets health (60 at 10), END speed, DEX aim;
   being hurt drops composure and spoils their aim for a while.
-- AI (`mode`): idle (on watch, sees 18 m (was 26; the owner had it lowered) in a 150 degree cone, 4 m all round; comes to gunshots), fight, search
+- AI (`mode`): idle (on watch, sees 18 m (was 26; the owner had it lowered) in a 150 degree cone; see Stealth; comes to gunshots), fight, search
   (goes to where it last saw or heard you, looks about, goes home), return.
 - Fighting: `_pick_cover()` finds cover between it and you within 12 m, with a clear straight walk there and a
   clear line to you once popped out; then it cycles hunker (reloads) -> peek -> pop out, aim 0.55 s, 1 to 3 shots

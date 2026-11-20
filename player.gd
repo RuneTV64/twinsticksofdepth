@@ -344,6 +344,22 @@ var _dash_t := 0.0
 var _dash_dir := Vector3.ZERO
 var _stagger := 0.0
 var held_by: Array[Enemy] = []   # zombies that have hold of you
+## How you are standing: 0 on your feet, 1 crouched, 2 flat on the ground. Lower is slower, quieter and harder
+## to see, and your own eyes are lower too.
+var posture := 0
+var prone_w := 0.0               # for the body: 1 = lying flat
+@export_group("Stealth")
+@export var crouch_speed := 0.55         # of walking speed
+@export var prone_speed := 0.25
+@export var crouch_seen := 0.65          # crouched, you are seen from this much of the usual distance
+@export var prone_seen := 0.4
+@export var crouch_hide_reach := 1.3     # m: crouched this close behind low cover, it hides you from the far side
+@export var prone_hide_reach := 2.6
+@export var noise_run := 10.0            # m your footsteps carry: running
+@export var noise_walk := 4.5
+@export var noise_crouch := 1.5
+@export var noise_prone := 0.8
+@export_group("")
 ## What you carry: weighted slots (inventory.gd).
 var inv := Inventory.new()
 ## Seeing to your wounds (the treatment screen is open). You don't move, and you see only a short way.
@@ -583,7 +599,7 @@ func is_melee() -> bool:
 ## True while your guard is up: Ready unarmed with stamina left to spend.
 ## A drained guard stays down until you've caught your breath (winded clears).
 func is_guarding() -> bool:
-	return armed and is_melee() and not dead and not winded and stamina > 0.0 and not sheet.one_armed
+	return armed and is_melee() and not dead and not winded and stamina > 0.0 and not sheet.one_armed and posture != 2
 
 
 func equip(w: String) -> void:
@@ -711,6 +727,7 @@ func _physics_process(delta: float) -> void:
 			return
 
 	_update_wheel()
+	_update_posture()
 	_update_stance()
 	_update_aim(delta)
 	_update_cover(delta, move_dir)
@@ -749,7 +766,7 @@ func _physics_process(delta: float) -> void:
 			spd = run_speed
 		var tired := fatigue()
 		spd *= lerpf(1.0, fatigue_min_speed, tired)
-		spd *= held_speed() * sheet.speed_mult
+		spd *= held_speed() * sheet.speed_mult * [1.0, crouch_speed, prone_speed][posture]
 		if perch > 0.25:
 			spd *= pile_speed   # wading over bodies
 			if move_dir.length() > 0.1:
@@ -1068,7 +1085,7 @@ func _update_cover(delta: float, move_dir: Vector3) -> void:
 			lean = d3 * cover_side * (1.0 if cover_mode == "pop" else 0.7)
 	elif _vault_t > 0.0:
 		crouch = 0.7
-	cover_crouch = crouch
+	cover_crouch = crouch if posture != 1 else maxf(crouch, 0.75)
 	cover_lean_dir = lean
 
 
@@ -1254,7 +1271,7 @@ func _try_vault() -> void:
 
 ## A roll along the ground, the way you are moving (or facing, if you aren't moving).
 func _start_roll(move_dir: Vector3) -> void:
-	if _roll_t > 0.0 or _roll_rec_t > 0.0 or _vault_t > 0.0 or dead or sheet.lame:
+	if _roll_t > 0.0 or _roll_rec_t > 0.0 or _vault_t > 0.0 or dead or sheet.lame or posture == 2:
 		return
 	if not held_by.is_empty():
 		show_status("Held! Shove it off or struggle", 0.8)
@@ -1468,11 +1485,11 @@ func _update_sight(delta := 0.0) -> void:
 	# Peeking or popped out, your view is back (and you can be seen).
 	var hunkered := in_cover and cover_mode == "hunker"
 	var eyes_down := treating and not treat_look
-	var low_eyes := in_cover and cover_face != null and cover_face.low and (hunkered or cover_side != 0)
+	var low_eyes := (in_cover and cover_face != null and cover_face.low and (hunkered or cover_side != 0)) or posture == 1
 	var k := 1.0 - exp(-10.0 * delta) if delta > 0.0 else 1.0
 	view_range = lerpf(view_range, treat_sight if eyes_down else (cover_hunker_sight if hunkered else sight_range), k)
 	view_near = lerpf(view_near, treat_sight if eyes_down else (cover_hunker_sight if hunkered else sight_near), k)
-	_eye_h = lerpf(_eye_h, (0.6 if low_eyes else sight_eye_height) + perch, k)   # higher up, you see over more
+	_eye_h = lerpf(_eye_h, (0.3 if posture == 2 else (0.6 if low_eyes else sight_eye_height)) + perch, k)   # higher up, you see over more
 	if sight_rays.size() != SIGHT_RAYS:
 		sight_rays.resize(SIGHT_RAYS)
 	if _sight_query == null:
@@ -1662,7 +1679,7 @@ func _update_sprint(delta: float, move_dir: Vector3) -> void:
 
 	var want_run := _sprint_t > sprint_tap_time and not armed and move_dir.length() > 0.1 \
 		and not winded and _stagger <= 0.0 and held_by.is_empty() and not in_cover and not cover_entering \
-		and perch <= 0.25 and not sheet.lame
+		and perch <= 0.25 and not sheet.lame and posture != 2
 	running = want_run and stamina > 0.0
 	if running:
 		stamina = maxf(stamina - run_drain * sheet.stamina_cost_mult * delta, 0.0)
@@ -1680,6 +1697,9 @@ func _update_sprint(delta: float, move_dir: Vector3) -> void:
 
 
 func _try_dash(move_dir: Vector3) -> void:
+	if posture == 2:
+		show_status("Get up first", 0.8)
+		return
 	if sheet.lame:
 		show_status("Not on one leg", 0.8)
 		return
@@ -1918,6 +1938,8 @@ func _shoot(dir: Vector3, from: Vector3, aimed: bool) -> void:
 ## Throw a punch. It doesn't stop you moving. The less stamina you have, the slower and
 ## weaker it is.
 func _punch() -> void:
+	if posture == 2:
+		return   # not from flat on the ground
 	var tired := 1.0 - clampf(stamina / max_stamina, 0.0, 1.0)
 	var slow := lerpf(1.0, punch_tired_slow, tired)
 	_swing_power = lerpf(1.0, punch_tired_damage, tired)
@@ -2271,6 +2293,53 @@ func _rise(things: Array[Dictionary]) -> void:
 		e.body.refresh()
 		e._new_zombie(false)
 	e.rise_from_death()
+
+
+## Crouch (Ctrl) and prone (X): each key gets you down and up again. Anything that needs your legs under you
+## (cover, a dash, a roll, a vault, a run, being grabbed) stands you up.
+func _update_posture() -> void:
+	if Input.is_action_just_pressed("crouch"):
+		posture = 0 if posture == 1 else 1
+	if Input.is_action_just_pressed("prone"):
+		posture = 0 if posture == 2 else 2
+	if in_cover or cover_entering or _dash_t > 0.0 or _roll_t > 0.0 or _roll_rec_t > 0.0 or _vault_t > 0.0 \
+			or not held_by.is_empty() or running or dead or perch > 0.25:
+		posture = 0
+	prone_w = 1.0 if posture == 2 else 0.0
+
+
+## How far off you can be seen, as a share of the watcher's usual range.
+func seen_mult() -> float:
+	return [1.0, crouch_seen, prone_seen][posture]
+
+
+## How far your footsteps carry right now (0 = silent: standing still).
+func noise_radius() -> float:
+	var v := Vector2(velocity.x, velocity.z).length()
+	if v < 0.3 or dead:
+		return 0.0
+	if posture == 2:
+		return noise_prone
+	if posture == 1:
+		return noise_crouch
+	return noise_run if (running or _dash_t > 0.0 or _roll_t > 0.0) else noise_walk
+
+
+## Down low behind something: is it between you and whoever is looking from `from`? (Crouched, low cover close
+## in front of you; flat on the ground, a little further off. Being "in cover" is the cover system's own rule.)
+func low_hidden_from(from: Vector3) -> bool:
+	if posture == 0:
+		return false
+	var me := Vector2(global_position.x, global_position.z)
+	var them := Vector2(from.x, from.z)
+	var reach := crouch_hide_reach if posture == 1 else prone_hide_reach
+	for b in Cover.boxes:
+		if not b.low or not Cover.crosses(them, me, b.rect):
+			continue
+		var near := Vector2(clampf(me.x, b.rect.position.x, b.rect.end.x), clampf(me.y, b.rect.position.y, b.rect.end.y))
+		if me.distance_to(near) <= reach:
+			return true
+	return false
 
 
 ## Sit down and see to your wounds (H), or put it down again.

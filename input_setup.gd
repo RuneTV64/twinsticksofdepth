@@ -37,6 +37,12 @@ static func apply() -> void:
 	_action("reload", 0.5)
 	_key("reload", KEY_R)
 
+	# Crouch and prone: each key gets you down, and up again.
+	_action("crouch", 0.5)
+	_key("crouch", KEY_CTRL)
+	_action("prone", 0.5)
+	_key("prone", KEY_X)
+
 	# HOLD: the camera lets go of you and follows the crosshair further out.
 	_action("free_look", 0.5)
 	_key("free_look", KEY_F)

@@ -6,7 +6,7 @@ extends SceneTree
 ## Run from a scratch copy of the game project (copy this file to its root), software OpenGL under xvfb:
 ##   ROW=0 OUT=/tmp/cover_0.png xvfb-run -a -s "-screen 0 2400x1600x24" godot --rendering-driver opengl3 \
 ##       --resolution 2240x560 -s res://cover_pose_preview.gd
-## ROW 0 = low cover, ROW 1 = high cover and the vault. Stack the rows with any image tool.
+## ROW 0 = low cover, ROW 1 = high cover and the vault, ROW 2 = crouched and prone (no cover). Stack the rows with any image tool.
 ## Test-only patch for the software renderer: it skips the linear->sRGB step, so the skin shader outputs its
 ## palette colors directly.
 
@@ -28,6 +28,16 @@ func _cells(row: int) -> Array:
 			["Ready: up over it", 1.2, -1, {"armed": true, "weapon": "gun"}],
 			["Blind fire over it", 1.2, -1, {"cover_crouch": 1.0, "cover_blind": true, "weapon": "gun"}],
 			["Ready: leaning out low", 1.2, -1, {"armed": true, "weapon": "gun", "cover_crouch": 0.75, "cover_lean_dir": Vector3(1, 0, 0)}],
+		]
+	if row == 2:
+		return [
+			["Standing (for scale)", 0.0, 1, {"nowall": true}],
+			["Crouched", 0.0, 1, {"cover_crouch": 0.75, "nowall": true}],
+			["Crouched, moving", 0.0, 1, {"cover_crouch": 0.75, "velocity": Vector3(1.2, 0, 0), "nowall": true}],
+			["Crouched, gun Ready", 0.0, 1, {"cover_crouch": 0.75, "armed": true, "weapon": "gun", "nowall": true}],
+			["Prone", 0.0, 1, {"prone_w": 1.0, "nowall": true}],
+			["Prone, crawling", 0.0, 1, {"prone_w": 1.0, "velocity": Vector3(0.5, 0, 0), "nowall": true}],
+			["Prone, gun Ready", 0.0, 1, {"prone_w": 1.0, "armed": true, "weapon": "gun", "nowall": true}],
 		]
 	return [
 		["Back to the wall", 2.6, 1, {}],

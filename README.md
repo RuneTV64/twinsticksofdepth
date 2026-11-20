@@ -23,6 +23,7 @@ Mouse and keyboard only. There is no controller support.
 | Roll (out of cover) | Space twice quickly |
 | Weapon wheel (hold) | Tab |
 | Reload | R |
+| Crouch / Prone (press again to get up) | Ctrl / X |
 | Camera in and out | Mouse wheel |
 | Free look (hold): the camera follows the crosshair further out | F or middle mouse button |
 | Character page | C |
