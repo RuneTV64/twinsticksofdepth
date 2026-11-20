@@ -112,6 +112,11 @@ extends CharacterBody3D
 @export var heap_rest := 3.0           # s with no crowd before the one on top drags itself out
 @export var fall_break := 1.8          # m: a drop this far can shake a rotten limb off
 
+@export_group("Breaking things")
+## Zombies tear at what is in their way (owner, 20 Nov 2026), the weakest thing first. All first guesses.
+@export var smash_force := 10.0        # a blow from an ordinary zombie; times walk_mult (1.2 fresh .. 0.6 rotted)
+@export var smash_every := 1.1         # s between blows, longer when stiff
+@export var smash_reach := 1.2         # m: how far in front of it it can beat on something
 @export_group("Crowd")
 ## Zombies closer than this (m, centre to centre) push apart; crawlers, lying longer, keep a bit more room.
 @export var personal_space := 0.75
@@ -149,6 +154,8 @@ var _in_heap := false
 var _heap_key := Vector2i.ZERO
 var _press_t := 0.0         # how long it has been walking into something
 var _press_box: Cover.Box = null
+var _barred := false        # the way over is shut by glass or boards: it beats on them
+var _smash_t := 0.0
 var _press_n := Vector3.ZERO
 var _climb_wait := 1.0
 var _crowd_n := 0           # how many others are pressing round it
@@ -245,7 +252,7 @@ func _ready() -> void:
 	collision_layer = 4
 	# Zombies don't collide with each other (it's the costliest part of a crowd); they steer apart instead (see
 	# _separation). They still collide with walls, doors and the player. Dummies still block everything.
-	collision_mask = 1 | 2 | 4 if kind == "dummy" else 1 | 2
+	collision_mask = (1 | 2 | 4 if kind == "dummy" else 1 | 2) | Solid.GLASS_LAYER
 	home = global_position
 	if kind == "shambler":
 		max_hp = shambler_hp
@@ -427,6 +434,7 @@ func _leave_tracks() -> void:
 		_step_from = global_position
 		_step_side = -_step_side
 		_ground_slow = Ground.it.slow_at(global_position)
+		Wreck.step_on(global_position, self)       # broken glass crunches under anyone
 		if perch < 0.25:
 			Ground.it.stamp(global_position, moved, _step_side, crawling)
 
@@ -724,7 +732,8 @@ func _tick(delta: float) -> void:
 					_press_n = Vector3(n.x, 0.0, n.z).normalized()
 			elif kind == "shambler" and col is StaticBody3D and absf(n.y) < 0.5 and going.dot(-n) > 0.5:
 				pressed = true
-				_press_box = Cover.box_of(col)
+				if Cover.box_of(col) != null:
+					_press_box = Cover.box_of(col)     # (window glass has none: the sill under it is what it climbs)
 				_press_n = Vector3(n.x, 0.0, n.z).normalized()
 	if kind == "shambler" and moving:
 		_press(delta, pressed)
@@ -979,6 +988,7 @@ func _settle(delta: float) -> void:
 func _press(delta: float, pressed: bool) -> void:
 	if not pressed or (state != "walk" and state != "down"):
 		_press_t = maxf(_press_t - delta * 2.0, 0.0)
+		_barred = false
 		return
 	if _press_t <= 0.0:
 		_climb_wait = randf_range(climb_delay.x, climb_delay.y) * (1.0 + body.stiff)
@@ -986,10 +996,20 @@ func _press(delta: float, pressed: bool) -> void:
 	var reach := climb_reach if body.legs() == 2 and not crawling else crawl_reach
 	if perch > 0.3:
 		reach += heap_boost   # shoved up from below by the ones still coming
-	if _press_box != null and _press_t >= _climb_wait and _press_box.top - perch <= reach:
+	var can_climb := _press_box != null and not _press_box.gone and _press_box.top - perch <= reach
+	if can_climb and _press_t >= _climb_wait:
 		if _start_climb():
 			return
 		_press_t = 0.0   # no way over here: keep pushing, look again in a while
+	# What it can't get over, it beats on, if something has its attention: whatever in front of it will give
+	# soonest (glass before boards, boards before a door, a door before a wall).
+	_smash_t -= delta
+	if _smash_t <= 0.0 and (not can_climb or _barred) and (prey != null or _drive > 0.0) and Breakable.count > 0:
+		_smash_t = smash_every * randf_range(0.8, 1.3) * (1.0 + body.stiff)
+		var force := smash_force * body.walk_mult
+		var b := Breakable.weakest(Vector2(global_position.x, global_position.z), Vector2(-_press_n.x, -_press_n.z), smash_reach, force)
+		if b != null:
+			b.hit(force, "blunt", global_position - _press_n * 0.4 + Vector3(0.0, 1.0, 0.0), self)
 	_heap_t -= delta
 	if _press_t > heap_after and _heap_t <= 0.0:
 		_heap_t = 0.5
@@ -1019,6 +1039,9 @@ func _start_climb() -> bool:
 		return false
 	var land := Vector2(global_position.x, global_position.z) + Vector2(dir.x, dir.z) * (depth + 1.0)
 	if not Cover.has_room(land, _press_box):
+		return false
+	if Breakable.barrier_between(Vector2(global_position.x, global_position.z), land) != null:
+		_barred = true     # a pane or boards across the opening: it has to break them first
 		return false
 	if Cover.bounds.size != Vector2.ZERO and not Cover.bounds.grow(-1.0).has_point(land):
 		return false

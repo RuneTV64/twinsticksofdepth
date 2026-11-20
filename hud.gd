@@ -81,6 +81,10 @@ Wounds: H sits you down to treat them by hand with what you carry (a first-aid b
 Bites infect. Only taking the arm or leg off before it reaches the body can cure it (hatchet, in the treatment
   screen), and that takes luck. Steroids slow it. Run its course and you turn; your old self walks with your things.
 Horde: noise warms an area and draws zombies in from round about. Z shows the readout. Killed ones don't come back.
+Breaking things: everything breaks. Ready, crosshair on it, close by, left-click: fists, or the hatchet (wood) or
+  sledgehammer (brick, pavement) if you carry one; a gun shoots it. Zombies beat on what is in their way, weakest
+  first. What is left can be picked through, and rusts and rots away. Broken glass crunches underfoot.
+  P boards the window by the crosshair   O breaks what the crosshair is on   Shift+O ten minutes of rust and rot
 Cutaway: walls between the camera and you open up. V switches it off and on, to compare.
 Cover test: G test gunner at the crosshair   Shift+G remove them
 Raiders: a camp in the south-west of the yard.  T adds one at the crosshair   Shift+T removes those

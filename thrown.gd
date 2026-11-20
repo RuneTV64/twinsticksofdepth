@@ -14,6 +14,8 @@ var peak := 2.0              # how high the arc goes above the straight line
 var flight := 0.8
 var thrower: Node = null
 var _t := 0.0
+var _pane: Breakable = null      # a window in the way: it goes through it
+var _pane_u := 0.0
 
 
 func _ready() -> void:
@@ -26,6 +28,14 @@ func _ready() -> void:
 	m.material_override = mat
 	add_child(m)
 	global_position = from
+	# Glass between the hand and where it is going breaks as the thing passes.
+	var p0 := Vector2(from.x, from.z)
+	var p1 := Vector2(to.x, to.z)
+	_pane = Breakable.barrier_between(p0, p1)
+	if _pane != null and _pane.lets_shots:
+		_pane_u = clampf((_pane.rect.get_center() - p0).dot(p1 - p0) / maxf((p1 - p0).length_squared(), 0.0001), 0.0, 1.0)
+	else:
+		_pane = null
 
 
 func _process(delta: float) -> void:
@@ -33,6 +43,10 @@ func _process(delta: float) -> void:
 	var u := clampf(_t / maxf(flight, 0.05), 0.0, 1.0)
 	global_position = from.lerp(to, u) + Vector3.UP * (4.0 * peak * u * (1.0 - u))
 	rotation += Vector3(7.0, 3.0, 5.0) * delta
+	if _pane != null and u >= _pane_u:
+		if is_instance_valid(_pane) and global_position.y >= _pane.foot and global_position.y <= _pane.top:
+			_pane.hit(15.0, "blunt", global_position, thrower)
+		_pane = null
 	if u >= 1.0:
 		_land()
 

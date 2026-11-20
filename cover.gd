@@ -23,6 +23,7 @@ class Box:
 	var top := 0.0
 	var low := false
 	var body: Object
+	var gone := false      # it was broken: whoever was using it has to let go
 
 
 class Face:
@@ -34,8 +35,8 @@ class Face:
 	var box: Box
 	var low := false
 	var top := 0.0
-	# Worked out once, the first time the face is used (see prep):
-	var ready := false
+	# Worked out the first time the face is used, and again after the level changes (see prep):
+	var ready := -1
 	var next: Array = [null, null]      # the face that carries on past each end, if any
 	var open: Array = [false, false]    # can you lean out round each end
 	var t_min := 0.0                    # how far along it a user can go
@@ -46,6 +47,7 @@ static var boxes: Array[Box] = []
 static var faces: Array[Face] = []
 static var by_body := {}          # a box's body (instance id) -> its Box, for whoever walks into it
 static var bounds := Rect2()      # the playable area (XZ); nothing climbs out of it. Empty = no limit
+static var version := 0           # goes up whenever a box is added or removed: faces work their ends out again
 
 
 static func clear() -> void:
@@ -72,6 +74,7 @@ static func add_box(body: Object, pos: Vector3, size: Vector3) -> void:
 	b.low = top <= LOW_TOP
 	b.body = body
 	boxes.append(b)
+	version += 1
 	if body != null:
 		by_body[body.get_instance_id()] = b
 	if b.low and body != null:
@@ -84,6 +87,18 @@ static func add_box(body: Object, pos: Vector3, size: Vector3) -> void:
 	_add_face(b, Vector2(x0, z1), Vector2.RIGHT, size.x, Vector2(0, 1), size.z)    # south side
 	_add_face(b, Vector2(x0, z0), Vector2.DOWN, size.z, Vector2(-1, 0), size.x)    # west side
 	_add_face(b, Vector2(x1, z0), Vector2.DOWN, size.z, Vector2(1, 0), size.x)     # east side
+
+
+## Something solid was broken or taken away: its box and faces go, and anyone using them is told by `gone`.
+static func remove_box(body: Object) -> void:
+	var b := box_of(body)
+	if b == null:
+		return
+	b.gone = true
+	by_body.erase(body.get_instance_id())
+	boxes.erase(b)
+	faces = faces.filter(func(f: Face) -> bool: return f.box != b)
+	version += 1
 
 
 static func _add_face(b: Box, a: Vector2, dir: Vector2, length: float, n: Vector2, depth: float) -> void:
@@ -109,9 +124,9 @@ static func spot(f: Face, t: float) -> Vector2:
 ## Work out a face's ends, once: what carries on past them, whether you can lean round them, how far you can go.
 ## Done on first use, so the whole level is registered by then.
 static func prep(f: Face) -> void:
-	if f.ready:
+	if f.ready == version:
 		return
-	f.ready = true
+	f.ready = version
 	for end in 2:
 		var nb := _neighbor(f, end)
 		f.next[end] = nb

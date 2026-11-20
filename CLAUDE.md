@@ -270,6 +270,90 @@ stand-ins until the game has a clock (`body_health.gd`, "the bite").
 - Not built: sickness other than the bite, a turned raider, more than one cutting tool, cauterising, prosthetics.
 - Next, in order: sickness; the new needs (hygiene, morale, toilet, warmth).
 
+## Two rules for every object (owner, 20 Nov 2026)
+
+Apply both to everything made from now on: level pieces, furniture, appliances, props, building assets.
+
+1. **Everything can be broken.** Walls, floors, ceilings, stairs, doors, windows, furniture, appliances, street
+   signs, pavement. Nothing solid goes into the world except through `Solid` (`solid.gd`), which gives it a
+   material and a `Breakable`. A new kind of object needs: what it is made of (one material, or shares of
+   several), what it is called, and what its wreckage is. If it needs a new material, add it to
+   `materials.gd` with its scrap item and what clears it away. The only exception is the test map's outer
+   wall (`fixed`): it is the edge of the map, not a thing in the world.
+2. **Everything has a purpose.** "If the object does not interact with the player in some way then it doesn't
+   need to exist in game. Everything has a purpose, even if it's just a blade of grass that sways when a
+   player walks through it." So no pure decoration: before adding an object, say what the player does with
+   it or what it does to the player (cover, a container, something to break for materials, something that
+   makes noise, hides you, slows you, lights you). If there is no answer, leave it out.
+
+## Breaking things (built 20 Nov 2026, in review; not seen by the owner)
+
+The owner's order: everything destructible; pavement broken up into rock with the proper tools and enough
+work; zombies destroy parts of buildings and tear first at the path of least resistance "of whatever little
+catches their attention" (someone jumps in a window and boards it: a zombie that saw it smacks at the window
+until it breaks); broken glass and broken appliances stick around, and their materials can be retrieved,
+broken; rust and wood rot clear broken things away over time, "the non-biodegradable form of maggots".
+This is the foundation; every number in it is Claude's first guess.
+
+- Materials (`materials.gd`, `Materials.DEFS`): glass, wood, plaster, brick, concrete, asphalt, metal,
+  plastic. Each has strength per square metre of the thing's biggest face (`hp`), a hardness (`hard`), how
+  well each kind of blow works on it, its scrap item, what clears its wreckage away (`agent`) and how far a
+  blow on it is heard. Kinds of blow: blunt (fists, boot, rifle butt, zombie hands), chop (hatchet), pound
+  (sledgehammer), pierce (bullet). A blow weaker than the material's hardness only scratches it (4% of its
+  force): nothing is unbreakable, but the wrong tool takes a very long time. That is the whole of "proper
+  tools and enough work".
+- `breakable.gd` (`Breakable`, a child of the thing; also in the group "destructible"): `hit(force, kind, at,
+  by)`, `hits_left(force, kind)` (the measure of resistance), `feel()` (how it will go, in words), three
+  stages of damage (sound, damaged, about to give: the test level darkens the thing a step each). When it
+  gives way: wreckage, a noise heard 1.8 times as far as a blow, out of the cover system
+  (`Cover.remove_box`; anyone using that cover lets go), freed. Sight and shots open up by themselves
+  because both are physics rays. It has no `_process`; things are found through a 2 m grid (`near()`,
+  `under()`, `weakest()`).
+- `solid.gd` (`Solid`): `box` (anything standing), `pane` (window glass), `board` (planks over a window),
+  `slab` / `surface` (floors, pavement). `main.gd`'s `_box`, `_glass` and `_flat_box` go through it.
+  - A long wall is cut where it is hit: the first blow cuts a 1.2 m section out as a piece of its own and
+    that is what breaks, so a hole is a person wide. Nothing is cut up until it is hit.
+  - Window glass is now solid to bodies (physics layer 16, `Solid.GLASS_LAYER`: it stops the player,
+    zombies and raiders, not sight). A shot goes through and shatters it; a thrown rock or bottle too.
+    Nobody vaults or climbs through an opening with a pane or boards across it (`Breakable.barrier_between`).
+  - Floors and pavement are worked a square metre at a time and leave a hole showing dirt.
+- In the test level: house walls brick, inside walls plaster, crates wood, cars metal with glass and
+  plastic, the street asphalt, floors wood, doors wood (the locked one twice as strong, part metal); a
+  table, a fridge and a street sign as one of each sort; a sledgehammer in the tool box.
+- The player (`player.gd`, `_strike_breakable()`, `break_tool()`): Ready, crosshair on the thing (the red x),
+  within `break_reach` 1.9 m, left-click. Fists Ready you use the best tool you carry for that material
+  (hatchet chops, sledgehammer pounds); gun in hand it is shot, or butted when empty. The prompt names the
+  thing, its material, its state and how it will go, never a number. Bare fists on glass may cut your arm
+  (35%), on something too hard may bruise it (15%). A failed door barge also splinters the door.
+- Zombies (`enemy.gd`, Breaking things exports): one walking into something it can't climb, with prey or a
+  drive in its head, beats on it every `smash_every` 1.1 s (slower stiff) with `smash_force` 10 times its
+  `walk_mult` (12 fresh, 6 rotted). It goes for whatever within `smash_reach` 1.2 m in front of it will give
+  in the fewest blows (`Breakable.weakest`): glass before boards, boards before a door, a door before a
+  wall. A low thing it can climb it still climbs, unless glass or boards bar the way; then it breaks them
+  first and climbs through. Its blows are not sent out as noise (a horde beating on a house would warm the
+  area for ever); the thing giving way is heard.
+- Wreckage (`wreck.gd`, `Wreck`): what is left where the thing stood, by material and area. Interact picks
+  through it for the scrap items (`glass_shard`, `wood_scrap`, `scrap_metal`, `plastic_scrap`; brick,
+  concrete and pavement give the existing `rock`). Wreckage landing within 0.8 m of more joins it.
+  - Broken glass crunches underfoot (`Wreck.step_on`, from the player's and enemies' footfalls): heard 6 m,
+    half that crouched or crawling, and each footfall grinds 4% of it away. So glass round a window is an
+    alarm for whoever walks on it, you included.
+  - Rust and rot (`wear.gd`, `Wear`, one node, a 5 s clock): wood and plaster rot (gone in 15 minutes dry),
+    metal rusts (30 minutes dry), both up to 3 to 4 times quicker in the wet (`Seasons` wetness); glass
+    goes only by being trodden in; stone and plastic stay until taken. What has rusted or rotted away can't
+    be salvaged. The times are stand-ins for the clock.
+- Debug keys: P boards the window nearest the crosshair (free and instant: a stand-in); O breaks what the
+  crosshair is on; Shift+O passes ten minutes of rust and rot.
+- Stand-ins and not built: the wreckage's look (a scatter of plain bits, not the 8-shade look) and the
+  damage stages (a darker colour); no cracks, dust or flying bits; boarding costs nothing (planks, nails, a
+  hammer and the time come with items); nothing falls when what held it up goes (a wall over a broken
+  section stays, no collapse); ceilings, stairs and upper floors don't exist yet; raiders don't break
+  things on purpose (their shots do damage walls); no fire; a hole in a floor or pavement does nothing yet
+  (it is meant to show soil to dig or plant in); broken appliances give materials only, not parts; a door's
+  footprint doesn't follow its swing; zombies have no pose for beating on things; wreckage is drawn whether
+  or not you can see the spot.
+- Test: `tools/break_test.gd` (headless, in the real level).
+
 ## Small rules the owner has set (20 Nov 2026)
 
 - The mind goes with the body (owner: zombies follow tracks too, but "the more they rot they lose the ability
@@ -500,7 +584,7 @@ changes, update both, and keep them the same files.
 - Aiming at a part (owner, 20 Nov 2026; built the same day, untested on the owner's PC). The cursor is the
   ring (white Ready, grey with the weapon away; it no longer hides with fists Ready). The owner tried a small
   grey x for it and changed their mind the same day: the ring stays, and Ready it switches to a red x on an
-  enemy or on something that can be broken (a node in the group "destructible"; nothing is in it yet). The
+  enemy or on something that can be broken (see Breaking things). The
   part of the enemy it is on is where the shot is likeliest to land. `Enemy.part_points()` gives where the six
   parts are (standing up, or lying along its facing); `Player._update_hover()` takes each part where the camera
   sees it against the ground (the camera never turns) and picks the nearest within `hover_radius` 0.34 m

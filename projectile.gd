@@ -83,10 +83,22 @@ func _physics_process(delta: float) -> void:
 			best_p = null
 	# 2) Walls / doors: physics ray. Shots pass over low cover (see wall_hit).
 	var hit := wall_hit(get_world_3d().direct_space_state, from, to, exclude)
+	var wall_t := 2.0
+	if not hit.is_empty():
+		wall_t = from.distance_to(hit["position"]) / maxf(from.distance_to(to), 0.0001)
+	# Glass in the way: the shot goes through it and it shatters.
+	var pane := Breakable.barrier_between(Vector2(from.x, from.z), Vector2(to.x, to.z))
+	if pane != null and pane.lets_shots and from.y >= pane.foot and from.y <= pane.top:
+		var pc := Vector3(pane.rect.get_center().x, from.y, pane.rect.get_center().y)
+		if (pc - from).dot(to - from) / maxf((to - from).length_squared(), 0.0001) < minf(wall_t, best_t):
+			pane.hit(damage, "pierce", pc, shooter if is_instance_valid(shooter) else null)
 	if not hit.is_empty():
 		var hp: Vector3 = hit["position"]
-		var wall_t := from.distance_to(hp) / maxf(from.distance_to(to), 0.0001)
 		if wall_t < best_t:
+			# Whatever it hit takes the shot: wood splinters, brick barely notices.
+			var br := Breakable.of(hit["collider"])
+			if br != null:
+				br.hit(damage, "pierce", hp, shooter if is_instance_valid(shooter) else null)
 			_report("hit wall (%s)" % (hit["collider"] as Node).name)
 			_impact(hp)
 			queue_free()

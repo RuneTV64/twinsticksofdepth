@@ -19,6 +19,11 @@ const DEFS := {
 	"fire_torch": {"name": "Burning torch", "w": 0.6, "cat": "tool", "uses": 300, "for": "A stick wound with rag and fat. Lit, it lights all round you for a few minutes and then it is gone."},
 	"rock": {"name": "Rock", "w": 0.4, "cat": "thrown", "stack": 3, "for": "Thrown, it makes a noise where it lands. It can be picked up again."},
 	"bottle": {"name": "Bottle", "w": 0.4, "cat": "thrown", "stack": 3, "for": "Thrown, it smashes: louder than a rock, and gone."},
+	"sledgehammer": {"name": "Sledgehammer", "w": 4.5, "cat": "tool", "for": "Pounds. The tool for brick, concrete and pavement; slow and tiring."},
+	"glass_shard": {"name": "Broken glass", "w": 0.1, "cat": "scrap", "stack": 5, "for": "Shards from something glass that broke. Sharp."},
+	"wood_scrap": {"name": "Splintered wood", "w": 0.4, "cat": "scrap", "stack": 3, "for": "Broken wood: no use as a plank any more, but it is still wood."},
+	"scrap_metal": {"name": "Scrap metal", "w": 0.6, "cat": "scrap", "stack": 2, "for": "Bent and torn metal from something that broke."},
+	"plastic_scrap": {"name": "Broken plastic", "w": 0.15, "cat": "scrap", "stack": 4, "for": "Cracked pieces of something plastic."},
 	"painkillers": {"name": "Painkillers", "w": 0.03, "cat": "medical", "uses": 6, "for": "Dulls pain for a few minutes: steadier hands, less slowed."},
 }
 

@@ -170,7 +170,7 @@ func _ready() -> void:
 	add_to_group("enemies")
 	add_to_group("raiders")
 	collision_layer = 4
-	collision_mask = 1 | 2 | 4
+	collision_mask = 1 | 2 | 4 | Solid.GLASS_LAYER
 	home = global_position
 	_look_dir = facing
 
@@ -244,6 +244,8 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if cover_face != null and cover_face.box.gone:
+		_drop_cover()      # what it was behind has been broken
 	_hurt_t -= delta
 	_stagger -= delta
 	_flash_t -= delta
@@ -850,7 +852,7 @@ func _get_past(box: Cover.Box, n: Vector3, going: Vector3) -> void:
 	if box != null and box.low:
 		var depth := box.rect.size.x if absf(n.x) > absf(n.z) else box.rect.size.y
 		var land := _xz(global_position) - Vector2(n.x, n.z) * (depth + 1.0)
-		if depth <= 2.2 and Cover.has_room(land, box) \
+		if depth <= 2.2 and Cover.has_room(land, box) and Breakable.barrier_between(_xz(global_position), land) == null \
 				and (Cover.bounds.size == Vector2.ZERO or Cover.bounds.grow(-1.0).has_point(land)):
 			_vault_from = global_position
 			_vault_to = Vector3(land.x, global_position.y, land.y)

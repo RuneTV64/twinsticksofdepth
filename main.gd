@@ -47,6 +47,8 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	Cover.clear()
+	Solid.reset()
+	add_child(Wear.new())
 	TallGrass.clear()
 	Daylight.reset()
 	add_child(Daylight.new())
@@ -165,6 +167,21 @@ func _unhandled_input(event: InputEvent) -> void:
 					hud.add_child(_zone_label)
 				_zone_label.visible = not _zone_label.visible
 				_zone_t = 0.0
+			KEY_P:   # board up the window nearest the crosshair (a stand-in until planks, nails and a hammer exist)
+				var win := Solid.window_near(player.global_position + player.reticle_offset, 2.5)
+				if win.is_empty():
+					player.show_status("No window by the crosshair.", 1.5)
+				else:
+					player.show_status("Boarded up." if Solid.board(win) else "It is boarded already.", 1.5)
+			KEY_O:   # break what the crosshair is on; Shift+O: ten minutes of rust and rot
+				if event.shift_pressed:
+					for w in get_tree().get_nodes_in_group("weathering"):
+						(w as Wear).pass_time(600.0)
+					player.show_status("Ten minutes of rust and rot.", 1.5)
+				elif player.hover_breakable != null:
+					player.hover_breakable.hit(100000.0, "pound", player.global_position + player.reticle_offset, player)
+				else:
+					player.show_status("Ready, with the crosshair on something.", 1.5)
 			KEY_V:   # the cutaway on / off, to compare
 				cutaway.enabled = not cutaway.enabled
 				player.show_status("Cutaway: %s" % ("ON" if cutaway.enabled else "OFF"), 1.5)
@@ -359,13 +376,14 @@ void fragment() {
 
 func _build_level() -> void:
 	var wall_col := Color(0.55, 0.52, 0.48)
-	# Outer wall around the whole map
+	# Outer wall around the whole map. It is the edge of the test map, not a thing in the world: the one
+	# thing that can't be broken (`fixed`).
 	var mid_z := (WORLD_Z0 + WORLD_Z1) * 0.5
 	var len_z := WORLD_Z1 - WORLD_Z0 + 1.0
-	_box(Vector3(0, WALL_H / 2, WORLD_Z0), Vector3(81, WALL_H, 1), wall_col)
-	_box(Vector3(0, WALL_H / 2, WORLD_Z1), Vector3(81, WALL_H, 1), wall_col)
-	_box(Vector3(WORLD_X0, WALL_H / 2, mid_z), Vector3(1, WALL_H, len_z), wall_col)
-	_box(Vector3(WORLD_X1, WALL_H / 2, mid_z), Vector3(1, WALL_H, len_z), wall_col)
+	Breakable.of(_box(Vector3(0, WALL_H / 2, WORLD_Z0), Vector3(81, WALL_H, 1), wall_col, "concrete")).fixed = true
+	Breakable.of(_box(Vector3(0, WALL_H / 2, WORLD_Z1), Vector3(81, WALL_H, 1), wall_col, "concrete")).fixed = true
+	Breakable.of(_box(Vector3(WORLD_X0, WALL_H / 2, mid_z), Vector3(1, WALL_H, len_z), wall_col, "concrete")).fixed = true
+	Breakable.of(_box(Vector3(WORLD_X1, WALL_H / 2, mid_z), Vector3(1, WALL_H, len_z), wall_col, "concrete")).fixed = true
 	# Wall between the yard and the cul-de-sac, with a gap for the road (x -5..5)
 	_box(Vector3(-22.5, WALL_H / 2, -40), Vector3(35, WALL_H, 1), wall_col)
 	_box(Vector3(22.5, WALL_H / 2, -40), Vector3(35, WALL_H, 1), wall_col)
@@ -392,12 +410,12 @@ func _build_level() -> void:
 
 	# Cover / props
 	var crate := Color(0.45, 0.36, 0.25)
-	_box(Vector3(-5, 0.6, 1), Vector3(1.2, 1.2, 1.2), crate)
-	_box(Vector3(6, 0.6, -3), Vector3(1.2, 1.2, 1.2), crate)
+	_box(Vector3(-5, 0.6, 1), Vector3(1.2, 1.2, 1.2), crate, "wood", "crate")
+	_box(Vector3(6, 0.6, -3), Vector3(1.2, 1.2, 1.2), crate, "wood", "crate")
 	_box(Vector3(12, 1.0, -6), Vector3(1, 2, 1), wall_col)
 	_box(Vector3(16, 1.0, 3), Vector3(1, 2, 1), wall_col)
-	_box(Vector3(-3, 0.5, -16), Vector3(2.4, 1.0, 1.0), crate)
-	_box(Vector3(4, 0.6, -19), Vector3(1.2, 1.2, 1.2), crate)
+	_box(Vector3(-3, 0.5, -16), Vector3(2.4, 1.0, 1.0), crate, "wood", "crate")
+	_box(Vector3(4, 0.6, -19), Vector3(1.2, 1.2, 1.2), crate, "wood", "crate")
 
 	# Dummies (west) to feel out aim
 	for p in [Vector3(-14, 0.05, 0), Vector3(-16, 0.05, 4), Vector3(-12, 0.05, 8), Vector3(-18, 0.05, -4)]:
@@ -423,7 +441,7 @@ func _build_level() -> void:
 	tools.title = "Tool box"
 	tools.tint = Color(0.7, 0.3, 0.2)
 	tools.position = Vector3(-5, 0, 4)
-	tools.contents = [Items.make("steroids"), Items.make("hatchet"), Items.make("torch"), Items.make("fire_torch")]
+	tools.contents = [Items.make("steroids"), Items.make("hatchet"), Items.make("torch"), Items.make("fire_torch"), Items.make("sledgehammer")]
 	add_child(tools)
 	_place_grass.call_deferred()     # once the whole level is built, so it lands clear of everything
 	for p in [Vector3(-1.5, 0, 3), Vector3(1.5, 0, 3), Vector3(-9, 0, 9), Vector3(-14, 0, 13)]:
@@ -436,6 +454,13 @@ func _build_level() -> void:
 	_sign(Vector3(20, 3.0, 0), "Shamblers")
 	_sign(Vector3(0, 3.4, -38), "Cul-de-sac ahead: ammo is in some of the houses")
 
+	# Things to break, one of each sort (everything else in the level breaks too): furniture, an appliance,
+	# a street sign. Each is there for a reason: cover, and what it is made of.
+	_box(Vector3(-4.5, 0.4, -12.5), Vector3(1.6, 0.8, 0.9), Color(0.5, 0.36, 0.22), "wood", "table")
+	_box(Vector3(-6.2, 0.9, -21.2), Vector3(0.8, 1.8, 0.8), Color(0.86, 0.87, 0.85), "metal", "fridge", {"metal": 0.6, "plastic": 0.4})
+	_box(Vector3(5.6, 1.2, -38.2), Vector3(0.12, 2.4, 0.12), Color(0.55, 0.57, 0.6), "metal", "street sign")
+	_sign(Vector3(0, 2.6, 5), "Break things: Ready, crosshair on it, left-click (P boards a window)")
+
 	_build_raider_camp()
 	_build_culdesac()
 
@@ -445,7 +470,7 @@ func _build_culdesac() -> void:
 	# Road in from the yard, ending in a turning circle.
 	var asphalt := Color(0.2, 0.2, 0.22)
 	var bulb := Vector3(0, 0, -78)
-	_flat_box(Vector3(0, 0.02, -51.5), Vector3(8, 0.04, 31), asphalt)
+	_flat_box(Vector3(0, 0.02, -51.5), Vector3(8, 0.04, 31), asphalt, "asphalt", "pavement")
 	var circle := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
 	cm.top_radius = 14.0
@@ -458,6 +483,7 @@ func _build_culdesac() -> void:
 	circle.material_override = cmat
 	circle.position = bulb + Vector3(0, 0.02, 0)
 	add_child(circle)
+	Solid.surface(circle, circle.position, Vector3(28, 0.04, 28), "asphalt", "pavement").radius = 14.0
 
 	# Houses: center (x, z), width (x), depth (z), which wall the front door is on.
 	_house(Vector2(-14, -53), 10, 12, "E", Color(0.66, 0.6, 0.5))          # street, west side
@@ -469,8 +495,8 @@ func _build_culdesac() -> void:
 	_house(Vector2(19, -98), 10, 10, "S", Color(0.6, 0.58, 0.62))          # circle, north-east
 
 	# Abandoned cars on the circle: cover you can see and shoot over.
-	_box(Vector3(-5, 0.7, -80), Vector3(1.9, 1.4, 4.2), Color(0.5, 0.18, 0.16))
-	_box(Vector3(9, 0.7, -70), Vector3(4.2, 1.4, 1.9), Color(0.2, 0.3, 0.5))
+	_box(Vector3(-5, 0.7, -80), Vector3(1.9, 1.4, 4.2), Color(0.5, 0.18, 0.16), "metal", "car", {"metal": 0.7, "glass": 0.1, "plastic": 0.2})
+	_box(Vector3(9, 0.7, -70), Vector3(4.2, 1.4, 1.9), Color(0.2, 0.3, 0.5), "metal", "car", {"metal": 0.7, "glass": 0.1, "plastic": 0.2})
 
 	# Ammo, inside four of the seven houses.
 	for p in [Vector3(-16, 0, -56), Vector3(30, 0, -82), Vector3(5, 0, -104.5), Vector3(21, 0, -100.5)]:
@@ -507,10 +533,10 @@ func _house(c: Vector2, w: float, d: float, door_side: String, col: Color,
 	var inner := col.darkened(0.12)
 	if split_x != 0.0:
 		_wall(Vector2(c.x + split_x, z0), Vector2(c.x + split_x, z1),
-			[{"at": d * 0.5 - DOOR_W * 0.5, "w": DOOR_W, "kind": "gap"}], inner)
+			[{"at": d * 0.5 - DOOR_W * 0.5, "w": DOOR_W, "kind": "gap"}], inner, "plaster")
 	if split_z != 0.0:
 		_wall(Vector2(x0, c.y + split_z), Vector2(x1, c.y + split_z),
-			[{"at": w * 0.5 - DOOR_W * 0.5, "w": DOOR_W, "kind": "gap"}], inner)
+			[{"at": w * 0.5 - DOOR_W * 0.5, "w": DOOR_W, "kind": "gap"}], inner, "plaster")
 
 
 ## Openings for one outside wall of the given length: a centered door with a window either
@@ -532,7 +558,7 @@ func _openings(length: float, has_door: bool) -> Array:
 ## A straight wall from a to b (XZ; must run along X or along Z) with openings cut into it.
 ## Each opening is {"at": meters from the west/north end to its near edge, "w": width,
 ## "kind": "door" (hinged Door), "window" (sill + glass) or "gap" (open doorway)}.
-func _wall(a: Vector2, b: Vector2, openings: Array, col: Color) -> void:
+func _wall(a: Vector2, b: Vector2, openings: Array, col: Color, stuff := "brick") -> void:
 	if a.x > b.x or a.y > b.y:
 		var t := a
 		a = b
@@ -544,14 +570,14 @@ func _wall(a: Vector2, b: Vector2, openings: Array, col: Color) -> void:
 	for o in openings:
 		var o0: float = o["at"]
 		var o1: float = o0 + float(o["w"])
-		_wall_piece(a, along_x, cursor, o0, 0.0, WALL_H, col)
+		_wall_piece(a, along_x, cursor, o0, 0.0, WALL_H, col, stuff)
 		match o["kind"]:
 			"window":
-				_wall_piece(a, along_x, o0, o1, 0.0, SILL_H, col)
-				_wall_piece(a, along_x, o0, o1, HEAD_H, WALL_H, col)
+				_wall_piece(a, along_x, o0, o1, 0.0, SILL_H, col, stuff)
+				_wall_piece(a, along_x, o0, o1, HEAD_H, WALL_H, col, stuff)
 				_glass(a, along_x, o0, o1)
 			"door":
-				_wall_piece(a, along_x, o0, o1, DOOR_H, WALL_H, col)
+				_wall_piece(a, along_x, o0, o1, DOOR_H, WALL_H, col, stuff)
 				var door := Door.new()
 				if along_x:
 					door.position = Vector3(a.x + o0, 0, a.y)       # panel runs toward +X
@@ -560,57 +586,37 @@ func _wall(a: Vector2, b: Vector2, openings: Array, col: Color) -> void:
 					door.rotation.y = PI / 2
 				add_child(door)
 			_:
-				_wall_piece(a, along_x, o0, o1, DOOR_H, WALL_H, col)
+				_wall_piece(a, along_x, o0, o1, DOOR_H, WALL_H, col, stuff)
 		cursor = o1
-	_wall_piece(a, along_x, cursor, length + WALL_T * 0.5, 0.0, WALL_H, col)
+	_wall_piece(a, along_x, cursor, length + WALL_T * 0.5, 0.0, WALL_H, col, stuff)
 
 
 ## One solid block of a wall: from d0 to d1 meters along it, from height y0 up to y1.
-func _wall_piece(a: Vector2, along_x: bool, d0: float, d1: float, y0: float, y1: float, col: Color) -> void:
+func _wall_piece(a: Vector2, along_x: bool, d0: float, d1: float, y0: float, y1: float, col: Color, stuff := "brick") -> void:
 	if d1 - d0 < 0.01:
 		return
 	var mid := (d0 + d1) * 0.5
 	var y := (y0 + y1) * 0.5
 	if along_x:
-		_box(Vector3(a.x + mid, y, a.y), Vector3(d1 - d0, y1 - y0, WALL_T), col)
+		_box(Vector3(a.x + mid, y, a.y), Vector3(d1 - d0, y1 - y0, WALL_T), col, stuff)
 	else:
-		_box(Vector3(a.x, y, a.y + mid), Vector3(WALL_T, y1 - y0, d1 - d0), col)
+		_box(Vector3(a.x, y, a.y + mid), Vector3(WALL_T, y1 - y0, d1 - d0), col, stuff)
 
 
-## Window glass: looks only. It doesn't stop sight, bullets or anything else (yet).
+## Window glass. It stops bodies, not sight; a shot or a blow breaks it (solid.gd).
 func _glass(a: Vector2, along_x: bool, d0: float, d1: float) -> void:
-	var m := MeshInstance3D.new()
-	var bm := BoxMesh.new()
 	var mid := (d0 + d1) * 0.5
+	var y := (SILL_H + HEAD_H) * 0.5
 	if along_x:
-		bm.size = Vector3(d1 - d0, HEAD_H - SILL_H, 0.05)
-		m.position = Vector3(a.x + mid, (SILL_H + HEAD_H) * 0.5, a.y)
+		Solid.pane(self, Vector3(a.x + mid, y, a.y), Vector3(d1 - d0, HEAD_H - SILL_H, 0.05))
 	else:
-		bm.size = Vector3(0.05, HEAD_H - SILL_H, d1 - d0)
-		m.position = Vector3(a.x, (SILL_H + HEAD_H) * 0.5, a.y + mid)
-	m.mesh = bm
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.6, 0.8, 0.95, 0.28)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.roughness = 0.1
-	m.material_override = mat
-	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(m)
+		Solid.pane(self, Vector3(a.x, y, a.y + mid), Vector3(0.05, HEAD_H - SILL_H, d1 - d0))
 
 
-## A flat colored slab with no collision (road, floorboards).
-func _flat_box(pos: Vector3, size: Vector3, col: Color) -> void:
-	var m := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = size
-	m.mesh = bm
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = col
-	mat.roughness = 0.95
-	m.material_override = mat
-	m.position = pos
-	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(m)
+## A flat slab with no collision (pavement, floorboards). Broken up a square metre at a time with the right
+## tool (solid.gd).
+func _flat_box(pos: Vector3, size: Vector3, col: Color, stuff := "wood", what := "floor") -> void:
+	Solid.slab(self, pos, size, col, stuff, what)
 
 
 func _first_aid(pos: Vector3) -> void:
@@ -658,24 +664,10 @@ func _ammo(pos: Vector3) -> void:
 	add_child(a)
 
 
-func _box(pos: Vector3, size: Vector3, col: Color) -> StaticBody3D:
-	var b := StaticBody3D.new()
-	b.collision_layer = 1
-	b.position = pos
-	var s := CollisionShape3D.new()
-	var bs := BoxShape3D.new()
-	bs.size = size
-	s.shape = bs
-	b.add_child(s)
-	var m := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = size
-	m.mesh = bm
-	m.material_override = Cutaway.solid(col)   # opens up when it stands between the camera and you
-	b.add_child(m)
-	add_child(b)
-	Cover.add_box(b, pos, size)   # anything solid standing on the ground is cover (cover.gd)
-	return b
+## Anything solid. `stuff` is what it is made of (materials.gd) and `what` is what it is called: everything
+## that goes into the level can be broken (solid.gd, breakable.gd).
+func _box(pos: Vector3, size: Vector3, col: Color, stuff := "brick", what := "wall", parts := {}) -> StaticBody3D:
+	return Solid.box(self, pos, size, col, stuff, what, parts)
 
 
 ## Raiders' camp, in the south-west corner of the yard: three raiders on watch among things to hide behind.
@@ -710,12 +702,12 @@ func _build_raider_camp() -> void:
 	var wall_col := Color(0.5, 0.48, 0.44)
 	_box(Vector3(-26, 0.55, 20), Vector3(4.0, 1.1, 0.5), wall_col)     # a low wall facing the yard
 	_box(Vector3(-19, 0.55, 23), Vector3(0.5, 1.1, 3.5), wall_col)     # and one on the east side
-	_box(Vector3(-30, 0.6, 24), Vector3(1.2, 1.2, 1.2), crate)
-	_box(Vector3(-23, 0.6, 27), Vector3(1.2, 1.2, 1.2), crate)
+	_box(Vector3(-30, 0.6, 24), Vector3(1.2, 1.2, 1.2), crate, "wood", "crate")
+	_box(Vector3(-23, 0.6, 27), Vector3(1.2, 1.2, 1.2), crate, "wood", "crate")
 	_box(Vector3(-27, 1.3, 30), Vector3(3.0, 2.6, 0.4), wall_col)      # a standing wall to lean round
 	_box(Vector3(-33, 1.0, 29), Vector3(1.0, 2.0, 1.0), wall_col)
 	# Cover on the way in, for you.
-	_box(Vector3(-17, 0.6, 14), Vector3(1.2, 1.2, 1.2), crate)
+	_box(Vector3(-17, 0.6, 14), Vector3(1.2, 1.2, 1.2), crate, "wood", "crate")
 	_box(Vector3(-24, 0.55, 12), Vector3(3.0, 1.1, 0.5), wall_col)
 	_box(Vector3(-11, 1.0, 20), Vector3(1.0, 2.0, 1.0), wall_col)
 	for p in [Vector3(-26, 0.05, 23), Vector3(-22, 0.05, 25), Vector3(-30, 0.05, 27)]:

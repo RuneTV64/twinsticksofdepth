@@ -177,6 +177,12 @@ var reload_time := 1.1
 @export var punch_still_speed := 0.6    # m/s; slower than this counts as holding still
 @export var punch_miss_chance := 0.2    # chance a punch in range just doesn't connect
 @export var punch_range := 1.75         # meters
+## Breaking things (first guesses): the force of a blow with each thing, times Strength (melee_mult).
+@export var break_fist := 6.0
+@export var break_butt := 14.0
+@export var break_hatchet := 30.0
+@export var break_sledge := 60.0
+@export var break_reach := 1.9          # m from you to the thing
 @export var punch_arc_dot := 0.5        # target must be within this cone of your facing (dot)
 @export var punch_knock := 1.5
 @export var punch_windup := 0.1         # fresh: seconds from the punch starting to it landing
@@ -430,16 +436,15 @@ var _weapon_mesh: BoxMesh
 var _weapon_mat: StandardMaterial3D
 var _reticle: MeshInstance3D
 var _reticle_x: MeshInstance3D
-## Something that can be broken is under the crosshair (a node in the group "destructible"). Nothing in the game
-## is in that group yet; things that can be broken should join it.
-var hover_breakable: Node3D = null
+## Something that can be broken is under the crosshair (breakable.gd: everything solid has one).
+var hover_breakable: Breakable = null
 var _reticle_mat: StandardMaterial3D
 
 
 func _ready() -> void:
 	add_to_group("player")
 	collision_layer = 2
-	collision_mask = 1 | 4
+	collision_mask = 1 | 4 | Solid.GLASS_LAYER
 	floor_snap_length = 0.3
 
 	var shape := CollisionShape3D.new()
@@ -869,6 +874,9 @@ func _update_ground() -> void:
 		_step_from = global_position
 		_step_side = -_step_side
 		Ground.it.stamp(global_position, moved, _step_side, crawl, true)
+		# Broken glass underfoot: it crunches, less going carefully.
+		if Wreck.step_on(global_position, self, 0.5 if posture > 0 else 1.0):
+			show_status("Glass crunches under you.", 0.9)
 
 
 func _tick_timers(delta: float) -> void:
@@ -1104,6 +1112,10 @@ func _go_to_cover(f: Cover.Face, t: float, recenter: bool) -> void:
 ## The Cover button, the crosshair's cover mark, and what state you are in behind cover.
 func _update_cover(delta: float, move_dir: Vector3) -> void:
 	var can := not dead and not wheel_open and held_by.is_empty() and _stagger <= 0.0 and _vault_t <= 0.0
+	if cover_face != null and cover_face.box.gone:
+		leave_cover()      # what you were behind has been broken
+	if cover_mark_face != null and cover_mark_face.box.gone:
+		cover_mark_face = null
 	# ---- the button: tap = slide into the nearest cover / leave (or vault); hold = go to the marked cover
 	if Input.is_action_just_pressed("cover") and can:
 		_cover_btn_t = 0.0
@@ -1329,6 +1341,10 @@ func _try_vault() -> void:
 		show_status("Too deep to vault", 0.8)
 		return
 	var land := Cover.spot(f, cover_t) - f.n * (f.depth + Cover.STANDOFF * 2.0)
+	var shut := Breakable.barrier_between(_xz(global_position), land)
+	if shut != null:
+		show_status("The %s is in the way: break it first" % ("window is shut and" if shut.stuff == "glass" else shut.title), 1.2)
+		return
 	var q := PhysicsPointQueryParameters3D.new()
 	q.collision_mask = 1
 	q.position = Vector3(land.x, global_position.y + 0.9, land.y)
@@ -1613,11 +1629,7 @@ func _update_hover() -> void:
 	hover_breakable = null
 	if not armed or dead or not reticle_visible:
 		return
-	for n in get_tree().get_nodes_in_group("destructible"):
-		var b := n as Node3D
-		if b != null and _xz(b.global_position - global_position - reticle_offset).length() <= 0.7:
-			hover_breakable = b
-			break
+	hover_breakable = Breakable.under(_xz(global_position + reticle_offset))
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
@@ -2062,12 +2074,62 @@ func _land_punch() -> void:
 		if to.length() < best and to.normalized().dot(facing) > punch_arc_dot:
 			best = to.length()
 			target = en
-	if target == null or randf() < punch_miss_chance:
+	if target == null:
+		_strike_breakable(_swing_power)     # no one to hit: the blow goes into whatever the crosshair is on
+		return
+	if randf() < punch_miss_chance:
 		return
 	var dmg := randf_range(punch_damage_min, punch_damage_max) * _swing_power * melee_mult
 	if Vector2(velocity.x, velocity.z).length() < punch_still_speed:
 		dmg *= punch_still_mult
 	target.take_hit(dmg, facing, punch_knock)
+
+
+## What you would hit this with right now: [force, kind, what to call it]. Fists Ready, you use the best tool
+## you carry for what it is made of (a hatchet chops, a sledgehammer pounds); gun in hand, its butt.
+func break_tool(b: Breakable) -> Array:
+	if armed and not is_melee():
+		return [break_butt * melee_mult, "blunt", "the butt of the gun"]
+	var best := [break_fist * melee_mult, "blunt", "your fists"]
+	if weapon == "fists":
+		for t: Array in [["hatchet", break_hatchet, "chop", "the hatchet"], ["sledgehammer", break_sledge, "pound", "the sledgehammer"]]:
+			if inv.has(t[0]) and b.dealt(t[1] * melee_mult, t[2]) > b.dealt(best[0], best[1]):
+				best = [t[1] * melee_mult, t[2], t[3]]
+	return best
+
+
+## Can you reach the breakable thing under the crosshair?
+func can_break() -> bool:
+	return armed and hover_breakable != null and is_instance_valid(hover_breakable) and hover_breakable.alive() \
+		and hover_breakable.gap_to(_xz(global_position)) <= break_reach \
+		and _xz(reticle_offset).length() <= break_reach + 1.0
+
+
+## A blow at whatever breakable thing the crosshair is on. Bare hands pay for it: glass cuts, stone bruises.
+func _strike_breakable(power: float) -> void:
+	if not can_break():
+		return
+	var b := hover_breakable
+	var tool := break_tool(b)
+	var at := global_position + reticle_offset
+	at.y = clampf(1.0, b.foot, maxf(b.top, b.foot))
+	var bare: bool = tool[2] == "your fists"
+	var hard: bool = float(tool[0]) < float(Materials.of(b.stuff)["hard"])
+	var stuff := b.stuff
+	b.hit(float(tool[0]) * power, tool[1], at, self)
+	_body.reach()
+	if tool[1] == "pound":
+		_fire_cd = maxf(_fire_cd, 0.9)          # a sledgehammer is slow and heavy
+		stamina = maxf(stamina - 8.0, 0.0)
+	elif tool[1] == "chop":
+		_fire_cd = maxf(_fire_cd, 0.5)
+		stamina = maxf(stamina - 3.0, 0.0)
+	if bare and stuff == "glass" and randf() < 0.35:
+		_wound("cut", 6.0, "ArmR")
+		show_status("The glass opens your arm.", 1.6)
+	elif bare and hard and randf() < 0.15:
+		_wound("bruise", 4.0, "ArmR")
+		show_status("You hurt your hand on it.", 1.4)
 
 
 ## Shove everything in reach in front of you straight back. No damage. Needs your guard:
@@ -2131,6 +2193,8 @@ func _bash() -> void:
 		to.y = 0.0
 		if to.length() < 1.8 and to.normalized().dot(facing) > 0.4:
 			en.take_hit(bash_damage, facing, 7.0)
+			return
+	_strike_breakable(1.0)
 
 
 func _update_interact() -> void:
@@ -2174,6 +2238,15 @@ func interact_prompt() -> String:
 		var ch := part_chance(hover_part, _xz(reticle_target.global_position - global_position).length())
 		return "%s: %s" % [str(PART_WORDS.get(hover_part, "body")).capitalize(),
 			"a long shot" if ch < 0.15 else ("a hard shot" if ch < 0.35 else ("a fair shot" if ch < 0.6 else ("a good shot" if ch < 0.93 else "can't miss")))]
+	if armed and hover_breakable != null and hover_target == null and hover_breakable.alive():
+		# Something to break: what it is, how it is holding up, and how this will go. Never a number.
+		var b := hover_breakable
+		var made := "%s, %s" % [Materials.of(b.stuff)["name"], b.state_word()]
+		if can_break() and (is_melee() or mag <= 0):
+			var tool := break_tool(b)
+			return "[Left-click]  Break the %s with %s (%s: %s)" % [b.title, tool[2], made, b.feel(tool[0], tool[1])]
+		if not is_melee() and mag > 0 and not b.surface:
+			return "The %s (%s): shooting it, %s" % [b.title, made, b.feel(shot_damage, "pierce")]
 	if interact_target == null:
 		return ""
 	var txt: String = interact_target.call("prompt_text", self)

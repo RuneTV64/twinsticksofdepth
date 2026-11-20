@@ -27,6 +27,7 @@ var _push_vel := 0.0
 var _weaken := 0.0
 var _shake := 0.0
 var _panel: MeshInstance3D
+var breakable: Breakable       # a door breaks like anything else: zombies beat on it, an axe goes through it
 
 
 func _ready() -> void:
@@ -63,6 +64,20 @@ func _ready() -> void:
 			band.material_override = Cutaway.solid(Color(0.25, 0.25, 0.28), 0.6)
 			band.position = Vector3(width * 0.5, y, 0.0)
 			body.add_child(band)
+	# What it is made of, and where it stands when shut (its footprint doesn't follow the swing).
+	var along := global_transform.basis.x
+	var mid := global_position + along * (width * 0.5) + Vector3(0.0, height * 0.5, 0.0)
+	var size := Vector3(width, height, 0.3) if absf(along.x) > 0.7 else Vector3(0.3, height, width)
+	breakable = Breakable.attach(self, mid, size, "wood", "door")
+	breakable.barrier = true
+	breakable.reindex()
+	body.set_meta("breakable", breakable)
+	if locked:
+		breakable.max_hp *= 2.0       # heavy, with iron bands
+		breakable.hp = breakable.max_hp
+		breakable.parts = {"wood": 0.85, "metal": 0.15}
+	var base := Color(0.32, 0.22, 0.14) if locked else Color(0.55, 0.38, 0.22)
+	breakable.on_stage = func(stage: int) -> void: _panel.material_override = Cutaway.solid(base.darkened(0.14 * stage))
 
 
 func _physics_process(delta: float) -> void:
@@ -121,6 +136,7 @@ func barge(power: float, from_pos: Vector3, dir: Vector3) -> bool:
 		return true
 	_weaken += 3.0
 	_shake = 0.25
+	breakable.hit(power * 2.0, "blunt", interact_point())     # every failed barge splinters it a little
 	return false
 
 
