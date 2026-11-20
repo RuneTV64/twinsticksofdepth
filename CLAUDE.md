@@ -89,6 +89,27 @@ it). The owner said to sketch before building anything; wait for their critique 
   container contents are rolled when first opened; time is applied on opening (spoiling, picked over by others);
   nothing respawns in a cupboard; keepsakes unlock starting builds.
 
+## Health, injury and medicine (being designed with the owner, 20 Nov 2026; nothing built)
+
+The owner put this ahead of items: how you take damage, get sick, get injured, get better, get worse and die.
+What the owner asked for: Sims-like needs (boredom, hunger, hygiene and so on) feeding a complex medical system;
+draw on other games but keep a twist of our own; treating wounds must be its own kind of interaction, different
+from the rummaging minigame; and the player must have a reason to learn medical.
+
+Claude's proposal, waiting for the owner's critique (sketch: `tools/sketches/treatment_screen_sketch.png`):
+
+- Wounds are on the body's six parts (the same six the zombie model has), of a few kinds: bruise, cut, deep cut,
+  bite, gunshot, break. Blood, not a health bar, is what kills quickly; pain and the injured part's function are
+  what slow you.
+- Knowing medicine is seeing: an untrained character knows only that it hurts and bleeds. Skill shows what is
+  actually wrong (a break or a sprain, an infection starting, where the bleeder is) and where to work.
+- Treatment is hands-on work on the wound close up, in order: stop the bleeding, clean it, close it, dress it,
+  support it. Each is done with the mouse and what you carry; your pointer shakes with pain and lost composure.
+- Other reasons to learn it: anatomy helps you kill (aimed shots, finishers); dissecting the dead is how you
+  practise; maggots from corpses clean infected wounds; you can treat other people.
+- Needs proposed: food, water, rest (exist), plus hygiene and morale (boredom, company), warmth with the seasons.
+- Open: what a zombie bite does (the turning mechanic), whether limbs can be lost, whether a toilet need exists.
+
 ## Naming: zombies and shamblers
 
 - **Zombies** is the name for the undead as a whole group.

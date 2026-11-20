@@ -1,0 +1,97 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box}
+body{margin:0;width:1600px;height:900px;background:#14171a;font-family:"DejaVu Sans Mono",monospace;color:#d9d4c7;position:relative;overflow:hidden}
+.world{position:absolute;left:0;top:0;width:1600px;height:210px;background:#2a2f2a}
+.dark{position:absolute;background:rgba(6,7,8,.86)}
+.cone{position:absolute;left:800px;top:170px;width:0;height:0;border-left:240px solid transparent;border-right:240px solid transparent;border-bottom:170px solid rgba(120,135,110,.55);transform:translate(-50%,-100%)}
+.you{position:absolute;left:787px;top:158px;width:26px;height:26px;border-radius:50%;background:#e08a3a;border:2px solid #111}
+.tag{position:absolute;font-size:13px;color:#e6c98a;background:rgba(0,0,0,.55);padding:3px 7px;border-radius:3px}
+.title{position:absolute;left:20px;top:12px;font-size:14px;color:#8f897b}
+.panel{position:absolute;left:60px;top:222px;width:1480px;height:650px;background:rgba(14,16,18,.97);border:2px solid #4a4438;display:flex}
+.half{padding:16px 20px;position:relative}
+.half+.half{border-left:2px solid #4a4438}
+h2{margin:0 0 4px;font-size:19px;letter-spacing:1px;color:#f0e6cf}
+.sub{font-size:12px;color:#8f897b;margin-bottom:8px;line-height:1.35}
+.note{position:absolute;font-size:12px;color:#e6c98a;border:1px dashed #e6c98a;padding:5px 8px;background:rgba(0,0,0,.75);line-height:1.3}
+.row{font-size:13px;margin:5px 0;display:flex;align-items:center;gap:8px}
+.meter{display:inline-block;width:170px;height:11px;border:1px solid #5a5446;position:relative;background:#22262a}
+.meter i{position:absolute;left:0;top:0;bottom:0}
+.step{font-size:13px;margin:4px 0;padding:5px 8px;border:1px solid #3d392f}
+.step.done{color:#8fbf7f;border-color:#3f5a38}.step.now{color:#f0e6cf;border-color:#e6c98a;background:#231f15}.step.no{color:#6b665b}
+.tool{display:inline-block;border:1px solid #5a5446;background:#1d2023;padding:7px 9px;font-size:12px;margin:0 6px 6px 0}
+.tool.sel{border-color:#e6c98a;color:#f0e6cf;background:#2a2416}
+.tool.na{color:#55514a;border-style:dashed}
+.lab{position:absolute;font-size:12px;line-height:1.25}
+.lab b{color:#f0e6cf;font-weight:normal}
+.red{color:#e8836b}.dim{color:#8f897b}.ok{color:#8fbf7f}
+</style></head><body>
+<div class="world"></div>
+<div class="dark" style="left:0;top:0;width:560px;height:210px"></div>
+<div class="dark" style="left:1040px;top:0;width:560px;height:210px"></div>
+<div class="dark" style="left:560px;top:184px;width:480px;height:26px"></div>
+<div class="cone"></div><div class="you"></div>
+<div class="tag" style="left:840px;top:150px">You, sat against a wall, working on your arm</div>
+<div class="tag" style="left:470px;top:14px">Treating a wound narrows your view like searching does. ALT looks up (your hands stop).</div>
+<div class="title">SKETCH: treatment screen. Not built.</div>
+
+<div class="panel">
+ <div class="half" style="width:470px">
+  <h2>YOUR BODY</h2>
+  <div class="sub">What you can tell about yourself. Medical 2 of 10: you can see cuts and bleeding. You can't yet tell a break from a sprain, or see an infection starting.</div>
+  <svg width="420" height="400" viewBox="0 0 420 400">
+   <g stroke="#111" stroke-width="3" fill="#b9a488">
+    <ellipse cx="150" cy="42" rx="26" ry="30"/>
+    <rect x="112" y="76" width="76" height="130" rx="12"/>
+    <rect x="72" y="80" width="30" height="78" rx="10"/><rect x="66" y="160" width="28" height="80" rx="10" fill="#c96a5a"/>
+    <rect x="198" y="80" width="30" height="78" rx="10"/><rect x="206" y="160" width="28" height="80" rx="10"/>
+    <rect x="116" y="210" width="32" height="92" rx="10"/><rect x="118" y="304" width="28" height="86" rx="10"/>
+    <rect x="152" y="210" width="32" height="92" rx="10"/><rect x="154" y="304" width="28" height="86" rx="10" fill="url(#h)"/>
+   </g>
+   <defs><pattern id="h" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#8d8068"/><rect width="4" height="8" fill="#5c5446"/></pattern></defs>
+   <circle cx="80" cy="198" r="9" fill="none" stroke="#e6c98a" stroke-width="3"/>
+  </svg>
+  <div class="lab" style="left:270px;top:250px"><b>Left forearm</b><br><span class="red">Deep cut, 7 cm. Bleeding.</span><br><span class="dim">(selected)</span></div>
+  <div class="lab" style="left:270px;top:420px"><b>Right shin</b><br><span class="dim">Swollen, hot, hurts to stand on.<br>You can't tell why.</span></div>
+  <div class="lab" style="left:270px;top:110px"><b>Head</b> <span class="ok">fine</span><br><b>Chest</b> <span class="dim">bruised</span></div>
+  <div style="position:absolute;left:20px;bottom:14px;width:430px">
+   <div class="row">Blood <span class="meter"><i style="width:71%;background:#c9584a"></i></span> 71% <span class="red">and falling</span></div>
+   <div class="row">Pain&nbsp; <span class="meter"><i style="width:58%;background:#d6a04a"></i></span> <span class="dim">slows you, spoils your aim</span></div>
+   <div class="row">Hands <span class="meter"><i style="width:44%;background:#7fae6a"></i></span> <span class="dim">shaken: they wander</span></div>
+  </div>
+ </div>
+
+ <div class="half" style="flex:1">
+  <h2>LEFT FOREARM: DEEP CUT</h2>
+  <div class="sub">The wound itself, close up. You work on it with what you carry, in order. Each job is done by hand with the mouse.</div>
+  <svg width="640" height="330" viewBox="0 0 640 330" style="background:#1a1512;border:2px solid #6b5540">
+   <rect x="0" y="70" width="640" height="190" fill="#b9a488"/>
+   <path d="M90 170 C180 120 300 215 420 150 S560 150 575 165 C520 200 430 185 400 195 S200 240 90 170Z" fill="#5a1512" stroke="#2a0806" stroke-width="3"/>
+   <path d="M120 170 C200 140 300 205 410 162 S520 160 550 166" fill="none" stroke="#8a2a22" stroke-width="10"/>
+   <path d="M140 172 C210 150 300 200 400 168" fill="none" stroke="#d8cdb4" stroke-width="3" stroke-dasharray="2 7"/>
+   <g stroke="#e9e2cf" stroke-width="3"><line x1="120" y1="148" x2="128" y2="194"/><line x1="170" y1="140" x2="176" y2="200"/><line x1="222" y1="146" x2="226" y2="208"/><line x1="276" y1="158" x2="278" y2="214"/></g>
+   <g fill="none" stroke="#e6c98a" stroke-width="2" stroke-dasharray="4 4"><circle cx="330" cy="168" r="9"/><circle cx="330" cy="204" r="9"/><circle cx="384" cy="160" r="9"/><circle cx="384" cy="196" r="9"/><circle cx="440" cy="150" r="9"/><circle cx="440" cy="186" r="9"/></g>
+   <polygon points="470,162 484,154 492,168 478,174" fill="#9fc3d6" stroke="#111" stroke-width="2"/>
+   <circle cx="520" cy="166" r="7" fill="#d23a2a"/><circle cx="520" cy="166" r="13" fill="none" stroke="#d23a2a" stroke-width="2"/>
+   <g stroke="#f0e6cf" stroke-width="2" fill="none"><circle cx="352" cy="176" r="14"/><line x1="352" y1="154" x2="352" y2="198"/><line x1="330" y1="176" x2="374" y2="176"/></g>
+   <path d="M352 176 q10 -9 3 -18 q-12 -4 -8 8" fill="none" stroke="#f0e6cf" stroke-width="1" stroke-dasharray="2 3"/>
+  </svg>
+  <div class="note" style="left:30px;top:96px;width:200px">Stitches you have put in: 4. The spacing is yours; uneven ones scar and may open.</div>
+  <div class="note" style="left:330px;top:300px;width:215px">Dotted rings: where the next ones should go. You only see these with enough Medical.</div>
+  <div class="note" style="left:468px;top:96px;width:190px">Glass still in it. Close over it and it festers.</div>
+  <div class="note" style="left:560px;top:214px;width:150px">The bleeder. Press on it first.</div>
+  <div style="display:flex;gap:26px;margin-top:10px">
+   <div style="width:330px">
+    <div class="step done">1. Stop the bleeding: press on it &nbsp; done</div>
+    <div class="step no">2. Clean it: 1 thing still in it &nbsp; skipped</div>
+    <div class="step now">3. Close it: 4 stitches of about 7</div>
+    <div class="step no">4. Dress it</div>
+   </div>
+   <div style="flex:1">
+    <div class="sub" style="margin:0 0 6px">In reach (from your slots):</div>
+    <span class="tool">Bare hand</span><span class="tool">Tweezers</span><span class="tool sel">Needle and thread (6)</span><span class="tool">Vodka (2)</span><span class="tool">Clean rag</span><span class="tool na">Bandage: none</span><span class="tool na">Splint: none</span>
+    <div class="sub" style="margin-top:6px">Your pointer drifts and jumps with your hands. Calm down, or take something for the pain, to steady it.</div>
+   </div>
+  </div>
+ </div>
+</div>
+</body></html>
