@@ -44,11 +44,20 @@ class Face:
 
 static var boxes: Array[Box] = []
 static var faces: Array[Face] = []
+static var by_body := {}          # a box's body (instance id) -> its Box, for whoever walks into it
+static var bounds := Rect2()      # the playable area (XZ); nothing climbs out of it. Empty = no limit
 
 
 static func clear() -> void:
 	boxes.clear()
 	faces.clear()
+	by_body.clear()
+	bounds = Rect2()
+
+
+## The box this body is, or null (doors, and boxes off the ground, aren't registered).
+static func box_of(body: Object) -> Box:
+	return by_body.get(body.get_instance_id()) if body != null else null
 
 
 ## Register a solid box: centre and size as built. Boxes off the ground (the wall over a window) and ones too low
@@ -63,6 +72,8 @@ static func add_box(body: Object, pos: Vector3, size: Vector3) -> void:
 	b.low = top <= LOW_TOP
 	b.body = body
 	boxes.append(b)
+	if body != null:
+		by_body[body.get_instance_id()] = b
 	if b.low and body != null:
 		body.set_meta("cover_low", true)
 	var x0 := b.rect.position.x

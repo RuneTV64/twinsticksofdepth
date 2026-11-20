@@ -275,7 +275,7 @@ func _pose_interval(e: Enemy) -> float:
 	if e.player == null:
 		return 0.0
 	var full := 1.0 / 60.0 - 0.0005   # (a hair under, so a 60 FPS frame never skips one)
-	if e.state != "walk" and e.state != "down" and not e.dead:
+	if e.state != "walk" and e.state != "down" and e.state != "heap" and not e.dead:
 		return full                     # it's got its hands on you, or its teeth in: always smooth
 	var now := Time.get_ticks_msec()
 	if now - _ranked_at > 250:

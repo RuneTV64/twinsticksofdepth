@@ -49,6 +49,24 @@ extends CharacterBody3D
 @export var corpse_time := 30.0        # s a dead zombie lies there before it fades (stand-in for the clean-up lore)
 @export var fall_apart_every := 20.0   # s: how often the most rotted get a chance to shed a part on their own
 
+@export_group("Climbing")
+# Zombies get over things by accident, not by plan. One that keeps walking into something it can get its arms over
+# drags itself across and tumbles down the far side. A crowd pressing on something taller tramples some of its own
+# underfoot; the fallen (and the dead) make a heap, the rest walk up it, and once the heap is high enough the ones
+# on top can reach the top of the wall and go over. It takes a crowd and some time, so it doesn't always happen.
+@export var climb_reach := 1.5         # m: it can drag itself over a top this far above its feet
+@export var crawl_reach := 0.6         # ... and this far when it has no legs to stand on
+@export var climb_delay := Vector2(0.6, 1.6)   # s pushing at it before it starts over (longer when stiff)
+@export var climb_time := 2.2          # s to get over, fresh (longer when stiff, and for a taller climb)
+@export var climb_max_depth := 2.6     # m: nothing deeper than this is climbed
+@export var heap_step := 0.85          # m: how big a step up it can take onto a heap (two bodies)
+@export var heap_pressure := 5         # this many pressing round it, and the one at the front can go under
+@export var heap_chance := 0.1         # ... with this chance every half second, once it has pushed for heap_after
+@export var heap_after := 2.5          # s it has to have been pushing first
+@export var heap_max := 5              # bodies deep, at most, in one spot (0.4 m each)
+@export var heap_rest := 3.0           # s with no crowd before the one on top drags itself out
+@export var fall_break := 1.8          # m: a drop this far can shake a rotten limb off
+
 @export_group("Crowd")
 ## Zombies closer than this (m, centre to centre) push apart; crawlers, lying longer, keep a bit more room.
 @export var personal_space := 0.75
@@ -71,8 +89,30 @@ const CELL := 1.0
 static var _grid := {}
 static var _grid_frame := -1
 
+# The heap: fallen and dead zombies by 0.8 m cell, bottom first. Everyone else walks on top of them.
+const HEAP_CELL := 0.8
+const HEAP_LAYER := 0.4
+static var _heap := {}
+static var _heap_n := 0     # bodies in heaps anywhere; 0 = no heap work is done at all
+
 var hp := 100.0
 var dead := false
+var perch := 0.0            # how far above the ground it is: standing on a heap, lying in one, going over a wall
+var _in_heap := false
+var _heap_key := Vector2i.ZERO
+var _press_t := 0.0         # how long it has been walking into something
+var _press_box: Cover.Box = null
+var _press_n := Vector3.ZERO
+var _climb_wait := 1.0
+var _crowd_n := 0           # how many others are pressing round it
+var _heap_t := 0.0
+var _quiet_t := 0.0
+var _climb_from := Vector3.ZERO
+var _climb_to := Vector3.ZERO
+var _climb_top := 0.0
+var _climb_h0 := 0.0
+var _climb_len := 2.0
+var _shown_y := 0.0
 var home := Vector3.ZERO
 var player: Player
 ## Who a zombie is after right now: the player or a raider, whichever living person it has noticed nearest.
@@ -269,6 +309,8 @@ func _update_fade(delta: float) -> void:
 func shove(dir: Vector3, force: float) -> void:
 	if dead or kind == "dummy":
 		return
+	if state == "climb" or state == "heap":
+		return   # half over a wall, or under a pile of others: there's no shoving it
 	_knock += Vector3(dir.x, 0.0, dir.z) * force
 	_cd = maxf(_cd, 0.6)
 	if state != "down" and state != "getup":
@@ -283,6 +325,9 @@ func _die() -> void:
 	hp = 0.0
 	collision_layer = 0
 	_let_go()
+	# Dying against a wall, or on a heap, it becomes part of the heap until the corpse is gone.
+	if body != null and not _in_heap and state != "climb" and (_press_t > 0.5 or perch > 0.1):
+		_join_heap()
 	_label.visible = false
 	if body != null:
 		_set_state("walk")
@@ -295,6 +340,9 @@ func _die() -> void:
 
 
 func _respawn() -> void:
+	_leave_heap()
+	perch = 0.0
+	_press_t = 0.0
 	dead = false
 	hp = max_hp
 	visible = true
@@ -310,12 +358,14 @@ func _respawn() -> void:
 
 
 func _set_state(s: String) -> void:
+	if state == "heap" and s != "heap" and not dead:
+		_leave_heap()
 	state = s
 	state_t = 0.0
 
 
 func _knock_down() -> void:
-	if dead or state == "down":
+	if dead or state == "down" or state == "climb" or state == "heap":
 		return
 	_let_go()
 	crawling = true
@@ -409,6 +459,11 @@ func _tick(delta: float) -> void:
 			# The corpse lies there, then dithers away.
 			body.set_fade(clampf(_corpse_t / 2.0, 0.0, 1.0) * _alpha)
 			body.visible = _corpse_t > 0.0
+			if _in_heap:
+				if _corpse_t <= 0.0:
+					_leave_heap()
+				else:
+					_settle(delta)
 		if _dead_t <= 0.0:
 			_respawn()
 		return
@@ -416,10 +471,28 @@ func _tick(delta: float) -> void:
 	var want := Vector3.ZERO
 	_noise_t -= delta
 	chasing = false
+	var moving := true
 	if kind == "shambler":
-		want = _think(delta)
+		if state == "climb":
+			_climb_step()
+			moving = false
+		elif state == "heap":
+			_heap_step(delta)
+			moving = false
+		else:
+			want = _think(delta)
 	elif kind == "dummy" and _since_hit > 3.0:
 		hp = max_hp
+	# Where it means to go, before the crowd pushes it about: what it is "walking into" is judged against this.
+	var going := want.normalized() if want.length() > 0.05 else Vector3.ZERO
+	var stepped := false
+	if _heap_n > 0 and moving and kind == "shambler":
+		# A heap ahead that is too big a step up stops it (and it presses there, like at a wall).
+		if going != Vector3.ZERO and heap_height(global_position + going * 0.5) > perch + heap_step:
+			want = Vector3.ZERO
+			stepped = true
+		if perch > 0.05:
+			want *= 0.6   # slow going over bodies
 
 	_knock = _knock.move_toward(Vector3.ZERO, 18.0 * delta)
 	if kind == "shambler":
@@ -445,19 +518,35 @@ func _tick(delta: float) -> void:
 	if kind == "dummy":
 		velocity.x = _knock.x
 		velocity.z = _knock.z
-	velocity.x *= _mult
-	velocity.z *= _mult
-	move_and_slide()
-	velocity.x /= _mult
-	velocity.z /= _mult
+	var pressed := stepped
+	if moving:
+		velocity.x *= _mult
+		velocity.z *= _mult
+		move_and_slide()
+		velocity.x /= _mult
+		velocity.z /= _mult
 
-	# Shamblers push doors open just like the player does.
-	for i in get_slide_collision_count():
-		var col := get_slide_collision(i).get_collider()
-		if col != null and col.has_meta("door"):
-			var door: Door = col.get_meta("door")
+		# Shamblers push doors open just like the player does. Anything else solid it is walking into, it presses on.
+		_press_box = null
+		for i in get_slide_collision_count():
+			var col := get_slide_collision(i).get_collider()
+			if col == null:
+				continue
 			var n := get_slide_collision(i).get_normal()
-			door.push(global_position, -Vector3(n.x, 0.0, n.z).normalized(), move_speed)
+			if col.has_meta("door"):
+				var door: Door = col.get_meta("door")
+				door.push(global_position, -Vector3(n.x, 0.0, n.z).normalized(), move_speed)
+			elif kind == "shambler" and col is StaticBody3D and absf(n.y) < 0.5 and going.dot(-n) > 0.5:
+				pressed = true
+				_press_box = Cover.box_of(col)
+				_press_n = Vector3(n.x, 0.0, n.z).normalized()
+	if kind == "shambler" and moving:
+		_press(delta, pressed)
+		# Standing on a heap, its feet are on the bodies.
+		perch = move_toward(perch, heap_height(global_position) if _heap_n > 0 else 0.0, (2.0 if _heap_n > 0 else 4.0) * delta)
+	if absf(perch - _shown_y) > 0.004:
+		_shown_y = perch
+		_visual.position.y = perch
 
 	if body != null:
 		_visual.rotation.y = atan2(-facing.x, -facing.z)
@@ -495,15 +584,20 @@ func _separation(delta: float) -> Array:
 	var cz := floori(p.z / CELL)
 	var push := Vector3.ZERO
 	var hard := Vector3.ZERO
+	var near := 0
 	for dx in range(-1, 2):
 		for dz in range(-1, 2):
 			var cell: Array = _grid.get(Vector2i(cx + dx, cz + dz), [])
 			for o: Enemy in cell:
 				if o == self:
 					continue
+				if o.state == "heap":
+					continue   # the fallen are underfoot, not in the way
 				var r := personal_space + (0.25 if crawling or o.crawling else 0.0)
 				var d := Vector3(p.x - o.global_position.x, 0.0, p.z - o.global_position.z)
 				var l2 := d.length_squared()
+				if l2 < 1.44:
+					near += 1
 				if l2 >= r * r:
 					continue
 				if l2 < 0.0001:
@@ -514,7 +608,153 @@ func _separation(delta: float) -> Array:
 				var g := min_gap + (0.2 if crawling or o.crawling else 0.0)
 				if l < g:
 					hard += d / l * (g - l) * 0.5 / maxf(delta, 0.001)   # (looked up every other tick: catches up over two)
+	_crowd_n = near
 	return [push, hard]
+
+
+# ---------------------------------------------------------------- over things, and over each other
+## How high the heap of bodies stands at this spot.
+static func heap_height(p: Vector3) -> float:
+	var arr: Array = _heap.get(Vector2i(floori(p.x / HEAP_CELL), floori(p.z / HEAP_CELL)), [])
+	return arr.size() * HEAP_LAYER
+
+
+## Lie down in the heap where it stands (fallen, or dead). False if that spot is already as deep as heaps get.
+func _join_heap() -> bool:
+	var key := Vector2i(floori(global_position.x / HEAP_CELL), floori(global_position.z / HEAP_CELL))
+	var arr: Array = _heap.get(key, [])
+	if arr.size() >= heap_max:
+		return false
+	arr.append(self)
+	_heap[key] = arr
+	_heap_key = key
+	_heap_n += 1
+	_in_heap = true
+	# It lands any old way: sprawled at an angle, tipped over the ones under it.
+	facing = facing.rotated(Vector3.UP, randf_range(-1.4, 1.4))
+	_visual.rotation.x = randf_range(-0.22, 0.22)
+	_visual.rotation.z = randf_range(-0.3, 0.3)
+	return true
+
+
+func _leave_heap() -> void:
+	if not _in_heap:
+		return
+	_in_heap = false
+	_visual.rotation.x = 0.0
+	_visual.rotation.z = 0.0
+	_heap_n = maxi(_heap_n - 1, 0)
+	var arr: Array = _heap.get(_heap_key, [])
+	arr.erase(self)
+	if arr.is_empty():
+		_heap.erase(_heap_key)
+
+
+func _exit_tree() -> void:
+	_leave_heap()
+
+
+## A body in the heap lies at its place in the stack, and sinks when one under it goes.
+func _settle(delta: float) -> void:
+	var arr: Array = _heap.get(_heap_key, [])
+	perch = move_toward(perch, maxi(arr.find(self), 0) * HEAP_LAYER, 2.5 * delta)
+	if absf(perch - _shown_y) > 0.004:
+		_shown_y = perch
+		_visual.position.y = perch
+
+
+## Walking into something. After a while it goes over, if it can get its arms over the top from where its feet
+## are. If it can't, and the crowd behind keeps pressing, sooner or later it goes under them.
+func _press(delta: float, pressed: bool) -> void:
+	if not pressed or (state != "walk" and state != "down"):
+		_press_t = maxf(_press_t - delta * 2.0, 0.0)
+		return
+	if _press_t <= 0.0:
+		_climb_wait = randf_range(climb_delay.x, climb_delay.y) * (1.0 + body.stiff)
+	_press_t += delta
+	var reach := climb_reach if body.legs() == 2 and not crawling else crawl_reach
+	if _press_box != null and _press_t >= _climb_wait and _press_box.top - perch <= reach:
+		if _start_climb():
+			return
+		_press_t = 0.0   # no way over here: keep pushing, look again in a while
+	_heap_t -= delta
+	if _press_t > heap_after and _heap_t <= 0.0:
+		_heap_t = 0.5
+		if _crowd_n >= heap_pressure and randf() < heap_chance and _join_heap():
+			# Down it goes, under the feet of the rest.
+			_let_go()
+			crawling = true
+			_quiet_t = 0.0
+			_set_state("heap")
+
+
+## Start over the thing it is pushing at: across it and down the far side, if there is room to land there.
+func _start_climb() -> bool:
+	var dir := -_press_n
+	var r := _press_box.rect
+	var depth := r.size.x if absf(dir.x) > absf(dir.z) else r.size.y
+	if depth > climb_max_depth:
+		return false
+	var land := Vector2(global_position.x, global_position.z) + Vector2(dir.x, dir.z) * (depth + 1.0)
+	if not Cover.has_room(land, _press_box):
+		return false
+	if Cover.bounds.size != Vector2.ZERO and not Cover.bounds.grow(-1.0).has_point(land):
+		return false
+	_let_go()
+	_climb_from = global_position
+	_climb_to = Vector3(land.x, global_position.y, land.y)
+	_climb_top = _press_box.top
+	_climb_h0 = perch
+	_climb_len = climb_time * (1.0 + 0.8 * body.stiff) * (0.7 + 0.3 * maxf(_climb_top - perch, 0.3))
+	crawling = true
+	facing = dir
+	_press_t = 0.0
+	_set_state("climb")
+	return true
+
+
+## Going over: up onto the top on its belly, across, and off the far edge in a heap.
+func _climb_step() -> void:
+	var u := clampf(state_t / maxf(_climb_len, 0.1), 0.0, 1.0)
+	var p := _climb_from.lerp(_climb_to, smoothstep(0.2, 0.9, u))
+	global_position = p
+	velocity = Vector3.ZERO
+	if u < 0.6:
+		perch = lerpf(_climb_h0, _climb_top, smoothstep(0.0, 0.4, u))
+	else:
+		perch = lerpf(_climb_top, 0.0, smoothstep(0.6, 1.0, u))
+	if u >= 1.0:
+		perch = 0.0
+		_set_state("down")
+		_down_t = randf_range(0.8, 2.5)
+		# A long drop can shake a rotten one apart.
+		if _climb_top >= fall_break and randf() < 0.3 + 0.5 * body.rot():
+			_shed_part()
+
+
+## Lying in the heap. The one on top drags itself out once the crowd has gone.
+func _heap_step(delta: float) -> void:
+	_settle(delta)
+	_heap_t -= delta
+	if _heap_t > 0.0:
+		return
+	_heap_t = 0.5
+	var arr: Array = _heap.get(_heap_key, [])
+	if arr.is_empty() or arr[arr.size() - 1] != self:
+		_quiet_t = 0.0
+		return   # others on top of it
+	var crowd := false
+	var cx := floori(global_position.x / CELL)
+	var cz := floori(global_position.z / CELL)
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for o: Enemy in _grid.get(Vector2i(cx + dx, cz + dz), []):
+				if o != self and is_instance_valid(o) and o.state != "heap" and not o.dead:
+					crowd = true
+	_quiet_t = 0.0 if crowd else _quiet_t + 0.5
+	if _quiet_t >= heap_rest:
+		_set_state("down")
+		_down_t = randf_range(0.4, 1.2)
 
 
 ## A shambler's mind: where it wants to go this tick, and what it does when it gets there.

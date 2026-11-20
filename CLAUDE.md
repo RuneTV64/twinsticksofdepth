@@ -232,10 +232,36 @@ document; keep it in step when the rules change).
 - Shots (`projectile.gd` `wall_hit`): low cover never stops a shot by itself, it goes over; someone hunkered behind
   it is protected by `Player.take_shot()`. Standing behind low cover without being in it gives no protection.
 - Zombies never use cover. One you are hidden from notices you at 0.35 of its range; one that was chasing goes to
-  where it last saw you. They don't climb low cover yet.
+  where it last saw you. They climb over low cover.
 - Poses are in `player_body.gd` (squat, peek, lean, gun up for blind fire, vault). Review sheet:
   `tools/preview/cover_poses.png`, made by `tools/cover_pose_preview.gd`.
-- Not built yet: zombies climbing low cover. (Raiders use cover and are protected by it: see Raiders.)
+- Zombies climb low cover (see Zombies over cover). Raiders use cover and are protected by it (see Raiders).
+
+## Zombies over cover and over each other (built 20 Nov 2026, in review; untested on the owner's PC)
+
+The owner asked for zombies to shamble over cover and, sometimes, to get over walls by piling up, like the film
+World War Z but mindless: an accident, not a plan. All of it is in `enemy.gd` (the Climbing exports).
+
+- Pressing: a zombie walking into something solid counts how long (`_press_t`). After 0.6 to 1.6 s (longer when
+  stiff) it goes over if the top is within `climb_reach` 1.5 m of its feet (0.6 m with no legs), the thing is no
+  deeper than 2.6 m, and there is room to land inside the world (`Cover.bounds`). So every piece of low cover,
+  window sills included, is climbed by one zombie alone.
+- Going over (`state` "climb"): a scripted move, on its belly over the top and off the far edge, 2 to 4 s; it lands
+  knocked down and gets up. A drop of 1.8 m or more can shake a limb off a rotten one.
+- The heap: when a zombie has pushed for 2.5 s at something it can't get over and 5 or more others are pressing
+  round it, every half second it has a 10% chance of going under them (`state` "heap"). Zombies that die pressing
+  or on a heap join it as corpses until they fade. Heaps are kept by 0.8 m cell (`Enemy._heap`), up to 5 bodies
+  (0.4 m each).
+- Everyone else walks on the heap: `perch` is how high a zombie stands (only the visual is raised; the physics body
+  stays on the ground). A step up of more than 0.85 m stops it, and it presses there, so the heap grows outward
+  into a rough ramp. From 1.2 m up, the top of a 2.6 m wall is in reach and it goes over.
+- The one on top of a heap drags itself out after 3 s with no crowd round it. Zombies in a heap or going over
+  can't be shoved or knocked down, but can be shot.
+- Cloud runs at a 2.6 m wall with the player behind it: 40 zombies, 15 over in 45 s; 20 zombies, 4 over after
+  about a minute; 10 zombies, none in two minutes. Nothing is done per tick when no heap exists anywhere.
+- Zombies don't look for heaps or ramps; they only ever walk at their prey. Raiders and the player don't climb
+  heaps. The climb uses the crawl pose; there is no pose of its own yet.
+- Review picture: `tools/preview/zombie_heap.png`, made by `tools/zombie_heap_preview.gd`.
 
 ## Character sheet (built 20 Nov 2026, in review; untested on the owner's PC)
 

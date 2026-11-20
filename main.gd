@@ -41,6 +41,7 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	Cover.clear()
+	Cover.bounds = Rect2(WORLD_X0, WORLD_Z0, WORLD_X1 - WORLD_X0, WORLD_Z1 - WORLD_Z0)
 	_build_environment()
 	_build_level()
 
