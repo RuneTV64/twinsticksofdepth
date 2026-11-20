@@ -39,7 +39,7 @@ Roll  Space twice quickly, out of cover: rolls the way you are moving"""
 const HELP_TAIL := """
 Doors: click them (weapon away) to open or shut them.
 A strong character (Strength 13) can bash a shut one in by dashing at it (it hurts). Doors stop zombies and raiders.
-Aim: the crosshair is a small grey x. Ready, on an enemy it goes red, and the part of them it is on (head, body,
+Aim: Ready, the cursor turns into a red x on an enemy, and the part of them it is on (head, body,
   an arm, a leg) is where the shot is likeliest to land: likelier close up and with Dexterity. Head = a kill;
   arms and legs can come off; a leg hit can put one down.
 Lock-on: a crosshair resting near an enemy settles onto it; move the mouse to take it off.

@@ -411,9 +411,11 @@ changes, update both, and keep them the same files.
   grasping fingers; the head turns toward its target. Springs run only in view within 14 m (`springs` to switch
   off): about +38% per posing there. Motion clips: `source/zombie_anim_clip.gd` + `zombie_anim_gif.py`
   (before/after GIFs in `preview/zombie_motion_*.gif`); stills can't show motion.
-- Aiming at a part (owner, 20 Nov 2026; built the same day, untested on the owner's PC). The crosshair is a
-  small grey x (weapon away too, and with fists Ready: it no longer hides). Ready, on an enemy it goes red, and
-  the part of them it is on is where the shot is likeliest to land. `Enemy.part_points()` gives where the six
+- Aiming at a part (owner, 20 Nov 2026; built the same day, untested on the owner's PC). The cursor is the
+  ring (white Ready, grey with the weapon away; it no longer hides with fists Ready). The owner tried a small
+  grey x for it and changed their mind the same day: the ring stays, and Ready it switches to a red x on an
+  enemy or on something that can be broken (a node in the group "destructible"; nothing is in it yet). The
+  part of the enemy it is on is where the shot is likeliest to land. `Enemy.part_points()` gives where the six
   parts are (standing up, or lying along its facing); `Player._update_hover()` takes each part where the camera
   sees it against the ground (the camera never turns) and picks the nearest within `hover_radius` 0.34 m
   (`hover_target`, `hover_part`). The gun turns to whoever the crosshair is on, so a shot at the head goes at

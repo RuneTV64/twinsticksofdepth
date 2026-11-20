@@ -372,6 +372,10 @@ var _weapon: MeshInstance3D
 var _weapon_mesh: BoxMesh
 var _weapon_mat: StandardMaterial3D
 var _reticle: MeshInstance3D
+var _reticle_x: MeshInstance3D
+## Something that can be broken is under the crosshair (a node in the group "destructible"). Nothing in the game
+## is in that group yet; things that can be broken should join it.
+var hover_breakable: Node3D = null
 var _reticle_mat: StandardMaterial3D
 
 
@@ -405,24 +409,41 @@ func _ready() -> void:
 	_body.attach_weapon(_weapon)   # the body carries it: in hand when Ready, on the back otherwise
 	_apply_weapon_look()
 
-	# The crosshair: a small x on the ground. Grey; red on an enemy.
+	# The cursor: a ring on the ground. Ready, on an enemy (or something that can be broken) it gives way to a
+	# red x (_reticle_x).
 	_reticle = MeshInstance3D.new()
-	var tm := BoxMesh.new()
-	tm.size = Vector3(0.36, 0.01, 0.06)
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.3
+	tm.outer_radius = 0.42
+	tm.rings = 24
+	tm.ring_segments = 6
 	_reticle.mesh = tm
-	_reticle.rotation.y = PI * 0.25
+	var xm := BoxMesh.new()
+	xm.size = Vector3(0.5, 0.01, 0.09)
+	var x_mat := StandardMaterial3D.new()
+	x_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	x_mat.no_depth_test = true
+	x_mat.render_priority = 10
+	x_mat.albedo_color = Color(1.0, 0.16, 0.12)
+	_reticle_x = MeshInstance3D.new()
+	_reticle_x.mesh = xm
+	_reticle_x.material_override = x_mat
+	_reticle_x.rotation.y = PI * 0.25
+	_reticle_x.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_reticle_x.top_level = true
 	var bar2 := MeshInstance3D.new()
-	bar2.mesh = tm
+	bar2.mesh = xm
+	bar2.material_override = x_mat
 	bar2.rotation.y = PI * 0.5
 	bar2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_reticle.add_child(bar2)
+	_reticle_x.add_child(bar2)
+	add_child(_reticle_x)
 	_reticle_mat = StandardMaterial3D.new()
 	_reticle_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_reticle_mat.no_depth_test = true
 	_reticle_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_reticle_mat.render_priority = 10
 	_reticle.material_override = _reticle_mat
-	bar2.material_override = _reticle_mat
 	_reticle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_reticle.top_level = true
 	add_child(_reticle)
@@ -1493,8 +1514,14 @@ func can_see(pos: Vector3, radius := 0.4) -> bool:
 func _update_hover() -> void:
 	hover_target = null
 	hover_part = ""
+	hover_breakable = null
 	if not armed or dead or not reticle_visible:
 		return
+	for n in get_tree().get_nodes_in_group("destructible"):
+		var b := n as Node3D
+		if b != null and _xz(b.global_position - global_position - reticle_offset).length() <= 0.7:
+			hover_breakable = b
+			break
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
@@ -2324,9 +2351,10 @@ func _update_visuals(delta: float) -> void:
 	if _cover_mark.visible:
 		var ms := Cover.spot(cover_mark_face, cover_mark_t)
 		_cover_mark.global_position = Vector3(ms.x, global_position.y + 0.06, ms.y)
-	_reticle.visible = reticle_visible and not dead
+	var on_it := armed and (hover_target != null or finish_pile != null or hover_breakable != null)
+	_reticle.visible = reticle_visible and not dead and not on_it
+	_reticle_x.visible = reticle_visible and not dead and on_it
 	_reticle.global_position = global_position + reticle_offset + Vector3(0.0, 0.08, 0.0)
-	if armed and (hover_target != null or finish_pile != null):
-		_reticle_mat.albedo_color = Color(1.0, 0.2, 0.15, 0.95)   # on an enemy
-	else:
-		_reticle_mat.albedo_color = Color(0.66, 0.68, 0.7, 0.8 if armed else 0.55)
+	_reticle_x.global_position = _reticle.global_position
+	# Ready: white. Weapon away: just a look cursor, a quiet grey.
+	_reticle_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.95) if armed else Color(0.62, 0.64, 0.66, 0.55)
