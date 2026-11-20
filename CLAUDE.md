@@ -208,6 +208,8 @@ changes, update both, and keep them the same files.
 ## Cover system (built 20 Nov 2026, in review; untested on the owner's PC)
 
 Designed with the owner on 20 Nov 2026 for raiders and other players as well as zombies. Rule: to see is to be seen.
+Design doc: the **Cover System Design** artifact, https://claude.ai/artifact/VpVzHHYeFH4q8hfbBtyckg (a Claude Docs
+document; keep it in step when the rules change).
 
 - `cover.gd` (`Cover`): no hand placement. Every solid box on the ground (`main.gd` `_box`) is registered; each side
   0.6 m or longer is a cover face. Top up to 1.5 m is low cover (crates, window sills, cars), taller is high. Wall
