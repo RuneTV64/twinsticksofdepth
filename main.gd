@@ -125,13 +125,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F7:
 				player.invulnerable = not player.invulnerable
 				player.show_status("Can't be hurt: %s" % ("ON" if player.invulnerable else "OFF"), 1.5)
-	elif event is InputEventJoypadButton and event.pressed:
-		match event.button_index:
-			JOY_BUTTON_BACK: hud.toggle_sheet()
-			JOY_BUTTON_DPAD_UP: hud.sheet_select(-1)
-			JOY_BUTTON_DPAD_DOWN: hud.sheet_select(1)
-			JOY_BUTTON_DPAD_LEFT: hud.sheet_adjust(-1)
-			JOY_BUTTON_DPAD_RIGHT: hud.sheet_adjust(1)
 	elif event is InputEventMouseButton and event.pressed \
 			and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

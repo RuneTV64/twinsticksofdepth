@@ -5,19 +5,25 @@ Godot 4.3+. Unzip the folder, open `project.godot`, then press F5. Everything is
 ## The idea
 You switch between two stances so that exploring and fighting use different controls.
 
-- **Weapon away (default):** you face the way you walk. The right stick or mouse moves a crosshair, and the camera pans to keep it centered. Your facing doesn't change. When you let go, the camera comes back to you and the crosshair hides. The attack button works as **Interact**. Hold Sprint to run.
-- **Ready (HOLD):** twin-stick. The reticle appears on you and you move it out from there. The right stick or mouse sets your facing once the reticle is off you, and the camera leans toward where you aim. The attack button **attacks**. You move slower and can't run, but you can still dash.
+- **Weapon away (default):** you face the way you walk. The mouse moves a crosshair, and the camera pans to keep it centered. Your facing doesn't change. When you let go, the camera comes back to you and the crosshair hides. The attack button works as **Interact**. Hold Sprint to run.
+- **Ready (HOLD):** the reticle appears on you and you move it out from there. The mouse sets your facing once the reticle is off you, and the camera leans toward where you aim. The attack button **attacks**. You move slower and can't run, but you can still dash.
 - **Doors work in either stance.** Walk into a door to push it open or shut. Run or dash into a shut door to barge it. The camera angle never rotates; it only pans.
 
 ## Controls
-| | Controller | Mouse + Keyboard |
-|---|---|---|
-| Move | Left stick | WASD |
-| Look / aim | Right stick | Mouse |
-| Ready (hold) | LT | Right mouse button (Q also works) |
-| Attack (Ready) / Interact (weapon away) | RT (A also works) | Left-click |
-| Sprint: tap = dash, hold = run | LB or L3 | Shift |
-| Reload | X | R |
+Mouse and keyboard only. There is no controller support.
+
+| | Mouse + Keyboard |
+|---|---|
+| Move | WASD |
+| Look / aim | Mouse |
+| Ready (hold) | Right mouse button (Q also works) |
+| Attack (Ready) / Interact (weapon away) / Finisher | Left-click |
+| Sprint: tap = dash, hold = run | Shift |
+| Cover: tap = in or out, hold = go to the marked cover | Space |
+| Roll (out of cover) | Space twice quickly |
+| Weapon wheel (hold) | Tab |
+| Reload | R |
+| Character page | C |
 
 F1 hides the help text. Esc frees the mouse, and clicking captures it again. Keys 1 to 6 lower or raise STR, END and WT live, so you can feel how the stats change movement.
 
@@ -31,7 +37,7 @@ F1 hides the help text. Esc frees the mouse, and clicking captures it again. Key
 ## Zombies
 Shamblers use the ShamblerMale_Muscular body (`zombie_body.gd`, see below). What one can do depends on what it has left:
 - **Grab:** with a hand left it reaches for you. With your guard up and facing it, you shove it off first. Otherwise it has hold of you: one hand slows you to 35%, two hands (or two zombies) nearly root you, and you can't run or dash. It pulls in and bites (15) after a second, then again every 1.5 s.
-- **Get loose:** hold Ready unarmed, facing it, to shove it off (costs stamina), or wiggle the move keys or stick back and forth to struggle free (about 1.5 s of hard wiggling against one hand, 3 s against two). Hitting it helps.
+- **Get loose:** hold Ready unarmed, facing it, to shove it off (costs stamina), or wiggle the move keys back and forth to struggle free (about 1.5 s of hard wiggling against one hand, 3 s against two). Hitting it helps.
 - **Lunge:** with no hands it can't grab. It crouches and throws itself at you mouth first; your guard shoves it off.
 - **Crawl:** with a leg gone it always crawls. A hard hit or a shove can knock any of them down; it crawls at you for a while, then gets back up if it has the legs. Crawlers grab at your ankles and bite.
 - **Losing parts:** a hit that doesn't kill can take an arm or a leg off (rotted parts go more easily), and the piece flies off. A headshot kills, and sometimes takes the head off. The head is still alive on the floor and, very rarely, bites if you step right next to it.

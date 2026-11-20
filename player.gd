@@ -1,13 +1,14 @@
 class_name Player
 extends CharacterBody3D
 ## Two stances:
-##  WEAPON AWAY (default): face where you walk. Right stick / mouse moves a crosshair and the
+##  Mouse and keyboard only.
+##  WEAPON AWAY (default): face where you walk. The mouse moves a crosshair and the
 ##    camera pans to keep it centered; your facing doesn't change. Let go and the camera
 ##    returns to you and the crosshair hides. Attack button = Interact. Hold Sprint to run.
 ##  COVER (B / Space): tap to slide into the nearest cover or to leave it; hold to go to the cover the crosshair
 ##    marks. Hunkered you are hidden and nearly blind. Push toward low cover (or along, at an end) to peek. Ready
 ##    pops you out to aim; attack without Ready fires blind. See the Cover section below and cover.gd.
-##  READY (hold LT / right-click / Q): twin-stick. Right stick / mouse sets facing, the camera
+##  READY (hold right-click / Q): the mouse sets facing, the camera
 ##    leads toward the aim point. Attack button attacks. Slower, no running (dash still works).
 ## Doors work in either stance: walk into them to push them, run or dash into them to barge.
 
@@ -46,7 +47,6 @@ var barge_min_speed := 5.3
 @export var accel := 26.0               # lower = heavier start-up
 @export var decel := 30.0               # lower = longer slide to a stop
 @export var turn_speed := 14.0          # rad/s, weapon away
-@export var ready_turn_speed := 28.0    # rad/s, Ready on a stick (mouse aim is instant)
 @export var backpedal_mult := 0.75      # Ready: speed when moving directly away from aim
 @export var draw_time := 0.12         # Ready pressed -> can attack
 @export var sprint_tap_time := 0.22     # release Sprint before this = dash, hold past it = run
@@ -56,26 +56,20 @@ var barge_min_speed := 5.3
 var look_range_bonus := 0.0             # weapon away: e.g. binoculars
 var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var aim_min_dist := 0.3         # Ready: reticle closer than this doesn't turn you
-@export var aim_follow_sharpness := 11.0 # Ready: how tightly the reticle tracks stick tilt
-# Stick tilt -> reticle distance curve. 1 = linear (twitchy: small tilts move it meters),
-# 2 = squared (fine control near you, full range still at full tilt). Higher = gentler.
-@export var stick_aim_curve := 2.0
 @export var ready_cam_lead := 0.45     # Ready: how far the camera leans toward the reticle
-@export var look_follow_sharpness := 9.0  # weapon away: how tightly the crosshair tracks stick tilt
 @export var look_return_sharpness := 6.0  # weapon away: how fast an idle mouse crosshair floats home
 @export var mouse_sens := 0.022         # world meters per mouse pixel
 @export var mouse_idle_hide := 1.2      # weapon away: idle mouse crosshair starts floating home after this
 @export_group("Lock-on")
-# Sticky aim: a crosshair brought near an enemy you can see is drawn onto it and follows it.
-# The pull fades out with distance, so pushing the stick (or moving the mouse) takes it off again.
+# Sticky aim: a crosshair resting near an enemy you can see settles onto it and follows it.
+# The pull fades out with distance, and moving the mouse takes it off again.
 @export var lock_on := true
-@export var lock_on_radius := 1.6       # m: the pull starts when the crosshair comes this close to an enemy
 @export var lock_on_core := 0.5         # m: inside this the crosshair sits dead centre on the enemy
 @export var lock_on_strength := 1.0     # 0..1: how far toward the enemy it is drawn (1 = centres)
 @export var lock_on_sharpness := 8.0    # how quickly the pull takes hold and lets go (lower = softer)
 @export var lock_on_hold := 0.75        # < 1: the enemy already locked wins ties with its neighbours
-@export var lock_on_mouse := true       # mouse: the crosshair settles onto a nearby enemy once the mouse rests
-@export var lock_on_mouse_radius := 1.0 # m: the mouse's pull radius (a mouse is precise; keep it small)
+@export var lock_on_mouse := true       # the crosshair settles onto a nearby enemy once the mouse rests
+@export var lock_on_mouse_radius := 1.0 # m: the pull starts when the crosshair rests this close to an enemy
 @export var lock_on_mouse_settle := 0.1 # s the mouse must be still before the pull acts
 @export_group("Cover")
 # In cover you are in one of three states (cover_mode). To see is to be seen:
@@ -195,7 +189,7 @@ var shove_force := 9.0
 @export var block_stamina_per_damage := 2.5   # stamina spent per point of damage stopped
 @export var block_regen_delay := 1.0    # seconds after a shove before stamina regenerates
 # Held: a zombie with hands can grab you. Held, you're slowed (two hands nearly root you) and it bites until
-# you get loose: shove it off (guard up, facing it) or struggle (wiggle the move stick / keys; hitting it helps).
+# you get loose: shove it off (guard up, facing it) or struggle (wiggle the move keys; hitting it helps).
 @export var held_speed_one := 0.35      # your speed with one hand on you
 @export var held_speed_two := 0.08      # with two hands (or two zombies) on you
 @export var struggle_per_wiggle := 0.12 # struggle gained per full swing of the move input
@@ -231,7 +225,6 @@ var stamina := 100.0
 var winded := false
 var running := false
 var armed := false
-var using_pad := false
 var dead := false
 var mag := 8
 var reserve := 8
@@ -244,7 +237,7 @@ var sight_rays := PackedFloat32Array()
 var _sight_query: PhysicsRayQueryParameters3D
 var _shove_cd := 0.0               # > 0 until you can shove again
 var _cam_carry := Vector3.ZERO     # camera offset left over from a stance change, eased to zero
-var wheel_open := false            # quick weapon wheel is up (Tab / LB held)
+var wheel_open := false            # quick weapon wheel is up (Tab held)
 var wheel_choice := -1             # slot highlighted on the wheel, -1 = none yet
 var _wheel_vec := Vector2.ZERO     # mouse travel since the wheel opened
 var _swing_t := 0.0                # > 0 while a punch is under way (windup + recovery left)
@@ -261,8 +254,7 @@ var reticle_visible := false
 var reticle_on_enemy := false
 var reticle_target: Enemy = null   # the enemy under the reticle (Ready only counts as "aimed")
 var lock_target: Enemy = null      # the enemy the crosshair is being drawn onto (lock-on), or null
-var _lock_shift := Vector3.ZERO    # stick: how far lock-on is moving the crosshair off where the stick asks
-var _aim_raw := Vector3.ZERO       # where the stick or mouse points, before lock-on shifts it (cover marking uses it)
+var _aim_raw := Vector3.ZERO       # where the mouse points (cover marking uses it)
 var _aim_raw_on := false
 
 # ---- cover (see the Cover exports)
@@ -545,7 +537,7 @@ static func wheel_angle(slot: int) -> float:
 	return PI + slot * TAU / WEAPONS.size()
 
 
-## Hold Tab / LB: the wheel opens. Point with the mouse or right stick to highlight a weapon,
+## Hold Tab: the wheel opens. Point with the mouse to highlight a weapon,
 ## release to equip it. Releasing without pointing keeps what you have.
 func _update_wheel() -> void:
 	var held := Input.is_action_pressed("weapon_wheel")
@@ -556,8 +548,6 @@ func _update_wheel() -> void:
 	if not wheel_open:
 		return
 	var v := _wheel_vec / WHEEL_MOUSE_RADIUS
-	if using_pad:
-		v = Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down", 0.2)
 	if v.length() > 0.45:
 		var dir := v.normalized()
 		var best := -2.0
@@ -592,7 +582,6 @@ func _input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			_rmb_event = event.pressed
 	if event is InputEventMouseMotion:
-		using_pad = false
 		if wheel_open:
 			# The mouse points at the wheel instead of moving the crosshair.
 			_wheel_vec = (_wheel_vec + event.relative).limit_length(WHEEL_MOUSE_RADIUS)
@@ -601,12 +590,6 @@ func _input(event: InputEvent) -> void:
 			reticle_offset += Vector3(rel.x, 0.0, rel.y) * mouse_sens
 			reticle_offset = reticle_offset.limit_length(current_reticle_range())
 			_mouse_idle = 0.0
-	elif event is InputEventJoypadButton:
-		using_pad = true
-	elif event is InputEventJoypadMotion and absf(event.axis_value) > 0.35:
-		using_pad = true
-	elif event is InputEventKey or event is InputEventMouseButton:
-		using_pad = false
 
 
 func _physics_process(delta: float) -> void:
@@ -754,12 +737,10 @@ func _tick_timers(delta: float) -> void:
 # ---------------------------------------------------------------- stance + aim
 func _update_stance() -> void:
 	var want_ready := ready_held()
-	# If you're actively aiming during a stance change (right stick tilted, or the mouse moved
-	# recently enough that the crosshair is still showing), the reticle carries over instead of
-	# resetting, so you can ready (or lower) mid-aim without losing your place.
+	# If you're actively aiming during a stance change (the mouse moved recently enough that the
+	# crosshair is still showing), the reticle carries over instead of resetting, so you can ready
+	# (or lower) mid-aim without losing your place.
 	var aim_active := _mouse_idle < mouse_idle_hide
-	if using_pad:
-		aim_active = Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down", 0.2).length() > 0.05
 	var cam_before := _cam_offset()
 	if want_ready and not armed:
 		armed = true
@@ -779,44 +760,18 @@ func _update_stance() -> void:
 
 
 func _update_aim(delta: float) -> void:
-	var stick := Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down", 0.2)
-	if stick.length() > 0.3:
-		using_pad = true
-	if wheel_open:
-		stick = Vector2.ZERO   # the stick is pointing at the wheel, not aiming
-
 	if armed:
-		if using_pad:
-			# Same rule as weapon away: tilt = distance, so easing off the stick floats the
-			# reticle back toward you. Tracks tighter than the look crosshair to stay snappy.
-			var target := _stick_reticle_target(stick)
-			_aim_raw = target
-			_aim_raw_on = stick.length() > 0.05
-			target += _stick_lock_shift(target, stick.length() > 0.05, delta)
-			reticle_offset = reticle_offset.lerp(target, 1.0 - exp(-aim_follow_sharpness * delta))
-		else:
-			_mouse_lock(delta)
+		_mouse_lock(delta)
 		reticle_offset = reticle_offset.limit_length(current_reticle_range())
 		reticle_visible = true
 	else:
-		var returning := false
-		if using_pad:
-			# The crosshair tracks the stick: tilt = distance, so easing off the stick floats
-			# it back toward you and letting go floats it all the way home. No snapping.
-			var target := _stick_reticle_target(stick)
-			returning = stick.length() <= 0.05
-			_aim_raw = target
-			_aim_raw_on = not returning
-			target += _stick_lock_shift(target, not returning, delta)
-			reticle_offset = reticle_offset.lerp(target, 1.0 - exp(-look_follow_sharpness * delta))
+		# It stays where you put it, then floats home once the mouse has been idle.
+		var returning := _mouse_idle >= mouse_idle_hide
+		if returning:
+			reticle_offset = reticle_offset.lerp(Vector3.ZERO, 1.0 - exp(-look_return_sharpness * delta))
+			lock_target = null
 		else:
-			# Mouse: it stays where you put it, then floats home once the mouse has been idle.
-			returning = _mouse_idle >= mouse_idle_hide
-			if returning:
-				reticle_offset = reticle_offset.lerp(Vector3.ZERO, 1.0 - exp(-look_return_sharpness * delta))
-				lock_target = null
-			else:
-				_mouse_lock(delta)
+			_mouse_lock(delta)
 		reticle_offset = reticle_offset.limit_length(current_reticle_range())
 		# Hidden only once it has actually arrived back on you.
 		if returning and reticle_offset.length() < 0.2:
@@ -824,9 +779,8 @@ func _update_aim(delta: float) -> void:
 			reticle_visible = false
 		else:
 			reticle_visible = true
-	if not using_pad:
-		_aim_raw = reticle_offset
-		_aim_raw_on = reticle_visible and (armed or _mouse_idle < mouse_idle_hide)
+	_aim_raw = reticle_offset
+	_aim_raw_on = reticle_visible and (armed or _mouse_idle < mouse_idle_hide)
 
 
 # ---------------------------------------------------------------- lock-on (sticky aim)
@@ -865,39 +819,13 @@ func _lock_pull(point: Vector3, radius: float) -> Vector3:
 	return (best_off - point) * pull
 
 
-## Stick: the crosshair goes where the tilt says, so lock-on shifts that spot, easing in and out.
-## Only while the stick is tilted: a stick at rest never aims for you.
-func _stick_lock_shift(target: Vector3, tilted: bool, delta: float) -> Vector3:
-	var want := Vector3.ZERO
-	if tilted:
-		want = _lock_pull(target, lock_on_radius)
-	else:
-		lock_target = null
-	_lock_shift = _lock_shift.lerp(want, 1.0 - exp(-lock_on_sharpness * delta))
-	return _lock_shift
-
-
-## Mouse: it has full control while it moves. Once it rests near an enemy, the crosshair settles
+## The mouse has full control while it moves. Once it rests near an enemy, the crosshair settles
 ## onto that enemy and follows it.
 func _mouse_lock(delta: float) -> void:
-	_lock_shift = Vector3.ZERO
 	if not lock_on_mouse or _mouse_idle < lock_on_mouse_settle:
 		lock_target = null
 		return
 	reticle_offset += _lock_pull(reticle_offset, lock_on_mouse_radius) * (1.0 - exp(-lock_on_sharpness * delta))
-
-
-## Where the stick is asking the reticle to be: direction straight from the stick, distance
-## from the tilt run through stick_aim_curve so the first part of the throw is fine-grained.
-func _stick_reticle_target(stick: Vector2) -> Vector3:
-	var tilt := minf(stick.length(), 1.0)
-	if tilt <= 0.0:
-		return Vector3.ZERO
-	var dir := stick / stick.length()
-	# Melee Ready has no reticle to place, only a direction to face: keep it linear so a light
-	# tilt already turns you.
-	var curve := 1.0 if armed and is_melee() else stick_aim_curve
-	return Vector3(dir.x, 0.0, dir.y) * pow(tilt, curve) * current_reticle_range()
 
 
 ## Max reticle distance right now: the shared base plus whatever the current stance's gear adds.
@@ -1143,7 +1071,6 @@ func _cover_velocity(delta: float, move_dir: Vector3) -> Vector3:
 			_leave_t = 0.0
 			if _cover_recenter:
 				reticle_offset = Vector3.ZERO
-				_lock_shift = Vector3.ZERO
 				_mouse_idle = 99.0
 			return Vector3.ZERO
 		if _cover_timeout <= 0.0:
@@ -1506,8 +1433,7 @@ func _update_facing(delta: float, move_dir: Vector3) -> void:
 		var n3 := Vector3(cover_face.n.x, 0.0, cover_face.n.y)
 		if cover_mode == "pop":
 			if reticle_offset.length() >= aim_min_dist:
-				facing = reticle_offset.normalized() if not using_pad \
-					else _turn_toward(facing, reticle_offset.normalized(), ready_turn_speed * delta)
+				facing = reticle_offset.normalized()
 				return
 			want = -n3
 		elif cover_mode == "peek" or cover_blind:
@@ -1518,7 +1444,6 @@ func _update_facing(delta: float, move_dir: Vector3) -> void:
 		return
 	elif armed:
 		want = reticle_offset
-		rate = ready_turn_speed
 	elif _dash_t > 0.0:
 		want = _dash_dir
 	elif move_dir.length() > 0.1:
@@ -1527,13 +1452,13 @@ func _update_facing(delta: float, move_dir: Vector3) -> void:
 	if want.length() < (aim_min_dist if armed else 0.01):
 		return
 	want = want.normalized()
-	if armed and not using_pad and _roll_turning:
-		# Just up from a roll: even with the mouse you turn round to your aim, you don't snap to it.
+	if armed and _roll_turning:
+		# Just up from a roll: you turn round to your aim, you don't snap to it.
 		facing = _turn_toward(facing, want, roll_turn_speed * delta)
 		if facing.dot(want) > 0.999:
 			_roll_turning = false
-	elif armed and not using_pad:
-		facing = want
+	elif armed:
+		facing = want   # the mouse aims you at once
 	else:
 		facing = _turn_toward(facing, want, rate * delta)
 		if facing.dot(want) > 0.999:
@@ -1645,7 +1570,7 @@ func _barge(door: Door, spd: float, into: Vector3) -> void:
 
 
 # ---------------------------------------------------------------- combat + interact
-## Ready = right mouse button (read three ways), LT, or Q.
+## Ready = right mouse button (read three ways), or Q.
 func ready_held() -> bool:
 	if Input.is_action_pressed("ready_weapon"):
 		return true
@@ -1653,7 +1578,7 @@ func ready_held() -> bool:
 		or (_has_mouse and (DisplayServer.mouse_get_button_state() & MOUSE_BUTTON_MASK_RIGHT) != 0)
 
 
-## Attack / Interact = left mouse button (read three ways), RT, or A.
+## Attack / Interact = left mouse button (read three ways).
 func attack_held() -> bool:
 	if Input.is_action_pressed("attack"):
 		return true
@@ -1930,10 +1855,10 @@ func _update_interact() -> void:
 
 func interact_prompt() -> String:
 	if finish_target == null and finish_pile != null:
-		return "[%s]  %s it, in case it's alive" % ["RT" if using_pad else "Left-click",
+		return "[%s]  %s it, in case it's alive" % ["Left-click",
 			"Shoot" if armed and not is_melee() and mag > 0 else ("Stomp" if is_melee() else "Rifle-butt")]
 	if finish_target != null:
-		var btn := "RT" if using_pad else "Left-click"
+		var btn := "Left-click"
 		if armed and not is_melee() and mag > 0:
 			return "[%s]  Shoot it in the head (1 round, loud)" % btn
 		var n := finisher_blows()
@@ -1944,7 +1869,7 @@ func interact_prompt() -> String:
 	var txt: String = interact_target.call("prompt_text", self)
 	if armed:
 		return "%s  (lower your weapon)" % txt
-	return "[%s]  %s" % ["RT" if using_pad else "Left-click", txt]
+	return "[Left-click]  %s" % txt
 
 
 # ---------------------------------------------------------------- health

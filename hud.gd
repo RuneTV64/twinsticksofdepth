@@ -33,23 +33,11 @@ Reload  R
 Cover  Space: tap = slide into nearest cover / leave it; hold = go to the cover the crosshair marks
 Roll  Space twice quickly, out of cover: rolls the way you are moving"""
 
-const HELP_PAD := """CONTROLLER
-Move  Left stick
-Look (weapon away)  Right stick moves the crosshair, camera follows
-Ready (HOLD)  LT
-Attack (while Ready)  RT
-Interact (weapon away)  RT  or  A
-Sprint  L3: tap = dash, hold = run
-Weapon wheel (HOLD)  LB, point with the right stick, release
-Reload  X
-Cover  B: tap = slide into nearest cover / leave it; hold = go to the cover the crosshair marks
-Roll  B twice quickly, out of cover: rolls the way you are moving"""
-
 const HELP_TAIL := """
 Doors: walk into them to push them open or shut.
 Run or dash into a shut one to barge it (it hurts).
 Aim: a red reticle on an enemy = aimed shot (more damage, headshot chance)
-Lock-on: a crosshair brought near an enemy is drawn onto it; push the stick on to move off.
+Lock-on: a crosshair resting near an enemy settles onto it; move the mouse to take it off.
 Unarmed + Ready: attack = punch (weak; a bit harder standing still).
 Hold Ready and face a zombie: when it gets within reach you shove it back,
 and any zombies right beside it. Each shove costs stamina;
@@ -64,7 +52,7 @@ Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt   L all on low model
 Finisher: crosshair on a downed zombie's head, close by, then attack. Unarmed = stomp, gun away = rifle butt
   (blows by Strength), gun Ready = one shot to the head.
 Corpse piles can be walked on: slow, bad footing, and what is still alive in them grabs. Cover at a wall = climb it.
-Character page: C (pad: Back). It shows attributes, needs, composure and conditions.
+Character page: C. It shows attributes, needs, composure and conditions.
 Cover test: G test gunner at the crosshair   Shift+G remove them
 Raiders: a camp in the south-west of the yard.  T adds one at the crosshair   Shift+T removes those
 F1 hide help    Esc free mouse"""
@@ -291,7 +279,7 @@ func _cell(text: String) -> String:
 
 func _sheet_text() -> String:
 	var s := player.sheet
-	var t := "[b]CHARACTER[/b]      [color=#999]C / Back closes.   PgUp PgDn / D-pad up down picks a row.   - = / D-pad left right changes it (test editing).[/color]\n\n"
+	var t := "[b]CHARACTER[/b]      [color=#999]C closes.   PgUp PgDn picks a row.   - = changes it (test editing).[/color]\n\n"
 	t += "[b]ATTRIBUTES[/b]   [color=#999]1 to 20; 10 is an ordinary adult[/color]\n[table=4]"
 	for a in CharacterSheet.ATTRS:
 		var does: String = CharacterSheet.GOVERNS[a]
@@ -354,9 +342,9 @@ func _process(delta: float) -> void:
 		stance += {"hunker": "  - IN COVER (hidden)", "peek": "  - PEEKING (seen)", "pop": "  - OUT OF COVER (exposed)"}[player.cover_mode]
 	if player.fatigue() > 0.3:
 		stance += "  - fatigued"
-	_state.text = "%s    |    %s" % [stance, "Controller" if player.using_pad else "Mouse + Keyboard"]
+	_state.text = stance
 	_state.add_theme_color_override("font_color", Color(1.0, 0.75, 0.3) if player.armed else Color.WHITE)
-	_help.text = (HELP_PAD if player.using_pad else HELP_KM) + "\n" + HELP_TAIL
+	_help.text = HELP_KM + "\n" + HELP_TAIL
 
 	_hp.max_value = player.max_health
 	_hp.value = player.health

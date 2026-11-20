@@ -2,8 +2,9 @@
 
 Godot 4 twin-stick zombie game (the owner works in Godot 4.7, Forward+). PC only, mouse and keyboard only (owner,
 20 Nov 2026: there is too much to build to keep a controller working too; maybe later). Design and tune new
-controls for mouse and keyboard; don't spend time on controller support. The controller bindings and stick aim
-already in the code can stay, but nothing needs to keep them working. Forward+ only: no Compatibility renderer, no web or phone builds (owner, 15 Nov 2026). The level is built in code (see README.md);
+controls for mouse and keyboard; don't spend time on controller support. The controller bindings and stick aiming
+were stripped out the same day at the owner's request (`input_setup.gd`, `player.gd`, `hud.gd`, `main.gd`).
+Forward+ only: no Compatibility renderer, no web or phone builds (owner, 15 Nov 2026). The level is built in code (see README.md);
 the character models, shaders and their scripts are in `assets/characters/` and in our claude.ai Artifacts.
 
 ## Working with the owner
@@ -194,10 +195,10 @@ changes, update both, and keep them the same files.
   grasping fingers; the head turns toward its target. Springs run only in view within 14 m (`springs` to switch
   off): about +38% per posing there. Motion clips: `source/zombie_anim_clip.gd` + `zombie_anim_gif.py`
   (before/after GIFs in `preview/zombie_motion_*.gif`); stills can't show motion.
-- Lock-on (sticky aim, 20 Nov 2026, untested on the owner's PC): `player.gd` `_lock_pull()`. A crosshair within
-  `lock_on_radius` 1.6 m of a living enemy the player can see is drawn onto it (dead centre inside `lock_on_core`
-  0.5 m, fading to nothing at the radius, so it never sticks) and follows it. Stick: shifts where the tilt points,
-  only while tilted. Mouse: settles on once the mouse rests (`lock_on_mouse_radius` 1 m). Exports in the Lock-on group.
+- Lock-on (sticky aim, 20 Nov 2026, untested on the owner's PC): `player.gd` `_lock_pull()`. Once the mouse rests,
+  a crosshair within `lock_on_mouse_radius` 1 m of a living enemy the player can see settles onto it (dead centre
+  inside `lock_on_core` 0.5 m, fading to nothing at the radius, so it never sticks) and follows it; moving the
+  mouse takes it off. Exports in the Lock-on group. (The stick version went with the controller.)
 - Debug keys: G adds a test gunner at the crosshair (Shift+G removes them); T adds a raider (Shift+T removes those).
 - Debug keys: F1 help, C character page, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
@@ -216,7 +217,7 @@ document; keep it in step when the rules change).
 - `cover.gd` (`Cover`): no hand placement. Every solid box on the ground (`main.gd` `_box`) is registered; each side
   0.6 m or longer is a cover face. Top up to 1.5 m is low cover (crates, window sills, cars), taller is high. Wall
   pieces in a line join up, so you slide along a wall and under its windows.
-- Controls (`player.gd`, Cover exports): Cover is B / Space. Tap = slide into the nearest cover (toward the move
+- Controls (`player.gd`, Cover exports): Cover is Space. Tap = slide into the nearest cover (toward the move
   stick) or leave it. Hold = go to the cover spot the crosshair marks (cyan ring; read before lock-on shifts the
   crosshair); the crosshair recentres on arrival. Pushing firmly away leaves; a dash or a grab also takes you out.
   Cover + pushing into low cover vaults it (window sills too).
@@ -346,7 +347,7 @@ a list of "the human experience as stats" the owner brought; the picks below are
 - Conditions also come from health (Hurt under 50%, Badly hurt under 25%: slower, worse aim; new, the game had no
   penalty for low health), load (Overloaded) and Winded. They are rebuilt 4 times a second on the sheet's slow
   clock (`Player._tick_timers`), into multipliers the Player reads (`speed_mult`, `aim_mult`...).
-- The page: C / pad Back. PgUp PgDn or D-pad up/down picks a row, - = or D-pad left/right changes it (test
+- The page: C. PgUp PgDn picks a row, - = changes it (test
   editing: this becomes levelling and eating). Conditions also list at the right edge of the screen. Render:
   `tools/preview/character_page.png`.
 - Not built: picked traits (good and bad, at character creation), skills and XP, food and drink, sleep, the clock,
