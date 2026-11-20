@@ -102,6 +102,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 			KEY_F1:
 				hud.toggle_help()
+			KEY_F2:   # how much of the UI shows: everything, only what you need, nothing
+				player.show_status(hud.next_ui_level(), 1.6)
 			KEY_F3:
 				hud.toggle_debug()
 			KEY_C: hud.toggle_sheet()

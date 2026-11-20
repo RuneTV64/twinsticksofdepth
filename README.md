@@ -35,7 +35,7 @@ Mouse and keyboard only. There is no controller support. The view is turned 45 d
 | Character page | C |
 | Treat wounds (sit down to it) | H; keys 1 to 7 or a click pick a tool; hold Alt to look up |
 
-F1 hides the help text. Esc frees the mouse, and clicking captures it again. Keys 1 to 6 lower or raise STR, END and WT live, so you can feel how the stats change movement.
+F1 opens and closes the help text. F2 hides the UI: once for the clutter, twice for all of it, a third time to bring it back. Esc frees the mouse, and clicking captures it again. Keys 1 to 6 lower or raise STR, END and WT live, so you can feel how the stats change movement.
 
 ## What's in the level
 - **First-aid box** by the spawn (and one in the yard house): take it, then H treats wounds by hand. J gives you a test wound.

@@ -18,6 +18,11 @@ var _hp: ProgressBar
 var _st: ProgressBar
 var _st_fill: StyleBoxFlat
 var _debug: Label
+var _root: Control
+var _hint: Label               # the one line left when the help is hidden
+## How much of the UI shows (F2 steps it): 0 everything, 1 only what you need to play (bars, ammo, prompts,
+## conditions), 2 nothing at all.
+var ui_level := 0
 var treat: TreatmentScreen     # seeing to wounds (H)
 var _wheel: Control
 var _wheel_labels: Array[Label] = []
@@ -78,11 +83,12 @@ Horde: noise warms an area and draws zombies in from round about. Z shows the re
 Cutaway: walls between the camera and you open up. V switches it off and on, to compare.
 Cover test: G test gunner at the crosshair   Shift+G remove them
 Raiders: a camp in the south-west of the yard.  T adds one at the crosshair   Shift+T removes those
-F1 hide help    Esc free mouse"""
+F1 hide help    F2 hide the UI (once: the clutter; twice: all of it)    Esc free mouse"""
 
 
 func _ready() -> void:
 	var root := Control.new()
+	_root = root
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
@@ -92,6 +98,11 @@ func _ready() -> void:
 
 	_help = _label(root, 16)
 	_help.position = Vector2(20, 56)
+	_help.visible = false          # it has grown long: it opens on F1 and stays out of the way otherwise
+	_hint = _label(root, 16)
+	_hint.position = Vector2(20, 56)
+	_hint.text = "F1 help     F2 hide the UI"
+	_hint.modulate = Color(1, 1, 1, 0.6)
 
 	_status = _label(root, 26)
 	_status.set_anchors_preset(Control.PRESET_CENTER_TOP)
@@ -183,6 +194,7 @@ func _ready() -> void:
 	treat = TreatmentScreen.new()
 	treat.player = player
 	root.add_child(treat)
+	_apply_ui.call_deferred()
 
 	# Quick weapon wheel: a ring of slots in the middle of the screen, shown while it's held open.
 	_wheel = Control.new()
@@ -248,6 +260,24 @@ func _bar(parent: Control, row: int, col: Color) -> ProgressBar:
 
 func toggle_help() -> void:
 	_help.visible = not _help.visible
+	_apply_ui()
+
+
+## F2: step how much of the UI shows.
+func next_ui_level() -> String:
+	ui_level = (ui_level + 1) % 3
+	_apply_ui()
+	return ["UI: everything", "UI: only what you need (F2 again hides it all)", "UI hidden (F2 brings it back)"][ui_level]
+
+
+func _apply_ui() -> void:
+	_root.visible = ui_level < 2
+	# The test readouts and the long help are the clutter: they go first.
+	_stats.visible = ui_level == 0
+	_hint.visible = ui_level == 0 and not _help.visible
+	if ui_level > 0:
+		_help.visible = false
+		_debug.visible = false
 
 
 func toggle_debug() -> void:

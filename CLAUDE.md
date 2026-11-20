@@ -454,7 +454,10 @@ changes, update both, and keep them the same files.
   mouse takes it off. Exports in the Lock-on group. (The stick version went with the controller.)
 - Debug keys: G adds a test gunner at the crosshair (Shift+G removes them); T adds a raider (Shift+T removes those);
   V switches the cutaway off and on; Z shows the horde readout.
-- Debug keys: H treat wounds, J a test wound, F1 help, C character page, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
+- The UI can be hidden (owner, 20 Nov 2026: "I can't see the game anymore"): F2 steps `Hud.ui_level`: 0
+  everything, 1 only what you need to play (bars, ammo, prompts, conditions, the stance line), 2 nothing. The
+  long help text now starts closed (F1 opens it), with a one-line hint in its place.
+- Debug keys: H treat wounds, J a test wound, F1 help, F2 hide the UI, C character page, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera's rest point over the player
