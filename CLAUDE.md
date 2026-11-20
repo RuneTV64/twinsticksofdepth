@@ -49,6 +49,11 @@ The aim is something like Project Zomboid with its own, better flavour. Two plac
   the Electrician skill and meet the criteria, and a later character can start as one. So the character is lost
   but the progress toward a kind of start is kept, and players are more likely to keep going after a death.
   Not designed yet: skills don't exist, and the unlock criteria, items and places are open. Ask before building.
+- Professions are hands-on mini-games (owner, 20 Nov 2026, on seeing the treatment screen: "Trauma Center! I
+  loved that game"; a slice or two of it is welcome, and "most professions should work in a similar mini-game
+  style way"). So medicine is the model: a skill is something the player does with the mouse, close up, and the
+  character's skill changes what they can see and how forgiving it is. Borrow mechanics, never another game's
+  names, art, characters or levels. Which professions and what each one's game is are not designed: propose.
 - Order of work as the owner sees it: loot is more important than buildings; modular building assets come later;
   spawning and how the horde moves, and the turning-undead mechanic, are also still to come.
 
@@ -148,7 +153,7 @@ Items and the treatment screen (built 20 Nov 2026, in review; untested on the ow
 build the items needed to test the kits, so only medical items exist.
 
 - `items.gd` (`Items.DEFS`): bandage, clean rag, needle and thread (12 stitches), tweezers, vodka (4 washes),
-  painkillers (6). A carried item is a Dictionary: `{"id", "n"}` for a stack, `{"id", "uses"}` for something used
+  painkillers (6), steroids (4), hatchet. A carried item is a Dictionary: `{"id", "n"}` for a stack, `{"id", "uses"}` for something used
   up. `inventory.gd` (`Inventory`, `player.inv`): the agreed weighted slots with no bag: four pockets (0.5 kg),
   two belt (1.5 kg), two hands (20 kg), one thing or one stack each. Jeans pockets are assumed until clothes
   exist. Shown on the character page under Carrying. Carried weight does not feed the WT number yet.
@@ -160,10 +165,13 @@ build the items needed to test the kits, so only medical items exist.
   looks up and stops your hands; moving, being grabbed or being hit puts it down.
   - Press: hold the bare hand or a rag on the wound, best on the bleeder. Pressure holds a deep wound at a fifth
     of what it bleeds left alone, and it wells back up over `well_up_time` 30 s: you work against that.
-  - Clean: tweezers click out what is in it (a bullet, a tooth, grit; a miss digs into flesh); vodka is held
+  - Clean: tweezers take out what is in it (a bullet, a tooth, grit; a miss digs into flesh); vodka is held
     and swept along the wound. Too much blood (over 0.1) hides the wound from tweezers and needle.
-  - Close: one stitch a click along the wound. `stitches_needed()` 2 to 7; `closed_frac()` counts the evenly
-    spaced places that have a stitch near. Slight cuts need none; a bite is left open.
+  - Close: hold and zigzag the needle across the wound; every crossing is a stitch where it crossed (it has to
+    swing 14 px clear each side, so a tremor alone doesn't stitch). `stitches_needed()` 2 to 7; `closed_frac()`
+    counts the evenly spaced places that have a stitch near. Slight cuts need none; a bite is left open.
+  - Tweezers work like forceps: grip the thing, draw it out slowly, let go clear of the wound. A jerk (the hand
+    moving over 700 px/s, smoothed) tears it free and the wound bleeds more: shaking hands do this by themselves.
   - Dress: hold and wind round the wound three turns with a bandage (or a rag, poorer). A bare-hand click takes
     a dressing off (it is lost).
   - Shut in dirty (stitched or dressed unwashed or with something in it) it festers: the pain doesn't ease and
@@ -174,7 +182,35 @@ build the items needed to test the kits, so only medical items exist.
   (flat placeholder shapes, not the 8-shade look; the skin is one fixed colour, not the character's).
 - Not built: splints and breaks (nothing causes a break yet), the wound's own look per body part, treating
   other people, dropping or moving items between slots.
-- Next, in order: the bite, amputation and turning; sickness; the new needs (hygiene, morale, toilet, warmth).
+
+The bite, amputation and turning (built 20 Nov 2026, in review; untested on the owner's PC). All the times are
+stand-ins until the game has a clock (`body_health.gd`, "the bite").
+
+- A bite takes 92% of the time (`takes_chance`); the player is never told. It starts in the part bitten and
+  spreads to the body: an arm in 200 s, a leg in 280 s, the head or chest at once (`spread_time`). From the bite
+  you turn in `turn_time` 900 s: Feverish, Sick, Failing (conditions), then "You turned."
+- Steroids (4 doses) hold both the spread and the sickness to 0.4 of their pace for 240 s. They cure nothing.
+- Amputation, in the treatment screen with the hatchet picked on a wound on an arm or a leg: tie it off above
+  (wind a rag or bandage round the cut line; skipping it is allowed and the stump pours), then three blows
+  clicked on the line. Each blow costs composure and is heard 10 m off; a miss is wasted and hurts. If the
+  infection went in by that limb and has not reached the body, the chance it is cured is 1 minus spread squared
+  (+0.1 on steroids, at most 0.97): 96% at 20 s for an arm, 74% at 100 s, 18% at 180 s (cloud, 600 tries each).
+  The player is not told whether it worked. A limb can be taken off needlessly.
+- The stump is a wound of its own (`stump`): it bleeds hard (0.6, or 0.24 tied) and is pressed and dressed, not
+  stitched.
+- Gone for good (`body.missing`, until that character dies). An arm: -40% aim, reloading takes twice as long,
+  no shoving or guarding, wilder blind fire. A leg: -55% speed, no running, dashing, rolling or vaulting. Hits
+  aimed at a missing limb go to the chest. Hooks, improvised hands and peg legs are for later (owner). The
+  player's model still shows the limb: the body model is approved and locked, so this needs the owner's say.
+- What you can tell (`bite_guess()`): Medical 0 to 1, only that you were bitten; 2, that it is infected; 4, how
+  far up the limb it has got, or that the bite seems not to have taken.
+- Death (`Player._die()`): infected, your old character gets up where you fell as a fresh zombie (`Enemy`
+  `was_player`, `carried`), missing the limbs you had lost, with everything you carried; killing it drops "Your
+  old things". Not infected, your things lie there as "Your body". The new character starts with nothing. The
+  risen zombie's skin is rolled, not yours: the player has no look of its own yet.
+- Not built: sickness other than the bite, a turned raider, more than one cutting tool, cauterising, the look of
+  a missing limb on the player, prosthetics.
+- Next, in order: sickness; the new needs (hygiene, morale, toilet, warmth).
 
 ## Small rules the owner has set (20 Nov 2026)
 

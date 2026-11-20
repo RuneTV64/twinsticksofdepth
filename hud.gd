@@ -57,6 +57,8 @@ Character page: C. It shows attributes, needs, composure, your body, what you ca
 Wounds: H sits you down to treat them by hand with what you carry (a first-aid box is by the spawn).
   Your view closes in; hold ALT to look up. Moving puts it down. Keys 1-7 or a click pick a tool.
   J gives you a test wound (a deep cut, a gunshot, a bite in turn).
+Bites infect. Only taking the arm or leg off before it reaches the body can cure it (hatchet, in the treatment
+  screen), and that takes luck. Steroids slow it. Run its course and you turn; your old self walks with your things.
 Horde: noise warms an area and draws zombies in from round about. Z shows the readout. Killed ones don't come back.
 Cutaway: walls between the camera and you open up. V switches it off and on, to compare.
 Cover test: G test gunner at the crosshair   Shift+G remove them
@@ -332,6 +334,13 @@ func _sheet_text() -> String:
 			t += "   [color=#e8836b]%s[/color]   %s\n" % [BodyHealth.NAMES[part], line]
 	if not any:
 		t += "   [color=#999]Nothing wrong that you can tell.[/color]\n"
+	if b.bite_guess() != "":
+		t += "   [color=#e8836b]%s[/color]\n" % b.bite_guess()
+	if not b.missing.is_empty():
+		var gone := ""
+		for m in b.missing:
+			gone += ("" if gone == "" else ", ") + str(BodyHealth.NAMES[m]).to_lower()
+		t += "   [color=#e8836b]Gone for good:[/color] %s\n" % gone
 	var guess := b.time_left_guess()
 	if guess != "":
 		t += "   [color=#d6a04a]%s[/color]\n" % guess

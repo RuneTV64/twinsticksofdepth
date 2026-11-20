@@ -66,6 +66,8 @@ var stamina_cost_mult := 1.0
 var aim_mult := 1.0        # scales the aimed-shot bonus and headshot chance
 var spread_mult := 1.0     # scales blind fire's spread
 var heal_mult := 1.0
+var one_armed := false     # an arm is gone
+var lame := false          # a leg is gone
 
 # ---- composure tuning
 var threat_loss := 3.0       # composure lost per second for one zombie right on top of you
@@ -239,7 +241,40 @@ func _rebuild() -> void:
 			aim_mult *= 1.0 - 0.4 * body.arm_pain - 0.1 * body.pain
 			spread_mult *= 1.0 + 0.5 * body.arm_pain
 	if body.bitten:
-		_add("Bitten", "what that means is still to come")
+		_add("Bitten", "if it has taken, only taking the limb off in time can save you")
+	var fever := body.fever_feel()
+	if fever == "Feverish":
+		_add(fever, "stamina comes back 20% slower")
+		stamina_regen_mult *= 0.8
+	elif fever == "Sick":
+		_add(fever, "-15% speed, -20% aim, stamina comes back 40% slower")
+		speed_mult *= 0.85
+		aim_mult *= 0.8
+		stamina_regen_mult *= 0.6
+	elif fever == "Failing":
+		_add(fever, "-40% speed, -50% aim: you are turning")
+		speed_mult *= 0.6
+		aim_mult *= 0.5
+		stamina_regen_mult *= 0.35
+	if body.steroid_t > 0.0:
+		_add("Steroids", "holding an infection back, for now", false)
+	# Limbs that are gone, for good.
+	var arms := 0
+	var legs := 0
+	for m in body.missing:
+		if m.begins_with("Arm"):
+			arms += 1
+		else:
+			legs += 1
+	one_armed = arms > 0
+	lame = legs > 0
+	if arms > 0:
+		_add("One-armed" if arms == 1 else "No arms", "-40% aim, reloading takes twice as long, no shoving, blind fire wilder")
+		aim_mult *= 0.6
+		spread_mult *= 1.4
+	if legs > 0:
+		_add("One-legged" if legs == 1 else "No legs", "-55% speed; no running, dashing, rolling or vaulting")
+		speed_mult *= 0.45 if legs == 1 else 0.2
 
 	if composure < 20.0:
 		_add("Panicked", "-30% aim, blind fire 50% wilder")

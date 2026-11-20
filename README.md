@@ -30,6 +30,7 @@ F1 hides the help text. Esc frees the mouse, and clicking captures it again. Key
 
 ## What's in the level
 - **First-aid box** by the spawn (and one in the yard house): take it, then H treats wounds by hand. J gives you a test wound.
+- **Bites infect.** Only taking the arm or leg off in time (the hatchet, in the treatment screen) can cure one, and that takes luck; steroids slow it. Let it run and you turn: your old character gets up as a zombie carrying your things.
 - **Ammo crate** next to spawn. It's the first interaction: put your weapon away, walk up and interact. Crates respawn.
 - **Dummies** to the west. They heal after 3 seconds and respawn fast.
 - **Shamblers** to the east, plus two inside the house. They're slow and walk straight at you, and they shove doors open just like you do. Each one is a different person, dead for a different time, with different parts missing (see Zombies).

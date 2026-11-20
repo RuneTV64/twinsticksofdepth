@@ -3,18 +3,23 @@ extends Control
 ## Seeing to your wounds, by hand. Half the screen is your body (what you can tell about it), the other half is
 ## one wound close up, which you work on with the mouse and what you carry:
 ##   bare hand / clean rag   hold on the wound to press on it (best right on the bleeder)
-##   tweezers                click on what is in the wound to pick it out
+##   tweezers                grip what is in the wound, draw it out slowly and steadily, let go clear of the wound
 ##   vodka                   hold and sweep along the wound to wash it
-##   needle and thread       click along the wound, one stitch a click
+##   needle and thread       hold and zigzag across the wound: every crossing is a stitch
 ##   bandage / clean rag     hold and wind round the wound, three turns, to dress it
-##   painkillers             picked = one taken
+##   painkillers, steroids   picked = one taken
+##   hatchet                 on an arm or a leg: tie it off above (wind a rag or bandage round the line), then
+##                           chop on the line, three blows, and the limb is off
+## (The drawn-out forceps and the zigzag stitch are borrowed from surgery games the owner likes.)
 ## Your pointer is your hand: it shakes with pain, lost composure and lost blood. What you can see of the wound
 ## (the bleeder, what is in it, where stitches should go) depends on Medical.
 ##
 ## It costs you your view: the Player sees only a short way while this is open. Hold ALT to look up (hands stop).
 ## The rules themselves are in body_health.gd; this only does them.
 
-const TOOLS: Array[String] = ["hand", "clean_rag", "tweezers", "vodka", "needle_thread", "bandage", "painkillers"]
+const TOOLS: Array[String] = ["hand", "clean_rag", "tweezers", "vodka", "needle_thread", "bandage", "painkillers", "steroids", "hatchet"]
+const SHORT := {"needle_thread": "Needle, thread", "painkillers": "Painkillers"}
+const BLOWS := 3
 const WRAP_TURNS := 3.0
 const WASH_PARTS := 8
 
@@ -50,6 +55,13 @@ var _washed: Array[bool] = []
 var _poured := false
 var _msg := ""
 var _msg_t := 0.0
+var _side := 0.0                 # stitching: which side of the wound the needle is on (and how far out it got)
+var _grip := -1                  # forceps: the bit held, or -1
+var _speed := 0.0                # how fast the hand is moving (smoothed), px/s
+var _last_at := Vector2.ZERO
+var _amp := false                # taking the limb off
+var _amp_tied := false
+var _amp_blows := 0
 var _rows: Array = []            # [Rect2, wound] for the list on the left
 var _font: Font
 
@@ -107,6 +119,8 @@ func _len() -> float:
 		return 0.0
 	if wound["kind"] == "gunshot":
 		return lerpf(50.0, 100.0, float(wound["sev"]))
+	if wound["kind"] == "stump":
+		return 220.0
 	return lerpf(170.0, 600.0, float(wound["sev"]))
 
 
@@ -158,6 +172,10 @@ func _pick_wound(w: Dictionary) -> void:
 				worst = float(o["bleed"]) + float(o["sev"]) * 0.01
 				w = o
 	wound = w
+	_amp = false
+	_amp_tied = false
+	_amp_blows = 0
+	_grip = -1
 	_wrap = 0.0
 	_wrap_on = false
 	_poured = false
@@ -184,9 +202,11 @@ func _input(event: InputEvent) -> void:
 			_click()
 		else:
 			_wrap_on = false
+			_side = 0.0
+			_release()
 	elif event is InputEventKey and event.pressed and not event.echo:
 		var k: int = event.physical_keycode
-		if k >= KEY_1 and k <= KEY_7:
+		if k >= KEY_1 and k <= KEY_9:
 			_take(TOOLS[k - KEY_1])
 			get_viewport().set_input_as_handled()
 
@@ -200,8 +220,40 @@ func _take(t: String) -> void:
 		player.sheet.body.take_painkiller()
 		_say("You swallow a painkiller. It will take the edge off for a few minutes.")
 		return
+	if t == "steroids":
+		player.inv.use(t)
+		player.sheet.body.take_steroid()
+		_say("You take a steroid. If something is in you, it will slow it. It cures nothing.")
+		return
+	if t == "hatchet":
+		if wound.is_empty() or not player.sheet.body.can_amputate(wound["part"]):
+			_say("Only an arm or a leg can come off.")
+			return
+		_amp = true
+		_amp_blows = 0
+	elif t != "clean_rag" and t != "bandage":
+		_amp = false
 	tool = t
 	_wrap = 0.0
+
+
+## The line the limb is cut on (above the wound).
+func _cut_x() -> float:
+	return _area().position.x + _area().size.x * 0.2
+
+
+func _release() -> void:
+	if _grip < 0 or wound.is_empty():
+		_grip = -1
+		return
+	var b := player.sheet.body
+	if float(_near(_at)[1]) > 45.0:
+		_bits().erase(_grip)
+		b.pull_debris(wound)
+		_say("It is out." if int(wound["debris"]) == 0 else "It is out. There is more in there.")
+	else:
+		_say("You let go of it too soon.")
+	_grip = -1
 
 
 func _click() -> void:
@@ -221,7 +273,7 @@ func _click() -> void:
 	var b := player.sheet.body
 	var near := _near(_at)
 	var on: bool = near[1] <= 22.0
-	if wound["dressed"] != "":
+	if wound["dressed"] != "" and not _amp:
 		if tool == "hand" and near[1] <= 70.0:
 			b.undress(wound)
 			_say("You take the dressing off. It is no use again.")
@@ -235,9 +287,9 @@ func _click() -> void:
 				return
 			for i in _bits():
 				if _at.distance_to(_debris_pt(i)) <= 15.0:
-					_bits().erase(i)
-					b.pull_debris(wound)
-					_say("Got it." if int(wound["debris"]) == 0 else "Got one. There is more in there.")
+					_grip = i
+					_speed = 0.0
+					_say("You have it. Draw it out slowly, and let go clear of the wound.")
 					return
 			if on:
 				b.fumble(wound)
@@ -246,17 +298,30 @@ func _click() -> void:
 		"needle_thread":
 			if BodyHealth.stitches_needed(wound) == 0:
 				_say("A bite is left open: don't stitch it." if wound["kind"] == "bite" else "It is too slight to need stitches.")
-			elif not on:
-				pass
 			elif float(wound["bleed"]) > 0.1:
 				_say("Too much blood to see what you are doing. Stop the bleeding first.")
-			else:
-				player.inv.use("needle_thread")
-				b.stitch(wound, near[0])
-				player.sheet.composure = maxf(player.sheet.composure - 2.0, 0.0)
-				if not player.inv.has("needle_thread"):
-					_say("That was the last of the thread.")
+			_side = 0.0
+		"hatchet":
+			if not _amp:
+				return
+			if absf(_at.x - _cut_x()) <= 26.0:
+				_amp_blows += 1
+				player.sheet.composure = maxf(player.sheet.composure - 18.0, 0.0)
+				Earshot.make(player.global_position, 10.0, player.get_tree(), player, true)   # you can't do this quietly
+				if _amp_blows >= BLOWS:
+					var part: String = wound["part"]
+					var tied := _amp_tied
+					b.amputate(part, tied)
+					player.recompute_stats()
+					_pick_wound({})
 					tool = "hand"
+					_say("It is off. Now stop the bleeding." if tied else "It is off, and it is pouring. Stop the bleeding!")
+				else:
+					_say("Again. On the line.")
+			else:
+				b.fumble(wound)
+				player.sheet.composure = maxf(player.sheet.composure - 10.0, 0.0)
+				_say("You missed the line. That was for nothing.")
 
 
 func _process(delta: float) -> void:
@@ -272,12 +337,20 @@ func _process(delta: float) -> void:
 		_jolt_t = randf_range(0.5, 2.2)
 		_jolt = Vector2.from_angle(randf() * TAU) * amp * randf_range(0.6, 1.6)
 	_jolt = _jolt.lerp(Vector2.ZERO, 1.0 - exp(-5.0 * delta))
+	_last_at = _at
 	_at = _ptr + _jolt + amp * 0.5 * Vector2(sin(_t * 7.3 + 1.0) + 0.6 * sin(_t * 13.1 + 2.0),
 		sin(_t * 8.9 + 3.0) + 0.6 * sin(_t * 15.7 + 4.0))
 	# A wound that has closed and gone is no longer there to work on.
 	if not wound.is_empty() and not player.sheet.body.wounds.has(wound):
 		_pick_wound({})
-	if _down and not wound.is_empty() and _area().has_point(_at) and wound["dressed"] == "":
+	_speed = lerpf(_speed, _at.distance_to(_last_at) / maxf(delta, 0.001), clampf(delta / 0.15, 0.0, 1.0))
+	if _grip >= 0 and _speed > 700.0:
+		# A jerk with something gripped: it tears free.
+		_grip = -1
+		player.sheet.body.fumble(wound)
+		player.sheet.composure = maxf(player.sheet.composure - 4.0, 0.0)
+		_say("Too fast: it tore out of the tweezers. Slowly.")
+	if _down and not wound.is_empty() and _area().has_point(_at) and (wound["dressed"] == "" or _amp):
 		_hold(delta)
 	queue_redraw()
 
@@ -287,6 +360,40 @@ func _hold(delta: float) -> void:
 	var b := player.sheet.body
 	var near := _near(_at)
 	var c := _centre()
+	if _amp:
+		# Tying it off: wind round the limb on the line.
+		c = Vector2(_cut_x(), c.y)
+		if (tool == "bandage" or tool == "clean_rag") and _has(tool) and not _amp_tied and _at.distance_to(c) > 50.0:
+			var ang2 := (_at - c).angle()
+			if _wrap_on:
+				_wrap += absf(angle_difference(_wrap_ang, ang2)) / TAU
+			_wrap_ang = ang2
+			_wrap_on = true
+			if _wrap >= WRAP_TURNS:
+				player.inv.use(tool)
+				_amp_tied = true
+				_wrap = 0.0
+				_down = false
+				_say("Tied off, tight. Now the hatchet.")
+		return
+	if tool == "needle_thread" and BodyHealth.stitches_needed(wound) > 0 and float(wound["bleed"]) <= 0.1:
+		# Zigzag: every time the needle crosses the wound, a stitch goes in where it crossed.
+		var t0: float = near[0]
+		var tan := (_pt(minf(t0 + 0.02, 1.0)) - _pt(maxf(t0 - 0.02, 0.0))).normalized()
+		var off := (_at - _pt(t0)).dot(Vector2(-tan.y, tan.x))
+		if _side == 0.0:
+			_side = off
+		elif signf(off) == signf(_side):
+			_side = off if absf(off) > absf(_side) else _side
+		elif absf(_side) >= 14.0 and absf(off) >= 6.0 and float(near[1]) <= 40.0:
+			player.inv.use("needle_thread")
+			b.stitch(wound, t0)
+			player.sheet.composure = maxf(player.sheet.composure - 2.0, 0.0)
+			_side = off
+			if not player.inv.has("needle_thread"):
+				_say("That was the last of the thread.")
+				tool = "hand"
+		return
 	var winding := (tool == "bandage" or tool == "clean_rag") and float(near[1]) > 46.0 and _at.distance_to(c) > 60.0
 	if winding and _has(tool):
 		# Winding it on: round and round the wound.
@@ -367,7 +474,10 @@ func _draw_body(b: BodyHealth) -> void:
 	var guess := b.time_left_guess()
 	if guess != "":
 		_text(Vector2(x, 164), guess, C_MARK, 16)
-	var y := 196.0
+	var bite := b.bite_guess()
+	if bite != "":
+		draw_multiline_string(_font, Vector2(x, 186), bite, HORIZONTAL_ALIGNMENT_LEFT, w, 15, 2, C_WARN)
+	var y := 230.0
 	_rows.clear()
 	for part in BodyHealth.PARTS:
 		var lines := b.describe(part)
@@ -419,7 +529,13 @@ func _draw_wound(b: BodyHealth, a: Rect2) -> void:
 		var yy := skin.position.y + skin.size.y * (i + 0.5) / 9.0
 		draw_line(Vector2(skin.position.x, yy), Vector2(skin.end.x, yy + 6.0), C_SKIN_D, 1.0)
 	var n := 28
-	if kind == "gunshot":
+	if kind == "stump":
+		# The raw end of the limb: meat, and the bone in the middle (pink-ivory: fresh bone is never white).
+		draw_circle(_centre(), 150.0, C_BLOOD_D)
+		draw_circle(_centre(), 138.0, C_FLESH)
+		draw_circle(_centre(), 40.0, Color(0.86, 0.74, 0.68))
+		draw_circle(_centre(), 17.0, Color(0.45, 0.12, 0.12))
+	elif kind == "gunshot":
 		var r := _len() * 0.5
 		draw_circle(_centre(), r + 9.0, C_BLOOD_D)
 		draw_circle(_centre(), r, C_FLESH)
@@ -444,14 +560,29 @@ func _draw_wound(b: BodyHealth, a: Rect2) -> void:
 			draw_colored_polygon(PackedVector2Array([top[i], top[i + 1], bot[i + 1], bot[i]]), C_FLESH)
 			draw_line(top[i], top[i + 1], C_BLOOD_D, 3.0)
 			draw_line(bot[i], bot[i + 1], C_BLOOD_D, 3.0)
+	# Taking the limb off: the line, the tourniquet on it, the blows so far.
+	if _amp:
+		var cx := _cut_x()
+		if _amp_tied or _wrap > 0.0:
+			var wdt := 46.0 * (1.0 if _amp_tied else _wrap / WRAP_TURNS)
+			draw_rect(Rect2(cx - 70.0, skin.position.y, wdt, skin.size.y), Color(0.6, 0.58, 0.5))
+		var yy := skin.position.y
+		while yy < skin.end.y:
+			draw_line(Vector2(cx, yy), Vector2(cx, minf(yy + 14.0, skin.end.y)), C_MARK, 3.0)
+			yy += 24.0
+		for i in _amp_blows:
+			draw_rect(Rect2(cx - 5.0, skin.position.y, 10.0, skin.size.y * (i + 1) / BLOWS), C_BLOOD_D)
+		_text(Vector2(cx + 14.0, skin.position.y + 24.0), "cut here", C_MARK, 16)
 	# Washed parts look clean.
 	for i in WASH_PARTS:
 		if _washed[i] and not wound["clean"]:
 			draw_circle(_pt((i + 0.5) / WASH_PARTS), 13.0, Color(0.85, 0.7, 0.66, 0.5))
 	# What is in it. Blood hides it; without Medical it is only a darker speck.
-	if bleed <= 0.1:
+	if bleed <= 0.1 or _grip >= 0:
 		for i in _bits():
-			var p := _debris_pt(i)
+			if bleed > 0.1 and i != _grip:
+				continue
+			var p := _debris_pt(i) if i != _grip else _at
 			draw_rect(Rect2(p - Vector2(5, 4), Vector2(10, 8)), Color(0.2, 0.22, 0.24) if med < 2 else Color(0.75, 0.8, 0.85))
 			if med >= 2:
 				draw_arc(p, 13.0, 0.0, TAU, 16, C_MARK, 1.5)
@@ -497,7 +628,12 @@ func _draw_wound(b: BodyHealth, a: Rect2) -> void:
 	# What to do, in order.
 	var y := a.end.y + 30.0
 	var i := 1
-	for st in b.steps(wound):
+	var steps: Array = b.steps(wound)
+	if _amp:
+		steps = [["Tie it off above the line", "tied" if _amp_tied else "not tied: it will pour", _amp_tied],
+			["Chop on the line", "%d of %d blows" % [_amp_blows, BLOWS], false]]
+		_text(Vector2(a.position.x + 520.0, 92), "TAKING IT OFF. There is no putting it back.", C_WARN, 20)
+	for st in steps:
 		_text(Vector2(a.position.x, y), "%d.  %s" % [i, st[0]], C_TEXT if not st[2] else C_DIM, 18)
 		_text(Vector2(a.position.x + 360.0, y), st[1], C_GOOD if st[2] else C_WARN, 18)
 		y += 26.0
@@ -506,8 +642,9 @@ func _draw_wound(b: BodyHealth, a: Rect2) -> void:
 		_text(Vector2(a.position.x, _sz().y - 190.0), _msg, C_MARK, 18)
 	var hint: String = {"hand": "Hold on the wound to press on it. On a dressing: click to take it off.",
 		"clean_rag": "Hold on the wound to press. Hold and wind round it, three turns, to tie it on.",
-		"tweezers": "Click on what is in the wound.", "vodka": "Hold and sweep along the wound to wash it. It stings.",
-		"needle_thread": "Click along the wound: one stitch a click, evenly spaced.",
+		"tweezers": "Grip what is in the wound, draw it out slowly, let go clear of the wound. A jerk tears it free.",
+		"hatchet": "Tie it off first (wind a rag or bandage round the line). Then click on the line: three blows.", "vodka": "Hold and sweep along the wound to wash it. It stings.",
+		"needle_thread": "Hold and zigzag across the wound: every crossing is a stitch. Keep them even.",
 		"bandage": "Hold and wind round the wound, three turns."}.get(tool, "")
 	_text(Vector2(a.position.x, _sz().y - 164.0), hint, C_DIM, 15)
 
@@ -520,7 +657,7 @@ func _draw_tray() -> void:
 		draw_rect(r, Color(0.3, 0.24, 0.12, 0.9) if t == tool else C_PANEL)
 		draw_rect(r, C_MARK if t == tool else C_LINE, false, 2.0)
 		_text(r.position + Vector2(10, 24), "%d" % (i + 1), C_DIM, 15)
-		_text(r.position + Vector2(10, 52), "Bare hand" if t == "hand" else Items.name_of(t), C_TEXT if have else C_DIM, 14)
+		_text(r.position + Vector2(10, 52), "Bare hand" if t == "hand" else str(SHORT.get(t, Items.name_of(t))), C_TEXT if have else C_DIM, 14)
 		var sub := ""
 		if t != "hand":
 			var key := player.inv.find(t)

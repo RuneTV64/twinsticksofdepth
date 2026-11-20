@@ -36,6 +36,7 @@ const KINDS := {
 	"bite": ["bite", 0.15, 0.6],
 	"gunshot": ["gunshot wound", 0.3, 0.8],
 	"break": ["break", 0.0, 0.9],
+	"stump": ["stump", 0.6, 1.0],
 }
 
 var blood := 100.0
@@ -56,6 +57,23 @@ var close_time := 150.0      # s for a wound that has stopped bleeding to close 
 var blood_back := 0.06       # blood % a second coming back when nothing is bleeding
 var dead_at := 35.0          # blood at which you die
 
+# ---- the bite (stand-in times until the game has a clock: a game day will be 2 to 4 real hours)
+## A zombie's bite infects. It starts in the part that was bitten and spreads to the body; once it is in the body
+## it runs its course and you turn. Only taking the limb off before it has spread cures it, and that takes luck.
+## Nobody is told any of these numbers: Medical gives the best guess.
+var takes_chance := 0.92     # a bite that doesn't take is the other kind of luck
+var turn_time := 900.0       # s from the bite to turning, untreated
+var spread_time := {"ArmL": 200.0, "ArmR": 200.0, "LegL": 280.0, "LegR": 280.0}   # s to reach the body; head and chest: at once
+var steroid_time := 240.0    # s one dose holds it back for
+var steroid_slow := 0.4      # ... to this share of its pace
+var infected := false        # it took
+var infect_part := ""        # where it went in
+var spread := 0.0            # 0 just bitten .. 1 it is in the body
+var sickness := 0.0          # 0 .. 1 you turn
+var steroid_t := 0.0
+## Limbs that are gone: "ArmL", "LegR"...
+var missing: Array[String] = []
+
 # What it all adds up to, rebuilt on tick(). The sheet multiplies these in.
 var pain := 0.0              # 0 none .. 1 overwhelming
 var leg_pain := 0.0
@@ -67,12 +85,22 @@ var bitten := false
 func reset() -> void:
 	blood = 100.0
 	painkiller_t = 0.0
+	steroid_t = 0.0
+	infected = false
+	infect_part = ""
+	spread = 0.0
+	sickness = 0.0
+	missing.clear()
 	wounds.clear()
 	_sum()
 
 
 ## A new wound. `amount` is the damage that caused it (40 or more is as bad as that kind gets).
 func hurt(kind: String, part: String, amount: float) -> void:
+	if missing.has(part):
+		part = "Torso"       # there is nothing there to hit
+	if kind == "bite":
+		_bitten(part)
 	var sev := clampf(amount / 40.0, 0.1, 1.0)
 	# A second hit on a part already hurt the same way makes that wound worse; it doesn't make a second one.
 	for w in wounds:
@@ -99,6 +127,97 @@ func hurt(kind: String, part: String, amount: float) -> void:
 	_sum()
 
 
+# ---------------------------------------------------------------- the bite
+func _bitten(part: String) -> void:
+	if infected:
+		# Bitten again somewhere nearer the body: it gets there sooner.
+		if not spread_time.has(part):
+			spread = 1.0
+		return
+	if randf() >= takes_chance:
+		return
+	infected = true
+	infect_part = part
+	spread = 0.0 if spread_time.has(part) else 1.0
+	sickness = 0.0
+
+
+func _tick_bite(dt: float) -> void:
+	steroid_t = maxf(steroid_t - dt, 0.0)
+	if not infected:
+		return
+	var pace := steroid_slow if steroid_t > 0.0 else 1.0
+	if spread < 1.0:
+		spread = minf(spread + dt * pace / float(spread_time[infect_part]), 1.0)
+	sickness = minf(sickness + dt * pace / turn_time, 1.0)
+
+
+func turned() -> bool:
+	return infected and sickness >= 1.0
+
+
+func take_steroid() -> void:
+	steroid_t = steroid_time
+
+
+## Can this part come off? (An arm or a leg that is still there.)
+func can_amputate(part: String) -> bool:
+	return spread_time.has(part) and not missing.has(part)
+
+
+## The limb comes off. If the infection went in there and hasn't reached the body, this may cure it: nearly
+## sure early, a coin toss late, a little better on steroids. `tied`: a tourniquet was on, so it bleeds far less.
+func amputate(part: String, tied: bool) -> void:
+	var i := 0
+	while i < wounds.size():
+		if wounds[i]["part"] == part:
+			wounds.remove_at(i)
+		else:
+			i += 1
+	missing.append(part)
+	if infected and infect_part == part and spread < 1.0:
+		var chance := clampf(1.0 - spread * spread + (0.1 if steroid_t > 0.0 else 0.0), 0.0, 0.97)
+		if randf() < chance:
+			infected = false
+			sickness = 0.0
+			spread = 0.0
+		else:
+			spread = 1.0
+	wounds.append({"part": part, "kind": "stump", "sev": 1.0, "bleed": 0.6 * (0.4 if tied else 1.0), "closing": 0.0,
+		"debris": 0, "clean": false, "stitches": [], "dressed": "", "fester": false, "seed": randi() % 100000, "tied": tied})
+	_sum()
+
+
+## How you feel from the infection: never a number.
+func fever_feel() -> String:
+	if not infected or sickness < 0.2:
+		return ""
+	if sickness < 0.45:
+		return "Feverish"
+	if sickness < 0.75:
+		return "Sick"
+	return "Failing"
+
+
+## What you can tell about the bite, by what you know; "" if nothing.
+func bite_guess() -> String:
+	var has_bite := false
+	for w in wounds:
+		has_bite = has_bite or w["kind"] == "bite"
+	if not has_bite and not (infected and sickness >= 0.2):
+		return ""
+	if medical < 2:
+		return "You have been bitten. You know what that means." if has_bite else ""
+	if not infected:
+		return "The bite looks clean so far. It may not have taken." if medical >= 4 and has_bite else "You have been bitten. Too soon to tell if it has taken."
+	if medical < 4:
+		return "The bite is infected." + (" If it is still in the limb, the limb could come off." if spread_time.has(infect_part) and not missing.has(infect_part) else "")
+	if spread < 1.0:
+		return "The infection is still in the %s: %s. Take it off and you may live." % [str(NAMES[infect_part]).to_lower(),
+			"it has barely started" if spread < 0.35 else ("it is climbing" if spread < 0.7 else "it is nearly at the body")]
+	return "The infection is in your body. Nothing cuts it out now."
+
+
 # ---------------------------------------------------------------- seeing to a wound
 ## Is there anything to be done for it by hand? (Not for a bruise; a break needs a splint, which is to come.)
 static func treatable(w: Dictionary) -> bool:
@@ -107,7 +226,7 @@ static func treatable(w: Dictionary) -> bool:
 
 ## How many stitches it wants. None for a slight cut, and a bite is left open.
 static func stitches_needed(w: Dictionary) -> int:
-	if w["kind"] == "bite" or not treatable(w) or float(w["sev"]) < 0.3:
+	if w["kind"] == "bite" or w["kind"] == "stump" or not treatable(w) or float(w["sev"]) < 0.3:
 		return 0
 	return 2 if w["kind"] == "gunshot" else clampi(ceili(float(w["sev"]) * 7.0), 2, 7)
 
@@ -137,6 +256,8 @@ func least_bleed(w: Dictionary) -> float:
 		least *= 0.2
 	elif w["dressed"] == "rag":
 		least *= 0.5
+	if w.get("tied", false):
+		least *= 0.3
 	return least
 
 
@@ -211,6 +332,8 @@ func steps(w: Dictionary) -> Array:
 		out.append(["Close it: stitches", ("%d of about %d" % [n, need]) if medical >= 3 else ("%d stitch%s" % [n, "" if n == 1 else "es"]), closed_frac(w) >= 0.99])
 	elif w["kind"] == "bite":
 		out.append(["Close it", "a bite is left open", true])
+	elif w["kind"] == "stump":
+		out.append(["Close it", "a stump is dressed, not stitched", true])
 	out.append(["Dress it", "bandaged" if w["dressed"] == "bandage" else ("rag tied on" if w["dressed"] == "rag" else "open"), w["dressed"] != ""])
 	return out
 
@@ -243,6 +366,7 @@ func tick(dt: float) -> void:
 				continue
 		i += 1
 	painkiller_t = maxf(painkiller_t - dt, 0.0)
+	_tick_bite(dt)
 	_sum()
 	if bleeding > ooze:
 		blood = maxf(blood - bleeding * dt, 0.0)

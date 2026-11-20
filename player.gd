@@ -511,7 +511,7 @@ func is_melee() -> bool:
 ## True while your guard is up: Ready unarmed with stamina left to spend.
 ## A drained guard stays down until you've caught your breath (winded clears).
 func is_guarding() -> bool:
-	return armed and is_melee() and not dead and not winded and stamina > 0.0
+	return armed and is_melee() and not dead and not winded and stamina > 0.0 and not sheet.one_armed
 
 
 func equip(w: String) -> void:
@@ -745,14 +745,10 @@ func _tick_timers(delta: float) -> void:
 			if randf() < pile_slip * hurry * nerve * _sheet_t:
 				_stagger = 0.6
 				show_status("You lose your footing!", 0.9)
+		if not dead and sheet.body.turned() and not invulnerable:
+			_die("You turned.")
 		if not dead and sheet.body.dead_from_blood() and not invulnerable:
-			health = 0.0
-			dead = true
-			leave_cover()
-			armed = false
-			held_by.clear()
-			_respawn_t = 2.5
-			show_status("You bled out. Respawning...", 2.5)
+			_die("You bled out.")
 		if not dead:
 			sheet.tick(_sheet_t, _threat(), not held_by.is_empty(), in_cover and cover_mode == "hunker",
 				health / max_health, winded, weight / strength)
@@ -1150,6 +1146,9 @@ func _cover_velocity(delta: float, move_dir: Vector3) -> Vector3:
 ## Over low cover and down the other side.
 func _try_vault() -> void:
 	var f := cover_face
+	if sheet.lame:
+		show_status("Not on one leg", 0.8)
+		return
 	if f.depth > vault_max_depth:
 		show_status("Too deep to vault", 0.8)
 		return
@@ -1171,7 +1170,7 @@ func _try_vault() -> void:
 
 ## A roll along the ground, the way you are moving (or facing, if you aren't moving).
 func _start_roll(move_dir: Vector3) -> void:
-	if _roll_t > 0.0 or _roll_rec_t > 0.0 or _vault_t > 0.0 or dead:
+	if _roll_t > 0.0 or _roll_rec_t > 0.0 or _vault_t > 0.0 or dead or sheet.lame:
 		return
 	if not held_by.is_empty():
 		show_status("Held! Shove it off or struggle", 0.8)
@@ -1520,7 +1519,7 @@ func _update_sprint(delta: float, move_dir: Vector3) -> void:
 
 	var want_run := _sprint_t > sprint_tap_time and not armed and move_dir.length() > 0.1 \
 		and not winded and _stagger <= 0.0 and held_by.is_empty() and not in_cover and not cover_entering \
-		and perch <= 0.25
+		and perch <= 0.25 and not sheet.lame
 	running = want_run and stamina > 0.0
 	if running:
 		stamina = maxf(stamina - run_drain * sheet.stamina_cost_mult * delta, 0.0)
@@ -1538,6 +1537,9 @@ func _update_sprint(delta: float, move_dir: Vector3) -> void:
 
 
 func _try_dash(move_dir: Vector3) -> void:
+	if sheet.lame:
+		show_status("Not on one leg", 0.8)
+		return
 	if perch > 0.25:
 		show_status("No footing to dash on this", 0.8)
 		return
@@ -1698,7 +1700,7 @@ func _start_reload() -> void:
 	if reserve <= 0:
 		show_status("No ammo. Find some, or bash (attack with an empty weapon).", 1.8)
 		return
-	_reload_t = reload_time
+	_reload_t = reload_time * (2.0 if sheet.one_armed else 1.0)
 	show_status("Reloading...", reload_time)
 
 
@@ -2043,13 +2045,7 @@ func take_damage(amount: float, dir: Vector3, knock: float, fright := true) -> v
 		velocity += dir * knock
 		_stagger = maxf(_stagger, 0.15)
 	if health <= 0.0:
-		health = 0.0
-		dead = true
-		leave_cover()
-		armed = false
-		held_by.clear()
-		_respawn_t = 2.5
-		show_status("You went down. Respawning...", 2.5)
+		_die("You went down.")
 
 
 ## A gunshot at you, fired from `from`. Your cover decides what it does, when the shot has to cross it to
@@ -2078,6 +2074,52 @@ func take_shot(amount: float, dir: Vector3, knock: float, from: Vector3) -> Stri
 
 
 ## A wound on the body (sheet.body) from damage just taken. Nothing if the damage didn't count.
+## The end of this character. Infected, they get up again as a zombie carrying what you had; otherwise what you
+## had lies where you fell. Then a new character starts with nothing of theirs.
+func _die(text: String) -> void:
+	health = 0.0
+	dead = true
+	treating = false
+	leave_cover()
+	armed = false
+	held_by.clear()
+	_respawn_t = 3.0
+	var things: Array[Dictionary] = []
+	for k in inv.slots:
+		things.append(inv.slots[k])
+	inv = Inventory.new()
+	if sheet.body.infected:
+		_rise(things)
+		text += " What was you gets up again."
+	elif not things.is_empty():
+		var box := ItemPickup.new()
+		box.title = "Your body"
+		box.contents = things
+		box.position = Vector3(global_position.x, 0.0, global_position.z)
+		get_parent().add_child(box)
+	show_status(text, 3.0)
+
+
+## Your old character, turned: a fresh zombie where you fell, missing what you had lost, carrying your things.
+func _rise(things: Array[Dictionary]) -> void:
+	var e := Enemy.new()
+	e.kind = "shambler"
+	e.player = self
+	e.position = Vector3(global_position.x, 0.0, global_position.z)
+	e.carried = things
+	e.was_player = true
+	get_parent().add_child(e)
+	if e.body != null and e.body.shambler != null:
+		var parts := {}
+		for m in sheet.body.missing:
+			parts[m] = "Destroyed"
+		e.body.shambler.call("show_parts", parts)
+		e.body.shambler.freshness.value = 1.0
+		e.body.refresh()
+		e._new_zombie(false)
+	e.rise_from_death()
+
+
 ## Sit down and see to your wounds (H), or put it down again.
 func toggle_treat() -> void:
 	if treating:

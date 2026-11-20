@@ -103,7 +103,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_C: hud.toggle_sheet()
 			KEY_H: player.toggle_treat()
 			KEY_J:   # a test wound, to try the treatment screen on
-				var tw: Array = [["deep cut", "ArmL", 30.0], ["gunshot", "Torso", 26.0], ["bite", "LegR", 20.0]][_test_wound % 3]
+				var tw: Array = [["deep cut", "ArmL", 30.0], ["gunshot", "Torso", 26.0], ["bite", "ArmR", 20.0]][_test_wound % 3]
 				_test_wound += 1
 				player._wound(tw[0], tw[1], tw[2])
 				player.show_status("Test wound: %s." % tw[0])
@@ -583,7 +583,7 @@ func _first_aid(pos: Vector3) -> void:
 	var b := ItemPickup.new()
 	b.position = pos
 	b.contents = [Items.make("bandage", 3), Items.make("clean_rag", 2), Items.make("needle_thread"),
-		Items.make("tweezers"), Items.make("vodka"), Items.make("painkillers")]
+		Items.make("tweezers"), Items.make("vodka"), Items.make("painkillers"), Items.make("steroids"), Items.make("hatchet")]
 	add_child(b)
 
 

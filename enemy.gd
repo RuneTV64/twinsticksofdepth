@@ -177,6 +177,9 @@ var crawling := false
 var hurt_t := 0.0
 var hit_dir := Vector3.ZERO
 var body: ZombieBody
+## Things it has on it (item Dictionaries): they fall where it dies.
+var carried: Array[Dictionary] = []
+var was_player := false      # this was your last character
 
 var _knock := Vector3.ZERO
 var _flash := 0.0
@@ -382,9 +385,23 @@ func shove(dir: Vector3, force: float) -> void:
 		_knock_down()
 
 
+## Just turned: it starts on the ground and gets up.
+func rise_from_death() -> void:
+	crawling = true
+	_set_state("down")
+	_down_t = 4.0
+
+
 func _die() -> void:
 	dead = true
 	hp = 0.0
+	if not carried.is_empty():
+		var box := ItemPickup.new()
+		box.title = "Your old things" if was_player else "Its things"
+		box.contents = carried
+		carried = []
+		box.position = Vector3(global_position.x, 0.0, global_position.z)
+		get_parent().add_child(box)
 	collision_layer = 0
 	_let_go()
 	# Dying against a wall, or on a heap, it becomes part of the heap until the corpse is gone.
