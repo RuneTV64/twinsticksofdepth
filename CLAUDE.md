@@ -282,6 +282,9 @@ changes, update both, and keep them the same files.
 - Character assets: the **Godot Assets** artifact, https://claude.ai/artifact/WRBAYq3aDXi9hMi5zS2wzC
   (MaleBody_Muscular, MaleBody_Muscular_Skins, ShamblerMale_Muscular). Find others with the Artifact tool's
   `list` action.
+- Ground assets (dirt, grass, seasons): the **Ground Assets** artifact,
+  https://claude.ai/artifact/UJoHeBzm47cZoGwVgMa3xU (`files/Ground/`; in review). The same files as
+  `assets/ground/`.
 - Before starting asset work, check the Artifacts first. Work done in an earlier chat may only be there, not in git.
 - Layout inside an asset artifact: `files/<AssetName>/`. Models are `.glb.b64.txt` (base64 of the .glb, since
   artifacts can't hold .glb). Godot scripts and shaders are `.gd.txt` / `.gdshader.txt`, Python `.py.txt`. The
