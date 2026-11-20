@@ -132,8 +132,8 @@ func _process(delta: float) -> void:
 	_mat.set_shader_parameter("face_angle", player.facing_angle())
 	_mat.set_shader_parameter("half_fov", deg_to_rad(player.sight_fov_deg) * 0.5)
 	_mat.set_shader_parameter("taper", Player.SIGHT_TAPER)
-	_mat.set_shader_parameter("sight_range", player.sight_range)
-	_mat.set_shader_parameter("sight_near", player.sight_near)
+	_mat.set_shader_parameter("sight_range", player.view_range)   # the view as it is now (shrinks behind cover)
+	_mat.set_shader_parameter("sight_near", player.view_near)
 	_clock += delta
 	_mat.set_shader_parameter("now", _clock)
 	_mat.set_shader_parameter("stale_delay", stale_delay)

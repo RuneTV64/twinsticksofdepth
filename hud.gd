@@ -24,7 +24,8 @@ Attack (while Ready)  Left-click
 Interact (weapon away)  Left-click
 Sprint  Shift: tap = dash, hold = run
 Weapon wheel (HOLD)  Tab, point with the mouse, release
-Reload  R"""
+Reload  R
+Cover  Space: tap = slide into nearest cover / leave it; hold = go to the cover the crosshair marks"""
 
 const HELP_PAD := """CONTROLLER
 Move  Left stick
@@ -34,7 +35,8 @@ Attack (while Ready)  RT
 Interact (weapon away)  RT  or  A
 Sprint  L3: tap = dash, hold = run
 Weapon wheel (HOLD)  LB, point with the right stick, release
-Reload  X"""
+Reload  X
+Cover  B: tap = slide into nearest cover / leave it; hold = go to the cover the crosshair marks"""
 
 const HELP_TAIL := """
 Doors: walk into them to push them open or shut.
@@ -46,8 +48,13 @@ Hold Ready and face a zombie: when it gets within reach you shove it back,
 and any zombies right beside it. Each shove costs stamina;
 out of stamina = no shoves, bites land until you recover.
 Grabbed: Ready and face it to shove it off, or wiggle the move keys to break free.
+In cover: hunkered = hidden, safe from shots across it, but you see only a short way.
+  Push toward low cover (or along it at an end) and hold = peek: you see, they see you, small chance of a head hit.
+  Ready = pop up or lean out to aim. Attack without Ready = blind fire. Push away = leave.
+  Cover + push toward low cover = vault it.
 Stat test keys: 1/2 STR   3/4 END   5/6 WT   7/8 DEX
 Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt   L all on low model
+Cover test: G test gunner at the crosshair   Shift+G remove them
 F1 hide help    Esc free mouse"""
 
 
@@ -193,6 +200,10 @@ func _process(_delta: float) -> void:
 			stance += "  - guarding"
 	if player.running:
 		stance += "  - running"
+	if player.cover_entering:
+		stance += "  - to cover"
+	elif player.in_cover:
+		stance += {"hunker": "  - IN COVER (hidden)", "peek": "  - PEEKING (seen)", "pop": "  - OUT OF COVER (exposed)"}[player.cover_mode]
 	if player.fatigue() > 0.3:
 		stance += "  - fatigued"
 	_state.text = "%s    |    %s" % [stance, "Controller" if player.using_pad else "Mouse + Keyboard"]

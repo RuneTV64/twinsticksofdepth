@@ -196,6 +196,7 @@ changes, update both, and keep them the same files.
   `lock_on_radius` 1.6 m of a living enemy the player can see is drawn onto it (dead centre inside `lock_on_core`
   0.5 m, fading to nothing at the radius, so it never sticks) and follows it. Stick: shifts where the tilt points,
   only while tilted. Mouse: settles on once the mouse rests (`lock_on_mouse_radius` 1 m). Exports in the Lock-on group.
+- Debug keys: G adds a test gunner at the crosshair (Shift+G removes them): a stand-in raider for the cover rules.
 - Debug keys: F1 help, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
@@ -203,6 +204,37 @@ changes, update both, and keep them the same files.
   (`low_beyond` 21 m, `mid_within` 19.5 m; on screen zombies are 15 to 29 m away) with `shambler.use_model()`,
   checked 4 times a second, at most 2 swaps a frame. Godot's automatic mesh LODs
   are kept off (`lod_bias` 64), as on the player: the shader needs the per-vertex data.
+
+## Cover system (built 20 Nov 2026, in review; untested on the owner's PC)
+
+Designed with the owner on 20 Nov 2026 for raiders and other players as well as zombies. Rule: to see is to be seen.
+
+- `cover.gd` (`Cover`): no hand placement. Every solid box on the ground (`main.gd` `_box`) is registered; each side
+  0.6 m or longer is a cover face. Top up to 1.5 m is low cover (crates, window sills, cars), taller is high. Wall
+  pieces in a line join up, so you slide along a wall and under its windows.
+- Controls (`player.gd`, Cover exports): Cover is B / Space. Tap = slide into the nearest cover (toward the move
+  stick) or leave it. Hold = go to the cover spot the crosshair marks (cyan ring; read before lock-on shifts the
+  crosshair); the crosshair recentres on arrival. Pushing firmly away leaves; a dash or a grab also takes you out.
+  Cover + pushing into low cover vaults it (window sills too).
+- Three states (`cover_mode`):
+  - hunker: hidden. Shots that cross the cover are stopped. You see only `cover_hunker_sight` 4 m all round (the
+    fog closes in, enemies beyond fade).
+  - peek: hold the stick toward low cover, or along it at an open end (low or high), for 0.4 s. Normal view; enemies
+    see you; a shot crossing the cover has a 15% chance to hit, and it is always a head hit.
+  - pop: Ready held. Near an open end you lean out round it, otherwise you stand up over low cover (high cover away
+    from an end has no angle). Hit as normal.
+- Head hit on the player: 75% of full health (owner, 20 Nov 2026, after looking at how Project Zomboid and its
+  Bandits mod do it). On zombies a headshot is still a kill.
+- Blind fire: attack without Ready in cover fires over low cover or round the near end of high cover, toward the
+  crosshair, 14 degrees either way, slower, no aimed bonus.
+- Shots (`projectile.gd` `wall_hit`): low cover never stops a shot by itself, it goes over; someone hunkered behind
+  it is protected by `Player.take_shot()`. Standing behind low cover without being in it gives no protection.
+- Zombies never use cover. One you are hidden from notices you at 0.35 of its range; one that was chasing goes to
+  where it last saw you. They don't climb low cover yet.
+- Poses are in `player_body.gd` (squat, peek, lean, gun up for blind fire, vault). Review sheet:
+  `tools/preview/cover_poses.png`, made by `tools/cover_pose_preview.gd`.
+- Not built yet: raider AI using cover (the faces and rules are ready for it), zombies climbing low cover, cover
+  protecting anyone but the player.
 
 ## Character shaders and models: how they are built
 

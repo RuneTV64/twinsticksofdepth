@@ -11,6 +11,8 @@ extends Node3D
 ##   head      turns toward the look crosshair while the weapon is away
 ##   arms      swing while the weapon is away; in Ready the hands are placed (two-bone IK) on a
 ##             boxing guard or on the gun, and punches, shoves, recoil, reload and bash move them
+##   cover     squats behind low cover, comes half up to peek and all the way up to aim over it, leans out round
+##             an end, holds the gun up over (or out round) the cover to fire blind, tucks up to vault
 ##   death     falls onto its back until the respawn
 ##
 ## Model space: +Z is forward, +X is the body's left, feet at the origin. This node sits inside
@@ -69,6 +71,11 @@ var _dash_w := 0.0
 var _fist_w := 0.0
 var _gun_w := 0.0
 var _dead_w := 0.0
+var _cover_w := 0.0                 # how far down behind cover (0 standing .. 1 squatting)
+var _lean := 0.0                    # leaning out round an end: + = to the body's left
+var _blind_w := 0.0                 # holding the gun up over, or out round, cover to fire blind
+var _slide_w := 0.0                 # sliding into cover
+var _vault_w := 0.0
 var _look := 0.0
 var _flinch := 0.0
 var _recoil := 0.0
@@ -183,7 +190,13 @@ func animate(p: Player, delta: float) -> void:
 	_run_w = _ease(_run_w, run_t, 10.0, delta)
 	_dash_w = _ease(_dash_w, 1.0 if p._dash_t > 0.0 else 0.0, 45.0 if p._dash_t > 0.0 else 14.0, delta)
 	_fist_w = _ease(_fist_w, 1.0 if p.armed and melee else 0.0, 16.0, delta)
-	_gun_w = _ease(_gun_w, 1.0 if p.armed and not melee else 0.0, 16.0, delta)
+	var blind := not melee and (p.cover_blind or p._blind_t > 0.0)
+	_gun_w = _ease(_gun_w, 1.0 if (p.armed or blind) and not melee else 0.0, 16.0, delta)
+	_cover_w = _ease(_cover_w, p.cover_crouch, 13.0, delta)
+	_lean = _ease(_lean, p.cover_lean_dir.dot(left), 12.0, delta)
+	_blind_w = _ease(_blind_w, 1.0 if blind else 0.0, 16.0, delta)
+	_slide_w = _ease(_slide_w, 1.0 if p.cover_entering else 0.0, 18.0, delta)
+	_vault_w = _ease(_vault_w, 1.0 if p._vault_t > 0.0 else 0.0, 20.0, delta)
 	_dead_w = _ease(_dead_w, 1.0 if p.dead else 0.0, 7.0, delta)
 	var hit := 1.0 if p._hurt_t > 0.0 or p._stagger > 0.0 else 0.0
 	_flinch = _ease(_flinch, hit, 30.0 if hit > _flinch else 9.0, delta)
@@ -227,7 +240,7 @@ func animate(p: Player, delta: float) -> void:
 	var knee_base := lerpf(0.08, 0.3, _run_w) * m
 	var knee_lift := lerpf(lerpf(0.55, 0.9, pace), 1.5, _run_w) * m
 	var swing_axis := Vector3(-cos(a), 0.0, sin(a))
-	var crouch := 0.2 * ready_w + 0.12 * _dash_w + 0.07 * tired
+	var crouch := 0.2 * ready_w + 0.12 * _dash_w + 0.07 * tired + 1.15 * _cover_w
 	var split := (0.2 * _fist_w + 0.12 * _gun_w) * (1.0 - 0.7 * m)  # Ready: left foot forward
 	var th: Array[float] = [0.0, 0.0]
 	for k in 2:
@@ -251,14 +264,15 @@ func animate(p: Player, delta: float) -> void:
 	var lean := (0.035 + 0.16 * _run_w) * m + 0.4 * _dash_w
 	var lean_axis := Vector3(cos(_dir), 0.0, -sin(_dir))
 	var stance_yaw := -0.5 * _fist_w - 0.38 * _gun_w              # Ready: left shoulder forward
-	var bend := 0.1 * ready_w + 0.14 * tired - 0.022 * b * ba - 0.22 * _flinch - 0.05 * _recoil + 0.14 * shove
+	var bend := 0.1 * ready_w + 0.14 * tired - 0.022 * b * ba - 0.22 * _flinch - 0.05 * _recoil + 0.14 * shove \
+		+ 0.42 * _cover_w - 0.3 * _slide_w + 0.35 * _vault_w   # hunched behind cover, leaning back in a slide
 	_tq[_hips] = _ry(hip_yaw + 0.4 * stance_yaw - 0.09 * sn * m) * _rz(-0.035 * cs * m)
 	_tq[_chest] = _ry(-hip_yaw + 0.6 * stance_yaw + punch_twist + 0.12 * _look) \
-		* Quaternion(lean_axis, lean) * _rx(bend) \
+		* Quaternion(lean_axis, lean) * _rx(bend) * _rz(-0.34 * _lean) \
 		* _ry(0.19 * sn * m * (1.0 + 0.6 * _run_w)) * _rz(0.035 * cs * m + 0.014 * sw)
 	_tq[_neck] = _ry(-0.45 * stance_yaw - 0.5 * punch_twist + 0.35 * _look - 0.09 * sn * m) \
-		* _rx(-0.03 * m + 0.018 * b * ba - 0.6 * lean * cos(_dir) + 0.1 * tired - 0.15 * _flinch) * _rz(-0.014 * sw)
-	_tq[_head] = _ry(-0.55 * stance_yaw - 0.3 * punch_twist + 0.45 * _look) * _rx(-0.06 * ready_w)
+		* _rx(-0.03 * m + 0.018 * b * ba - 0.6 * lean * cos(_dir) + 0.1 * tired - 0.15 * _flinch) * _rz(-0.014 * sw + 0.14 * _lean)
+	_tq[_head] = _ry(-0.55 * stance_yaw - 0.3 * punch_twist + 0.45 * _look) * _rx(-0.06 * ready_w - 0.3 * _cover_w) * _rz(0.1 * _lean)   # head stays level when hunched or leaning
 
 	# Keep the lower foot on the ground whatever the legs are doing (this is also the walk's bob).
 	_hips_off = Vector3(-0.012 * cs * m, 0.0, 0.0)
@@ -274,6 +288,8 @@ func animate(p: Player, delta: float) -> void:
 	var bash := smoothstep(0.25, 0.5, p._bash_cd) if not melee else 0.0
 	var gun_o := Vector3(cg.origin.x * 0.5 - 0.17, cg.origin.y + 0.11 - 0.05 * reload_w,
 		cg.origin.z * 0.5 + 0.42 - 0.08 * _recoil + 0.28 * bash)
+	# Blind fire: the gun goes up over the cover (when squatting behind it) or out round its end.
+	gun_o += Vector3(0.3 * _lean, 0.46 * _cover_w, 0.06) * _blind_w
 	var gun_b := Basis(_rx(-0.12 * _recoil + 0.4 * reload_w) * _rz(0.45 * reload_w))
 	var grip := gun_o + gun_b * Vector3(0.0, -0.05, -0.27)       # right hand
 	var fore := gun_o + gun_b * Vector3(0.05, -0.06, 0.0)        # left hand

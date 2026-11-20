@@ -82,6 +82,7 @@ var state := "walk"      # walk, reach, hold, bite, lunge_wind, lunge, down, get
 var state_t := 0.0       # seconds in the current state
 var target := Vector3.ZERO   # world point it reaches or bites toward
 var chasing := false
+var _was_chasing := false
 var crawling := false
 var hurt_t := 0.0
 var hit_dir := Vector3.ZERO
@@ -533,7 +534,15 @@ func _think(delta: float) -> Vector3:
 	to.y = 0.0
 	var dist := to.length()
 	var d := to / dist if dist > 0.01 else facing
-	chasing = dist < aggro_range
+	# Hunkered behind cover, out of its sight, it only notices you from much closer. One that was already after
+	# you goes to where it last saw you.
+	var notice := aggro_range
+	if player.in_cover and player.hidden_from(global_position):
+		notice *= player.cover_hidden_aggro
+	chasing = dist < notice
+	if _was_chasing and not chasing:
+		hear_noise(player.global_position)
+	_was_chasing = chasing
 	# Upright it goes for your chest; on the floor, for your legs.
 	target = player.global_position + Vector3.UP * (0.25 if crawling else 1.25)
 

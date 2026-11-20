@@ -4,6 +4,9 @@ extends CharacterBody3D
 ##  WEAPON AWAY (default): face where you walk. Right stick / mouse moves a crosshair and the
 ##    camera pans to keep it centered; your facing doesn't change. Let go and the camera
 ##    returns to you and the crosshair hides. Attack button = Interact. Hold Sprint to run.
+##  COVER (B / Space): tap to slide into the nearest cover or to leave it; hold to go to the cover the crosshair
+##    marks. Hunkered you are hidden and nearly blind. Push toward low cover (or along, at an end) to peek. Ready
+##    pops you out to aim; attack without Ready fires blind. See the Cover section below and cover.gd.
 ##  READY (hold LT / right-click / Q): twin-stick. Right stick / mouse sets facing, the camera
 ##    leads toward the aim point. Attack button attacks. Slower, no running (dash still works).
 ## Doors work in either stance: walk into them to push them, run or dash into them to barge.
@@ -64,6 +67,33 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var lock_on_mouse := true       # mouse: the crosshair settles onto a nearby enemy once the mouse rests
 @export var lock_on_mouse_radius := 1.0 # m: the mouse's pull radius (a mouse is precise; keep it small)
 @export var lock_on_mouse_settle := 0.1 # s the mouse must be still before the pull acts
+@export_group("Cover")
+# In cover you are in one of three states (cover_mode). To see is to be seen:
+#   hunker  hidden behind it. Shots that cross the cover are stopped. You see only a short way.
+#   peek    head up over low cover, or round an end. You see as normal; enemies see you; a shot that crosses
+#           the cover has a small chance to hit, and when it does it is a head hit.
+#   pop     Ready held: up over low cover, or leaning out round an end, to aim. Hit as normal.
+@export var cover_reach := 2.5          # m: tap Cover within this of cover to slide in
+@export var cover_run_reach := 4.0      # m: the same from a run or a dash
+@export var cover_slide_speed := 7.0    # m/s sliding in
+@export var cover_move_speed := 1.9     # m/s along cover, hunkered
+@export var cover_leave_hold := 0.18    # s pushing firmly away from cover before you leave it
+@export var cover_peek_hold := 0.4      # s pushing toward low cover (or along, at an end) before you peek
+@export var cover_edge_dist := 0.7      # m: this close to an open end, Ready leans round it
+@export var cover_peek_out := 0.15      # m your centre goes past the end when peeking round it
+@export var cover_pop_out := 0.5        # m past the end when leaning out to aim
+@export var cover_lean_speed := 6.0     # m/s leaning out and back
+@export var cover_hunker_sight := 4.0   # m: how far you see all round while hunkered
+@export var cover_hidden_aggro := 0.35  # zombies you are hidden from notice you at this much of their range
+@export var cover_peek_hit_chance := 0.15   # chance a shot crossing your cover hits while you peek
+@export var head_hit_fraction := 0.75   # a head hit on you takes this much of full health
+@export var blind_fire_spread_deg := 14.0   # blind fire goes this far either side of the crosshair
+@export var blind_fire_slow := 1.6      # blind fire's interval is the gun's times this
+@export var cover_hold_time := 0.25     # s holding Cover before you go to the marked cover
+@export var cover_aim_radius := 1.5     # m: the crosshair marks cover within this of it
+@export var vault_time := 0.42          # s to vault low cover
+@export var vault_max_depth := 2.2      # m: cover deeper than this can't be vaulted
+@export var vault_cost := 6.0           # stamina
 @export_group("")
 @export var interact_range := 1.9
 @export var max_health := 100.0
@@ -182,6 +212,39 @@ var reticle_on_enemy := false
 var reticle_target: Enemy = null   # the enemy under the reticle (Ready only counts as "aimed")
 var lock_target: Enemy = null      # the enemy the crosshair is being drawn onto (lock-on), or null
 var _lock_shift := Vector3.ZERO    # stick: how far lock-on is moving the crosshair off where the stick asks
+var _aim_raw := Vector3.ZERO       # where the stick or mouse points, before lock-on shifts it (cover marking uses it)
+var _aim_raw_on := false
+
+# ---- cover (see the Cover exports)
+var in_cover := false
+var cover_entering := false        # on the way to a cover spot
+var cover_face: Cover.Face = null  # the face you are using, or heading for
+var cover_t := 0.0                 # where along it you are settled (m from its a end)
+var cover_mode := "hunker"         # hunker, peek or pop
+var cover_side := 0                # peek / pop: -1 round the a end, 1 round the b end, 0 over the top
+var cover_crouch := 0.0            # 0 standing .. 1 right down: what the body should be doing
+var cover_lean_dir := Vector3.ZERO # which way the body leans out (world), 0..1 long
+var cover_blind := false           # firing blind right now (the body holds the gun up over or round)
+var cover_mark_face: Cover.Face = null   # the cover the crosshair is marking, for hold-Cover
+var cover_mark_t := 0.0
+var view_range := 26.0             # how far you see now: sight_range and sight_near, or less behind cover
+var view_near := 3.0
+var _eye_h := 1.5                  # height the sight rays go out at now
+var _cover_u := 0.0                # where along the face you actually are (cover_t plus any lean out)
+var _cover_btn_t := -1.0           # how long Cover has been held, -1 = not held
+var _cover_went := false           # this press already sent you to the marked cover
+var _cover_recenter := false       # recentre the crosshair on arriving
+var _cover_timeout := 0.0
+var _cover_speed := 7.0
+var _peek_t := 0.0
+var _leave_t := 0.0
+var _mark_tick := 0
+var _blind_t := 0.0                # > 0 just after a blind shot
+var _vault_t := 0.0                # > 0 while vaulting
+var _vault_from := Vector3.ZERO
+var _vault_to := Vector3.ZERO
+var _vault_h := 0.0
+var _cover_mark: MeshInstance3D
 var aimed_mult := 1.5              # derived: damage multiplier for a shot aimed at its target
 var headshot_chance := 0.13        # derived: chance an aimed hit is a one-shot kill
 var interact_target: Node = null
@@ -270,6 +333,29 @@ func _ready() -> void:
 	_reticle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_reticle.top_level = true
 	add_child(_reticle)
+
+	# Marks the cover spot the crosshair is pointing out (hold Cover to go there).
+	_cover_mark = MeshInstance3D.new()
+	var cm := TorusMesh.new()
+	cm.inner_radius = 0.34
+	cm.outer_radius = 0.4
+	cm.rings = 20
+	cm.ring_segments = 4
+	_cover_mark.mesh = cm
+	var cmat := StandardMaterial3D.new()
+	cmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	cmat.no_depth_test = true
+	cmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	cmat.albedo_color = Color(0.45, 0.9, 1.0, 0.85)
+	cmat.render_priority = 9
+	_cover_mark.material_override = cmat
+	_cover_mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_cover_mark.top_level = true
+	_cover_mark.visible = false
+	add_child(_cover_mark)
+	view_range = sight_range
+	view_near = sight_near
+	_eye_h = sight_eye_height
 
 	recompute_stats()
 	_reset_vitals()
@@ -470,10 +556,20 @@ func _physics_process(delta: float) -> void:
 	_update_wheel()
 	_update_stance()
 	_update_aim(delta)
+	_update_cover(delta, move_dir)
 	_update_sprint(delta, move_dir)
 
+	if _vault_t > 0.0:
+		_vault_step(delta)
+		_update_facing(delta, move_dir)
+		_update_sight(delta)
+		_update_visuals(delta)
+		return
+
 	var horiz := Vector3(velocity.x, 0.0, velocity.z)
-	if _dash_t > 0.0:
+	if (in_cover or cover_entering) and _dash_t <= 0.0 and _stagger <= 0.0:
+		horiz = _cover_velocity(delta, move_dir)
+	elif _dash_t > 0.0:
 		horiz = _dash_dir * dash_speed
 	elif _stagger > 0.0:
 		horiz = horiz.move_toward(Vector3.ZERO, decel * 0.4 * delta)
@@ -504,7 +600,7 @@ func _physics_process(delta: float) -> void:
 	_handle_collisions(pre_vel)
 
 	_update_facing(delta, move_dir)
-	_update_sight()
+	_update_sight(delta)
 	_update_line_of_fire()
 	_update_combat()
 	_update_interact()
@@ -521,6 +617,7 @@ func _tick_timers(delta: float) -> void:
 	_shove_cd -= delta
 	_swing_t -= delta
 	_block_t -= delta
+	_blind_t -= delta
 	_cam_carry = _cam_carry.lerp(Vector3.ZERO, 1.0 - exp(-cam_stance_sharpness * delta))
 	_hurt_t -= delta
 	_flash_t -= delta
@@ -577,6 +674,8 @@ func _update_aim(delta: float) -> void:
 			# Same rule as weapon away: tilt = distance, so easing off the stick floats the
 			# reticle back toward you. Tracks tighter than the look crosshair to stay snappy.
 			var target := _stick_reticle_target(stick)
+			_aim_raw = target
+			_aim_raw_on = stick.length() > 0.05
 			target += _stick_lock_shift(target, stick.length() > 0.05, delta)
 			reticle_offset = reticle_offset.lerp(target, 1.0 - exp(-aim_follow_sharpness * delta))
 		else:
@@ -590,6 +689,8 @@ func _update_aim(delta: float) -> void:
 			# it back toward you and letting go floats it all the way home. No snapping.
 			var target := _stick_reticle_target(stick)
 			returning = stick.length() <= 0.05
+			_aim_raw = target
+			_aim_raw_on = not returning
 			target += _stick_lock_shift(target, not returning, delta)
 			reticle_offset = reticle_offset.lerp(target, 1.0 - exp(-look_follow_sharpness * delta))
 		else:
@@ -607,6 +708,9 @@ func _update_aim(delta: float) -> void:
 			reticle_visible = false
 		else:
 			reticle_visible = true
+	if not using_pad:
+		_aim_raw = reticle_offset
+		_aim_raw_on = reticle_visible and (armed or _mouse_idle < mouse_idle_hide)
 
 
 # ---------------------------------------------------------------- lock-on (sticky aim)
@@ -692,6 +796,290 @@ func muzzle_position() -> Vector3:
 	return global_position + Vector3(0.0, 1.1, 0.0) + facing * 0.3
 
 
+# ---------------------------------------------------------------- cover
+func _xz(v: Vector3) -> Vector2:
+	return Vector2(v.x, v.z)
+
+
+## Are you out of sight of something at `from`: hunkered, with your cover between you and it? With `any_mode`,
+## it only asks whether the cover is between you (for shots at someone peeking).
+func hidden_from(from: Vector3, any_mode := false) -> bool:
+	if not in_cover or cover_face == null or (cover_mode != "hunker" and not any_mode):
+		return false
+	return Cover.shields(cover_face, Cover.spot(cover_face, cover_t), _xz(from))
+
+
+func leave_cover() -> void:
+	in_cover = false
+	cover_entering = false
+	cover_face = null
+	cover_mode = "hunker"
+	cover_side = 0
+	cover_blind = false
+	_peek_t = 0.0
+	_leave_t = 0.0
+
+
+## Head for a spot on a cover face. `recenter` puts the crosshair back on you when you get there.
+func _go_to_cover(f: Cover.Face, t: float, recenter: bool) -> void:
+	Cover.prep(f)
+	var d := _xz(global_position).distance_to(Cover.spot(f, t))
+	in_cover = false
+	cover_entering = true
+	cover_face = f
+	cover_t = t
+	_cover_u = t
+	cover_mode = "hunker"
+	cover_side = 0
+	_cover_recenter = recenter
+	# A slide from close by, a low run from further off.
+	_cover_speed = cover_slide_speed if d <= cover_run_reach else maxf(run_speed * 1.1, 4.0)
+	_cover_timeout = d / _cover_speed * 1.6 + 0.6
+	running = false
+
+
+## The Cover button, the crosshair's cover mark, and what state you are in behind cover.
+func _update_cover(delta: float, move_dir: Vector3) -> void:
+	var can := not dead and not wheel_open and held_by.is_empty() and _stagger <= 0.0 and _vault_t <= 0.0
+	# ---- the button: tap = slide into the nearest cover / leave (or vault); hold = go to the marked cover
+	if Input.is_action_just_pressed("cover") and can:
+		_cover_btn_t = 0.0
+		_cover_went = false
+	if _cover_btn_t >= 0.0:
+		if Input.is_action_pressed("cover") and can:
+			_cover_btn_t += delta
+			if not _cover_went and _cover_btn_t >= cover_hold_time and cover_mark_face != null:
+				_cover_went = true
+				_go_to_cover(cover_mark_face, cover_mark_t, true)
+		else:
+			if not _cover_went and can:
+				_cover_tap(move_dir)
+			_cover_btn_t = -1.0
+
+	# ---- the mark: which cover the crosshair is pointing out (looked up a few times a second)
+	_mark_tick += 1
+	if _mark_tick % 6 == 0:
+		cover_mark_face = null
+		if can and _aim_raw_on and _aim_raw.length() > 1.0:
+			var me := _xz(global_position)
+			var m := Cover.find_aim(me + _xz(_aim_raw), me, cover_aim_radius)
+			if not m.is_empty():
+				var sp := Cover.spot(m["face"], m["t"])
+				var here := me if not (in_cover or cover_entering) else Cover.spot(cover_face, cover_t)
+				if sp.distance_to(here) > 0.8:
+					cover_mark_face = m["face"]
+					cover_mark_t = m["t"]
+
+	# ---- what the body should be doing
+	var crouch := 0.0
+	var lean := Vector3.ZERO
+	if cover_entering:
+		crouch = 0.8
+	elif in_cover and cover_face != null:
+		_cover_state(delta, move_dir)
+	if in_cover and cover_face != null:
+		var d3 := Vector3(cover_face.dir.x, 0.0, cover_face.dir.y)
+		if cover_face.low:
+			if cover_mode == "hunker":
+				crouch = 1.0
+			elif cover_mode == "peek":
+				crouch = 0.7 if cover_side == 0 else 1.0
+			else:
+				crouch = 0.0 if cover_side == 0 else 0.75
+		if cover_side != 0 and (cover_mode != "hunker" or cover_blind):
+			lean = d3 * cover_side * (1.0 if cover_mode == "pop" else 0.7)
+	elif _vault_t > 0.0:
+		crouch = 0.7
+	cover_crouch = crouch
+	cover_lean_dir = lean
+
+
+func _cover_tap(move_dir: Vector3) -> void:
+	if cover_entering:
+		leave_cover()
+		return
+	if in_cover:
+		var n3 := Vector3(cover_face.n.x, 0.0, cover_face.n.y)
+		if cover_face.low and move_dir.dot(-n3) > 0.6:
+			_try_vault()
+		else:
+			leave_cover()
+		return
+	var reach := cover_run_reach if running or _dash_t > 0.0 else cover_reach
+	var want := move_dir if move_dir.length() > 0.2 else facing
+	var c := Cover.find_near(_xz(global_position), reach, _xz(want))
+	if c.is_empty():
+		show_status("No cover in reach", 0.7)
+		return
+	_dash_t = 0.0
+	_go_to_cover(c["face"], c["t"], false)
+
+
+## The open end within `within` meters of where you are, as -1 / 1, or 0. With both in reach, `prefer` (how far
+## the aim points along the face) picks; `prefer` near zero picks the nearer one.
+func _near_open_end(prefer: float, within: float) -> int:
+	var f := cover_face
+	var a_ok: bool = f.open[0] and cover_t - f.t_min < within
+	var b_ok: bool = f.open[1] and f.t_max - cover_t < within
+	if a_ok and b_ok:
+		if absf(prefer) > 0.2:
+			return 1 if prefer > 0.0 else -1
+		return 1 if f.t_max - cover_t < cover_t - f.t_min else -1
+	if a_ok:
+		return -1
+	if b_ok:
+		return 1
+	return 0
+
+
+## Hunker, peek or pop, and round which end. Also leaving by pushing away.
+func _cover_state(delta: float, move_dir: Vector3) -> void:
+	var f := cover_face
+	var n3 := Vector3(f.n.x, 0.0, f.n.y)
+	var d3 := Vector3(f.dir.x, 0.0, f.dir.y)
+	var along := move_dir.dot(d3)
+	var into := move_dir.dot(-n3)
+
+	# Pushing firmly away from it leaves.
+	_leave_t = _leave_t + delta if into < -0.7 else 0.0
+	if _leave_t >= cover_leave_hold:
+		leave_cover()
+		return
+
+	var mode := "hunker"
+	var side := 0
+	if armed:
+		# Ready pops you out: round an end when you are near one, else up over low cover.
+		var aim := reticle_offset if reticle_offset.length() >= aim_min_dist else -n3
+		var aim_along := aim.normalized().dot(d3)
+		side = _near_open_end(aim_along, cover_edge_dist)
+		if f.low and side != 0:
+			# Low cover can also be stood up over: when the aim points away from that end, or, on a piece
+			# so short that both ends are in reach, when it points straight across.
+			var both := _near_open_end(1.0, cover_edge_dist) == 1 and _near_open_end(-1.0, cover_edge_dist) == -1
+			if aim_along * side < -0.35 or (both and absf(aim_along) <= 0.2):
+				side = 0
+		if side != 0 or f.low:
+			mode = "pop"
+		_peek_t = 0.0
+	else:
+		# Peeking: hold the stick toward low cover to look over it; hold it along the cover, at an open end
+		# where nothing carries on, to look round it.
+		var want_side := 0
+		if absf(along) > 0.6 and absf(into) < 0.6:
+			var e := 1 if along > 0.0 else 0
+			var at_end := (f.t_max - cover_t < 0.06) if e == 1 else (cover_t - f.t_min < 0.06)
+			if at_end and f.open[e] and f.next[e] == null:
+				want_side = 1 if e == 1 else -1
+		var want_over := f.low and into > 0.6
+		if want_side != 0 or want_over:
+			_peek_t += delta
+			if _peek_t >= cover_peek_hold:
+				mode = "peek"
+				side = want_side
+		else:
+			_peek_t = 0.0
+		if cover_blind and mode == "hunker" and not f.low:
+			side = cover_side   # the gun arm stays out round the end it is firing round
+	cover_mode = mode
+	cover_side = side
+
+
+## Moving in cover: sliding in, sliding along it, leaning out and back. Returns this tick's ground velocity.
+func _cover_velocity(delta: float, move_dir: Vector3) -> Vector3:
+	var f := cover_face
+	var me := _xz(global_position)
+	if cover_entering:
+		var to := Cover.spot(f, cover_t) - me
+		_cover_timeout -= delta
+		if to.length() < 0.12:
+			cover_entering = false
+			in_cover = true
+			_cover_u = cover_t
+			_peek_t = 0.0
+			_leave_t = 0.0
+			if _cover_recenter:
+				reticle_offset = Vector3.ZERO
+				_lock_shift = Vector3.ZERO
+				_mouse_idle = 99.0
+			return Vector3.ZERO
+		if _cover_timeout <= 0.0:
+			leave_cover()   # something was in the way
+			return Vector3.ZERO
+		var ve := to.normalized() * minf(_cover_speed, to.length() / maxf(delta, 0.001))
+		return Vector3(ve.x, 0.0, ve.y)
+
+	var d3 := Vector3(f.dir.x, 0.0, f.dir.y)
+	var along := move_dir.dot(d3)
+	var leaning := cover_side != 0 and cover_mode != "hunker"
+	# Slide along it (not while leaning out round an end). Faces that carry on in a line are walked straight onto.
+	if absf(along) > 0.25 and not leaning:
+		var spd := ready_speed if cover_mode == "pop" else cover_move_speed
+		var nt := cover_t + along * spd * delta
+		var nf := f
+		if nt > f.length and f.next[1] != null:
+			nf = f.next[1]
+			nt -= f.length
+		elif nt < 0.0 and f.next[0] != null:
+			nf = f.next[0]
+			nt += nf.length
+		Cover.prep(nf)
+		nt = clampf(nt, nf.t_min, nf.t_max)
+		if Cover.has_room(Cover.spot(nf, nt), nf.box):
+			if nf != f:
+				cover_face = nf
+				f = nf
+				_cover_u = nt
+			cover_t = nt
+
+	# Where along the face the body should be: settled, or out past an end.
+	var want_u := cover_t
+	if leaning:
+		var out := cover_pop_out if cover_mode == "pop" else cover_peek_out
+		want_u = f.length + out if cover_side > 0 else -out
+	_cover_u = move_toward(_cover_u, want_u, cover_lean_speed * delta)
+	var gap := f.a + f.dir * _cover_u + f.n * Cover.STANDOFF - me
+	if gap.length() > 1.6:
+		leave_cover()   # dragged or knocked well away from it
+		return Vector3.ZERO
+	var v := (gap / maxf(delta, 0.001)).limit_length(8.0)
+	return Vector3(v.x, 0.0, v.y)
+
+
+## Over low cover and down the other side.
+func _try_vault() -> void:
+	var f := cover_face
+	if f.depth > vault_max_depth:
+		show_status("Too deep to vault", 0.8)
+		return
+	var land := Cover.spot(f, cover_t) - f.n * (f.depth + Cover.STANDOFF * 2.0)
+	var q := PhysicsPointQueryParameters3D.new()
+	q.collision_mask = 1
+	q.position = Vector3(land.x, global_position.y + 0.9, land.y)
+	if not Cover.has_room(land, f.box) or not get_world_3d().direct_space_state.intersect_point(q, 1).is_empty():
+		show_status("No room on the other side", 0.8)
+		return
+	_vault_from = global_position
+	_vault_to = Vector3(land.x, global_position.y, land.y)
+	_vault_h = maxf(f.top - 0.45, 0.2)
+	_vault_t = vault_time
+	stamina = maxf(stamina - vault_cost, 0.0)
+	_regen_delay = maxf(_regen_delay, 0.6)
+	leave_cover()
+
+
+func _vault_step(delta: float) -> void:
+	_vault_t -= delta
+	var u := clampf(1.0 - _vault_t / maxf(vault_time, 0.01), 0.0, 1.0)
+	var p := _vault_from.lerp(_vault_to, smoothstep(0.0, 1.0, u))
+	p.y += sin(PI * u) * _vault_h
+	global_position = p
+	velocity = Vector3.ZERO
+	if _vault_t <= 0.0:
+		global_position = _vault_to
+		velocity = (_vault_to - _vault_from).normalized() * walk_speed
+
+
 # ---------------------------------------------------------------- vision
 const SIGHT_TAPER := 0.1   # radians over which the cone's edge falls from full range to sight_near
 
@@ -707,7 +1095,7 @@ func facing_angle() -> float:
 func sight_limit(a: float) -> float:
 	var off := absf(wrapf(a - facing_angle(), -PI, PI))
 	var half := deg_to_rad(sight_fov_deg) * 0.5
-	return lerpf(sight_range, sight_near, smoothstep(half, half + SIGHT_TAPER, off))
+	return lerpf(view_range, view_near, smoothstep(half, half + SIGHT_TAPER, off))
 
 
 ## How far you can actually see in direction a right now: the cone, cut short by walls.
@@ -721,14 +1109,22 @@ func sight_reach_angle(a: float) -> float:
 
 
 ## Sweep the rays: how far it is to the first wall or door in every direction.
-func _update_sight() -> void:
+func _update_sight(delta := 0.0) -> void:
+	# Hunkered behind cover you see only a short way, all round, and your eyes are below the top of low cover.
+	# Peeking or popped out, your view is back (and you can be seen).
+	var hunkered := in_cover and cover_mode == "hunker"
+	var low_eyes := in_cover and cover_face != null and cover_face.low and (hunkered or cover_side != 0)
+	var k := 1.0 - exp(-10.0 * delta) if delta > 0.0 else 1.0
+	view_range = lerpf(view_range, cover_hunker_sight if hunkered else sight_range, k)
+	view_near = lerpf(view_near, cover_hunker_sight if hunkered else sight_near, k)
+	_eye_h = lerpf(_eye_h, 0.6 if low_eyes else sight_eye_height, k)
 	if sight_rays.size() != SIGHT_RAYS:
 		sight_rays.resize(SIGHT_RAYS)
 	if _sight_query == null:
 		_sight_query = PhysicsRayQueryParameters3D.new()
 		_sight_query.collision_mask = 1
 	var space := get_world_3d().direct_space_state
-	var eye := global_position + Vector3(0.0, sight_eye_height, 0.0)
+	var eye := global_position + Vector3(0.0, _eye_h, 0.0)
 	_sight_query.from = eye
 	for i in SIGHT_RAYS:
 		var a := -PI + i * TAU / SIGHT_RAYS
@@ -761,7 +1157,7 @@ func can_see(pos: Vector3, radius := 0.4) -> bool:
 func _update_line_of_fire() -> void:
 	reticle_on_enemy = false
 	reticle_target = null
-	if not armed or dead or is_melee():
+	if not armed or dead or is_melee() or (in_cover and cover_mode != "pop"):
 		return
 	var from := muzzle_position()
 	var to := from + facing * Projectile.MAX_DIST
@@ -776,8 +1172,7 @@ func _update_line_of_fire() -> void:
 			reticle_target = en
 	if reticle_target == null:
 		return
-	var q := PhysicsRayQueryParameters3D.create(from, to, 1, [get_rid()])
-	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	var hit := Projectile.wall_hit(get_world_3d().direct_space_state, from, to, [get_rid()])
 	if not hit.is_empty():
 		var hp: Vector3 = hit["position"]
 		if from.distance_to(hp) / Projectile.MAX_DIST < best_t:
@@ -789,7 +1184,24 @@ func _update_line_of_fire() -> void:
 func _update_facing(delta: float, move_dir: Vector3) -> void:
 	var want := Vector3.ZERO
 	var rate := turn_speed
-	if armed:
+	if _vault_t > 0.0:
+		want = _vault_to - _vault_from
+	elif in_cover and cover_face != null:
+		# Hunkered: back to the cover. Peeking or firing blind: turned to it. Popped out: where you aim.
+		var n3 := Vector3(cover_face.n.x, 0.0, cover_face.n.y)
+		if cover_mode == "pop":
+			if reticle_offset.length() >= aim_min_dist:
+				facing = reticle_offset.normalized() if not using_pad \
+					else _turn_toward(facing, reticle_offset.normalized(), ready_turn_speed * delta)
+				return
+			want = -n3
+		elif cover_mode == "peek" or cover_blind:
+			want = -n3
+		else:
+			want = n3
+		facing = _turn_toward(facing, want, turn_speed * delta)
+		return
+	elif armed:
 		want = reticle_offset
 		rate = ready_turn_speed
 	elif _dash_t > 0.0:
@@ -826,7 +1238,7 @@ func _update_sprint(delta: float, move_dir: Vector3) -> void:
 			_sprint_t = -1.0
 
 	var want_run := _sprint_t > sprint_tap_time and not armed and move_dir.length() > 0.1 \
-		and not winded and _stagger <= 0.0 and held_by.is_empty()
+		and not winded and _stagger <= 0.0 and held_by.is_empty() and not in_cover and not cover_entering
 	running = want_run and stamina > 0.0
 	if running:
 		stamina = maxf(stamina - run_drain * delta, 0.0)
@@ -851,6 +1263,7 @@ func _try_dash(move_dir: Vector3) -> void:
 		if winded:
 			show_status("Too winded to dash", 0.8)
 		return
+	leave_cover()   # a dash breaks out of cover
 	_dash_dir = move_dir if move_dir.length() > 0.1 else facing
 	_dash_dir = _dash_dir.normalized()
 	_dash_t = dash_time
@@ -934,7 +1347,21 @@ func _update_combat() -> void:
 		return
 	if Input.is_action_just_pressed("reload") and not is_melee():
 		_start_reload()
-	if armed:
+	cover_blind = false
+	if in_cover and cover_mode != "pop" and not is_melee():
+		# In cover and not popped out: the attack button fires blind, over the cover or round its end.
+		# (Something to interact with right beside you still comes first.)
+		if attack_tapped and interact_target != null and not armed:
+			interact_target.call("interact", self)
+			_body.reach()
+		elif held and _stagger <= 0.0 and _reload_t <= 0.0:
+			cover_blind = true
+			if _fire_cd <= 0.0:
+				if mag > 0:
+					_blind_fire()
+				elif reserve > 0:
+					_start_reload()
+	elif armed:
 		if _draw_t > 0.0 or _stagger > 0.0 or _reload_t > 0.0:
 			return
 		if is_melee():
@@ -967,34 +1394,73 @@ func _start_reload() -> void:
 
 
 func _fire() -> void:
-	mag -= 1
 	_fire_cd = fire_interval
+	_shoot(facing, muzzle_position(), true)
+	velocity -= facing * shot_kick
+	if camera_rig:
+		camera_rig.kick(-facing * shot_cam_kick)
+	if mag == 0 and reserve > 0:
+		_start_reload()
+
+
+## Blind fire: from cover without popping out. The gun goes up over low cover, or round the nearest open end of
+## high cover, and fires toward the crosshair with a wide spread: no aimed bonus, no headshots. Hunkered, you
+## don't see what it hits.
+func _blind_fire() -> void:
+	var f := cover_face
+	var n3 := Vector3(f.n.x, 0.0, f.n.y)
+	var d3 := Vector3(f.dir.x, 0.0, f.dir.y)
+	var dir := -n3
+	if reticle_visible and reticle_offset.length() > 0.5:
+		dir = reticle_offset.normalized()
+	var from := global_position + Vector3(0.0, 1.25, 0.0) - n3 * 0.3
+	if not f.low:
+		# High cover: the gun has to go round an end. Take the open end within reach that the crosshair favours.
+		var side := _near_open_end(dir.dot(d3), cover_edge_dist * 1.5)
+		if side == 0:
+			show_status("No angle from here: move to an end", 0.9)
+			_fire_cd = 0.3
+			return
+		var u := f.length + 0.35 if side > 0 else -0.35
+		var at := f.a + f.dir * u + f.n * (Cover.STANDOFF * 0.6)
+		from = Vector3(at.x, global_position.y + 1.25, at.y)
+		if dir.dot(-n3) < 0.15:
+			dir = (-n3 + d3 * side * 0.4).normalized()   # it can only point past the wall
+		cover_side = side
+	dir = dir.rotated(Vector3.UP, deg_to_rad(randf_range(-blind_fire_spread_deg, blind_fire_spread_deg)))
+	_fire_cd = fire_interval * blind_fire_slow
+	_blind_t = 0.3
+	_shoot(dir, from, false)
+	if camera_rig:
+		camera_rig.kick(-dir * shot_cam_kick * 0.5)
+	if mag == 0 and reserve > 0:
+		_start_reload()
+
+
+## One round leaves the gun: the projectile, the flash, the noise. `aimed` lets it carry the aimed-shot bonus.
+func _shoot(dir: Vector3, from: Vector3, aimed: bool) -> void:
+	mag -= 1
 	_flash_t = 0.06
 	var shot := Projectile.new()
-	shot.dir = facing
+	shot.dir = dir
 	shot.speed = shot_speed
 	shot.damage = shot_damage
 	shot.exclude = [get_rid()]
 	shot.shooter = self
 	# Fired with the reticle on an enemy: the shot is "aimed" at that enemy.
-	if reticle_target != null:
+	if aimed and reticle_target != null:
 		shot.aimed_at = reticle_target
 		shot.aimed_mult = aimed_mult
 		shot.headshot_chance = headshot_chance
 	shots_fired += 1
-	print("[fire] #%d dir %s mag %d" % [shots_fired, facing, mag])
-	shot.position = muzzle_position()
+	print("[fire] #%d dir %s mag %d%s" % [shots_fired, dir, mag, "" if aimed else " (blind)"])
+	shot.position = from
 	get_parent().add_child(shot)
 	# The shot is loud: every enemy within earshot comes to where it was fired.
 	for e in get_tree().get_nodes_in_group("enemies"):
 		var en := e as Enemy
 		if en != null and en.global_position.distance_to(global_position) <= shot_noise_range:
 			en.hear_noise(global_position)
-	velocity -= facing * shot_kick
-	if camera_rig:
-		camera_rig.kick(-facing * shot_cam_kick)
-	if mag == 0 and reserve > 0:
-		_start_reload()
 
 
 ## Throw a punch. It doesn't stop you moving. The less stamina you have, the slower and
@@ -1162,6 +1628,7 @@ func take_grab(e: Enemy, hands: int) -> bool:
 		return false
 	if not held_by.has(e):
 		held_by.append(e)
+	leave_cover()   # hands on you drag you out of cover
 	show_status("Grabbed! Shove it off or struggle free", 1.6)
 	return true
 
@@ -1248,13 +1715,38 @@ func take_damage(amount: float, dir: Vector3, knock: float) -> void:
 	if health <= 0.0:
 		health = 0.0
 		dead = true
+		leave_cover()
 		armed = false
 		held_by.clear()
 		_respawn_t = 2.5
 		show_status("You went down. Respawning...", 2.5)
 
 
+## A gunshot at you, fired from `from`. Your cover decides what it does, when the shot has to cross it to
+## reach you (from the side or behind, cover does nothing):
+##   hunkered  the cover stops it
+##   peeking   only your head shows: a small chance it hits, and then it is a head hit (most of your health)
+##   popped out, or not in cover: an ordinary hit
+## Returns "cover", "head" or "hit". (Raiders and other players in cover are meant to get the same rule.)
+func take_shot(amount: float, dir: Vector3, knock: float, from: Vector3) -> String:
+	if dead:
+		return "hit"
+	if in_cover and cover_mode != "pop" and hidden_from(from, true):
+		if cover_mode == "hunker" or randf() >= cover_peek_hit_chance:
+			return "cover"
+		var dmg := max_health * head_hit_fraction
+		take_damage(dmg, dir, knock)
+		if not dead and not invulnerable:
+			show_status("Head hit! -%d HP" % roundi(dmg), 1.2)
+		return "head"
+	take_damage(amount, dir, knock)
+	if not dead and not invulnerable:
+		show_status("Shot! -%d HP" % roundi(amount), 0.8)
+	return "hit"
+
+
 func _respawn() -> void:
+	leave_cover()
 	dead = false
 	global_position = spawn_point
 	velocity = Vector3.ZERO
@@ -1281,6 +1773,10 @@ func _update_visuals(delta: float) -> void:
 	_weapon_mat.emission_energy_multiplier = 4.0 if _flash_t > 0.0 else 0.0
 
 	# Ready with a melee weapon: no reticle. You still turn toward where you're pointing.
+	_cover_mark.visible = cover_mark_face != null and not dead
+	if _cover_mark.visible:
+		var ms := Cover.spot(cover_mark_face, cover_mark_t)
+		_cover_mark.global_position = Vector3(ms.x, global_position.y + 0.06, ms.y)
 	_reticle.visible = reticle_visible and not dead and not (armed and is_melee())
 	_reticle.global_position = global_position + reticle_offset + Vector3(0.0, 0.08, 0.0)
 	if not armed:

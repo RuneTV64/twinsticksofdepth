@@ -39,6 +39,7 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
+	Cover.clear()
 	_build_environment()
 	_build_level()
 
@@ -94,6 +95,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_L:   # (not F8: that's the Godot editor's Stop Running Project)
 				ZombieBody.force_low = not ZombieBody.force_low
 				player.show_status("All zombies on the low model: %s" % ("ON" if ZombieBody.force_low else "OFF"), 1.5)
+			KEY_G:   # cover test: something that shoots at you
+				if event.shift_pressed:
+					for g in get_tree().get_nodes_in_group("gunners"):
+						g.queue_free()
+					player.show_status("Test gunners removed", 1.5)
+				else:
+					_add_gunner()
 			KEY_F7:
 				player.invulnerable = not player.invulnerable
 				player.show_status("Can't be hurt: %s" % ("ON" if player.invulnerable else "OFF"), 1.5)
@@ -130,6 +138,19 @@ func _add_crowd(n: int) -> void:
 		made += 1
 	_perf.visible = true
 	player.show_status("Crowd: %d extra shamblers" % _crowd.size(), 1.5)
+
+
+## Cover test (G): a stand-in for a raider. It stands where the crosshair is and shoots at you whenever it can see
+## you, so the cover rules can be tried before raiders exist.
+func _add_gunner() -> void:
+	var at := player.global_position + player.reticle_offset
+	if player.reticle_offset.length() < 3.0:
+		at = player.global_position + player.facing * 10.0
+	var g := TestGunner.new()
+	g.position = Vector3(at.x, 0.0, at.z)
+	g.player = player
+	add_child(g)
+	player.show_status("Test gunner added (Shift+G removes them)", 1.5)
 
 
 func _clear_crowd() -> void:
@@ -514,6 +535,7 @@ func _box(pos: Vector3, size: Vector3, col: Color) -> StaticBody3D:
 	m.material_override = mat
 	b.add_child(m)
 	add_child(b)
+	Cover.add_box(b, pos, size)   # anything solid standing on the ground is cover (cover.gd)
 	return b
 
 

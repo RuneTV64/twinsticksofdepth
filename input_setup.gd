@@ -37,6 +37,10 @@ static func apply() -> void:
 	_action("weapon_wheel", 0.5)
 	_key("weapon_wheel", KEY_TAB); _button("weapon_wheel", JOY_BUTTON_LEFT_SHOULDER)
 
+	# Cover: tap = slide into the nearest cover / leave it; hold = go to the cover the crosshair marks.
+	_action("cover", 0.5)
+	_key("cover", KEY_SPACE); _button("cover", JOY_BUTTON_B)
+
 	_action("reload", 0.5)
 	_key("reload", KEY_R); _button("reload", JOY_BUTTON_X)
 
