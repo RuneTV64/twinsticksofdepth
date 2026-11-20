@@ -236,6 +236,7 @@ func _sheet_rows() -> Array:
 	rows.append_array(CharacterSheet.ATTRS)
 	rows.append("weight")
 	rows.append_array(CharacterSheet.NEEDS)
+	rows.append("medical")
 	return rows
 
 
@@ -258,6 +259,8 @@ func sheet_adjust(d: int) -> void:
 	var s := player.sheet
 	if row == "weight":
 		player.weight = maxf(player.weight + d, 1.0)
+	elif row == "medical":
+		s.body.medical = clampi(s.body.medical + d, 0, 10)
 	elif CharacterSheet.NEEDS.has(row):
 		s.set_need(row, float(s.needs[row]) + d * 10.0)
 	else:
@@ -306,7 +309,25 @@ func _sheet_text() -> String:
 	t += "[/table]\n"
 	t += "[b]COMPOSURE[/b]   %s  %d   [color=#999]danger wears it down; quiet brings it back, cover faster[/color]\n\n" % [
 		_meter(s.composure), roundi(s.composure)]
-	t += "[b]CONDITIONS[/b]\n"
+	# The body: what you can tell about it, which depends on what you know.
+	var b := s.body
+	t += "[b]BODY[/b]   %s   [color=#999]%s[/color]\n" % [player.death_feel(),
+		b.blood_feel() if b.blood_feel() != "" else "colour good"]
+	t += "   %sMedical %d of 10   [color=#999]%s[/color]\n" % [_mark("medical"), b.medical,
+		["you can tell what hurts and what bleeds", "you can tell what hurts and what bleeds",
+		"you can tell what kind of wound it is and how bad", "you can see a wound closing",
+		"you can judge what won't stop on its own, and how long you have"][mini(b.medical, 4)]]
+	var any := false
+	for part in BodyHealth.PARTS:
+		for line in b.describe(part):
+			any = true
+			t += "   [color=#e8836b]%s[/color]   %s\n" % [BodyHealth.NAMES[part], line]
+	if not any:
+		t += "   [color=#999]Nothing wrong that you can tell.[/color]\n"
+	var guess := b.time_left_guess()
+	if guess != "":
+		t += "   [color=#d6a04a]%s[/color]\n" % guess
+	t += "\n[b]CONDITIONS[/b]\n"
 	if s.conditions.is_empty():
 		t += "   [color=#999]None[/color]\n"
 	for c in s.conditions:
@@ -348,8 +369,11 @@ func _process(delta: float) -> void:
 	_state.add_theme_color_override("font_color", Color(1.0, 0.75, 0.3) if player.armed else Color.WHITE)
 	_help.text = HELP_KEYS + "\n" + HELP_TAIL
 
-	_hp.max_value = player.max_health
-	_hp.value = player.health
+	# Health is shown roughly, in five steps: you can tell you are close to death, not how close.
+	_hp.max_value = 5.0
+	var worst := minf(player.health / player.max_health,
+		(player.sheet.body.blood - player.sheet.body.dead_at) / (100.0 - player.sheet.body.dead_at))
+	_hp.value = clampf(ceilf(worst * 5.0), 0.0 if player.dead else 1.0, 5.0)
 	_st.max_value = player.max_stamina
 	_st.value = player.stamina
 	# Green when fresh, sliding to yellow as fatigue sets in; orange while winded.

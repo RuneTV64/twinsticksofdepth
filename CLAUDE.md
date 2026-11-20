@@ -120,6 +120,30 @@ Claude's proposal, waiting for the owner's critique (sketch: `tools/sketches/tre
   - When you turn, your old character walks the map as a zombie carrying your things: "Absolutely".
   - The hands-on treatment is "exactly what I had in mind".
 
+Built so far (20 Nov 2026, untested on the owner's PC): the foundation only.
+
+- `body_health.gd` (`BodyHealth`, at `sheet.body`): wounds on six parts (Head, Torso, ArmL, ArmR, LegL, LegR),
+  each with a kind (bruise, cut, deep cut, bite, gunshot, break), a severity from the damage that caused it, a
+  bleed rate and pain. Blood starts at 100; bleeding drains it; at 35 you die ("You bled out"). It comes back
+  slowly when nothing bleeds. Everything moves on the sheet's slow clock.
+- What makes wounds (`player.gd` `_wound()`): a zombie's bite (an arm, the chest or the head; a leg if it is on
+  the ground), a lunge, a raider's clubbing (bruise), a gunshot (mostly the chest), a head hit while peeking, being
+  crushed, a bite from the pile or a severed head (a leg).
+- Conditions from it (`character_sheet.gd`): Bleeding, Bleeding badly; Pale, Light-headed, Faint, Fading as blood
+  falls (slower, worse aim); In pain / In agony (hurt legs slow you, hurt arms spoil your aim; adrenaline hides it);
+  Bitten (a label only: the bite's real consequences are not built).
+- Never an exact number (owner): the health bar now shows five rough steps of the worse of health and blood;
+  `Player.death_feel()` puts it in words ("You are in a bad way", "You are dying"). Damage messages no longer
+  give numbers.
+- Medical is a stand-in number, 0 to 10, set on the character page (C) until skills exist. 0 to 1: you know what
+  hurts and what bleeds. 2: the kind of wound and how bad. 3: you can see it closing. 4 and up: a rough guess at
+  how long you have, rougher the less you know.
+- Stand-ins: small wounds clot (bleeding halves every 60 s) and close after 150 s; `deep_floor` is 0, so even
+  deep wounds stop in the end, because nothing can be treated yet (three gunshots cost about a third of your
+  blood). The old health number and its automatic healing are still there underneath.
+- Next, in order: the treatment screen (it needs supplies, and items don't exist: a stand-in kit, or items
+  first); the bite, amputation and turning; sickness; the new needs (hygiene, morale, toilet, warmth).
+
 ## Small rules the owner has set (20 Nov 2026)
 
 - Zombies linger when you look away: one that leaves your view stays drawn for `linger_time` 1.2 s (you remember

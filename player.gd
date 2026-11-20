@@ -724,6 +724,14 @@ func _tick_timers(delta: float) -> void:
 			if randf() < pile_slip * hurry * nerve * _sheet_t:
 				_stagger = 0.6
 				show_status("You lose your footing!", 0.9)
+		if not dead and sheet.body.dead_from_blood() and not invulnerable:
+			health = 0.0
+			dead = true
+			leave_cover()
+			armed = false
+			held_by.clear()
+			_respawn_t = 2.5
+			show_status("You bled out. Respawning...", 2.5)
 		if not dead:
 			sheet.tick(_sheet_t, _threat(), not held_by.is_empty(), in_cover and cover_mode == "hunker",
 				health / max_health, winded, weight / strength)
@@ -1294,8 +1302,9 @@ func pile_grab(dir: Vector3, bite: float) -> void:
 	sheet.startle()
 	if bite > 0.0:
 		take_damage(bite, dir, 0.0)
+		_wound("bite", bite, _pick(["LegL", "LegR"]))
 		if not dead and not invulnerable:
-			show_status("Bitten by something in the pile! -%d HP" % roundi(bite), 1.2)
+			show_status("Bitten by something in the pile!", 1.2)
 	else:
 		show_status("Something in the pile has your leg!", 1.0)
 
@@ -1303,8 +1312,9 @@ func pile_grab(dir: Vector3, bite: float) -> void:
 ## Caught where the horde is trampling its own: you are in the crush with them.
 func take_crush(amount: float, dir: Vector3) -> void:
 	take_damage(amount, dir, 2.0)
+	_wound("bruise", amount, _pick(["Torso", "Torso", "ArmL", "ArmR"]))
 	if not dead and not invulnerable:
-		show_status("Crushed in the press! -%d HP" % roundi(amount), 0.9)
+		show_status("Crushed in the press!", 0.9)
 
 
 func _vault_step(delta: float) -> void:
@@ -1887,8 +1897,13 @@ func take_attack(amount: float, dir: Vector3, knock: float, attacker: Enemy = nu
 		_spend_guard(amount * block_stamina_per_damage)
 		return
 	take_damage(amount, dir, knock)
+	# A zombie's lunge is its teeth; a raider's is the butt of a gun.
+	if attacker != null and attacker.kind == "raider":
+		_wound("bruise", amount, _pick(["Torso", "ArmL", "ArmR", "Head"]))
+	else:
+		_wound("bite", amount, _pick(["ArmL", "ArmR", "Torso", "LegL", "LegR"]))
 	if not dead and not invulnerable:
-		show_status("Hit! -%d HP" % roundi(amount), 0.8)
+		show_status("Hit!", 0.8)
 
 
 ## A zombie with hands reaches for you. With your guard up and it in front of you, you shove it off before its
@@ -1924,10 +1939,12 @@ func is_held_by(e: Enemy) -> bool:
 
 
 ## A bite from a zombie that has hold of you. Your guard can't stop it: you have to get loose first.
-func take_bite(amount: float, dir: Vector3, _e: Enemy) -> void:
+func take_bite(amount: float, dir: Vector3, e: Enemy) -> void:
 	take_damage(amount, dir, 1.0)
+	# A standing zombie gets its teeth into an arm, a shoulder, the neck; one on the ground, a leg.
+	_wound("bite", amount, _pick(["LegL", "LegR"]) if e != null and e.crawling else _pick(["ArmL", "ArmR", "ArmL", "ArmR", "Torso", "Head"]))
 	if not dead and not invulnerable:
-		show_status("Bitten! -%d HP" % roundi(amount), 0.9)
+		show_status("Bitten!", 0.9)
 
 
 ## Something that helps you get loose (hitting the one holding you).
@@ -2019,13 +2036,40 @@ func take_shot(amount: float, dir: Vector3, knock: float, from: Vector3) -> Stri
 			return "cover"
 		var dmg := max_health * head_hit_fraction
 		take_damage(dmg, dir, knock)
+		_wound("gunshot", dmg, "Head")
 		if not dead and not invulnerable:
-			show_status("Head hit! -%d HP" % roundi(dmg), 1.2)
+			show_status("Shot in the head!", 1.2)
 		return "head"
 	take_damage(amount, dir, knock)
+	_wound("gunshot", amount, _pick(["Torso", "Torso", "Torso", "ArmL", "ArmR", "LegL", "LegR"]))
 	if not dead and not invulnerable:
-		show_status("Shot! -%d HP" % roundi(amount), 0.8)
+		show_status("Shot!", 0.8)
 	return "hit"
+
+
+## A wound on the body (sheet.body) from damage just taken. Nothing if the damage didn't count.
+func _wound(kind: String, amount: float, part: String) -> void:
+	if dead or invulnerable:
+		return
+	sheet.body.hurt(kind, part, amount)
+
+
+func _pick(parts: Array) -> String:
+	return parts[randi() % parts.size()]
+
+
+## How close to death you feel. Never a number: you can tell you are close, not how close.
+func death_feel() -> String:
+	var worst := minf(health / max_health, (sheet.body.blood - sheet.body.dead_at) / (100.0 - sheet.body.dead_at))
+	if worst > 0.75:
+		return "You feel all right."
+	if worst > 0.5:
+		return "You are hurt."
+	if worst > 0.3:
+		return "You are in a bad way."
+	if worst > 0.15:
+		return "You are badly hurt. You could die of this."
+	return "You are dying."
 
 
 func _respawn() -> void:

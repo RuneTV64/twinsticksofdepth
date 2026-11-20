@@ -46,6 +46,8 @@ const NEED_DRAIN := {"food": 4.0, "water": 6.0, "rest": 5.0}
 
 var attrs := {}
 var needs := {}
+## Where they are hurt, their blood and their pain (body_health.gd).
+var body := BodyHealth.new()
 var composure := 100.0
 ## Game hours per real second. 0 = needs don't run down: there is no clock and nothing to eat yet. The time
 ## system sets this.
@@ -132,6 +134,7 @@ func tick(dt: float, threat: float, held: bool, hidden: bool, health_frac: float
 		_calm_t += dt
 		if _calm_t >= calm_delay:
 			composure = minf(composure + calm_gain * (hidden_gain if hidden else 1.0) * dt, 100.0)
+	body.tick(dt)
 	adrenaline_t = maxf(adrenaline_t - dt, 0.0)
 	if adrenaline_t <= 0.0 and crash_t > 0.0:
 		crash_t = maxf(crash_t - dt, 0.0)
@@ -165,6 +168,7 @@ func reset() -> void:
 	_adrenaline_cd = 0.0
 	_health_frac = 1.0
 	_winded = false
+	body.reset()
 	_rebuild()
 
 
@@ -201,6 +205,41 @@ func _rebuild() -> void:
 		_add("Hurt", "-10% speed" if not rush else "ignored for now")
 		if not rush:
 			speed_mult *= 0.9
+
+	# The body: bleeding, blood lost, pain. Adrenaline hides the pain, not the bleeding.
+	if body.bleeding > 0.25:
+		_add("Bleeding badly", "you are losing blood fast")
+	elif body.bleeding > 0.02:
+		_add("Bleeding", "you are losing blood")
+	var feel := body.blood_feel()
+	if feel == "Pale":
+		_add(feel, "stamina comes back 15% slower")
+		stamina_regen_mult *= 0.85
+	elif feel == "Light-headed":
+		_add(feel, "-10% speed, -15% aim, stamina comes back 30% slower")
+		speed_mult *= 0.9
+		aim_mult *= 0.85
+		stamina_regen_mult *= 0.7
+	elif feel == "Faint":
+		_add(feel, "-25% speed, -35% aim: you need to stop the bleeding")
+		speed_mult *= 0.75
+		aim_mult *= 0.65
+		stamina_regen_mult *= 0.5
+	elif feel == "Fading":
+		_add(feel, "-45% speed, -60% aim: you are close to death")
+		speed_mult *= 0.55
+		aim_mult *= 0.4
+		stamina_regen_mult *= 0.3
+	if body.pain > 0.08:
+		if rush:
+			_add("In pain", "you don't feel it yet", false)
+		else:
+			_add("In agony" if body.pain > 0.6 else "In pain", "hurt legs slow you, hurt arms spoil your aim")
+			speed_mult *= 1.0 - 0.35 * body.leg_pain - 0.08 * body.pain
+			aim_mult *= 1.0 - 0.4 * body.arm_pain - 0.1 * body.pain
+			spread_mult *= 1.0 + 0.5 * body.arm_pain
+	if body.bitten:
+		_add("Bitten", "what that means is still to come")
 
 	if composure < 20.0:
 		_add("Panicked", "-30% aim, blind fire 50% wilder")
