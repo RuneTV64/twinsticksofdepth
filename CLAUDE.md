@@ -7,26 +7,29 @@ were stripped out the same day at the owner's request (`input_setup.gd`, `player
 Forward+ only: no Compatibility renderer, no web or phone builds (owner, 15 Nov 2026). The level is built in code (see README.md);
 the character models, shaders and their scripts are in `assets/characters/` and in our claude.ai Artifacts.
 
-## Where we left off (21 Nov 2026, the owner going to work; picking up from a phone)
+## Where we left off (21 Nov 2026, the owner at work; picking up from a phone)
 
-Everything built in the long session of 20 to 21 Nov is on `main` (last feature commit `46a3934`), and almost
-none of it has been played on the owner's PC: it was tested headless and with the software renderer in the cloud.
-The owner's first job at the PC is to pull and look. What most needs their eyes, in rough order:
+Everything built in the long session of 20 to 21 Nov is on `main`. The owner has now played all of it on
+their PC (21 Nov 2026: "I've tested all of it. It seems fine so far. We can tweak once we get the bulk of the
+game put together"). So the "untested on the owner's PC" notes further down are out of date for anything
+built before that, and nearly every timing, range and chance is still Claude's first guess: don't tune
+unasked, build the bulk first.
 
-- The new ground and grass on Forward+ (never seen there): colours, the stepped light, shadows on the ground,
-  frame rate, the grass parting. B swaps back to the old ground if it misbehaves.
-- Night (N): the dark was never rendered at all in the cloud. Torches (E), the raiders' torches, the lamps.
-- The camera at 45 degrees with the wheel zoom, and whether the lighting on characters still looks right.
-- The treatment screen (H, J for a test wound), prone and crawling (X), zombies falling and getting up.
-- Feel and numbers everywhere: nearly every timing, range and chance is Claude's first guess.
+The owner's answers to what was open (21 Nov 2026):
 
-Open questions for the owner (asked in reports, not yet answered):
+- The camera: the fixed 45 degree turn is exactly what they meant.
+- The torch: both kinds. The battery one and a burning one now exist (see Light and dark).
+- A lost limb may be hidden on the player by the pose code: done (see The bite).
+- Ground colours, flooding and the tall grass stay as they are. But overgrowth must come one day: "As the
+  years roll by nature will reclaim what is hers." It belongs with the time system (see Where the game is
+  going); nothing is designed.
+- Raiders seeing 18 m against the player's 40 m is fine for now. Raiders still beat the owner from across
+  the screen, because you have to be zoomed in to see what you are doing close up. The owner's thought:
+  "might need to add an outline to zombies and players to help them stand out". Not ordered yet; the
+  character shaders are approved assets, so propose how before building.
 
-- "A 45 degree rotation on the camera": fixed turn (built) or a camera the player turns in steps?
-- "Torch": built as a battery hand torch; did they mean a burning one?
-- Showing a missing limb on the player means touching the approved body model: may the pose code hide it?
-- Spring grass is a vivid green, summer rain floods a lot, the tall hiding grass looked thin: change any?
-- Raiders now see 18 m and the player 40 m: too generous to the player?
+Built after those answers and not yet seen by the owner: the burning torch, and lost limbs showing on the
+player (sheet: `tools/preview/missing_limbs.png`).
 
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
@@ -50,9 +53,8 @@ say what a picture can't show).
 
 - The camera never turns in play (owner, 20 Nov 2026): it only pans and moves in and out. No rotation, snapped
   or free. Later the same day the owner decided the view itself is turned 45 degrees: `camera_rig.gd`
-  `yaw_deg` 45, so north is toward the top right of the screen, as in an isometric game. (Claude took "a 45
-  degree rotation on the camera" to mean this fixed turn, not a camera the player can rotate; if the owner
-  meant turning in 45 degree steps, everything already asks the rig for its yaw.) Anything that maps the
+  `yaw_deg` 45, so north is toward the top right of the screen, as in an isometric game. (The owner confirmed on 21 Nov 2026 that this fixed turn is what they
+  meant, not a camera the player can rotate.) Anything that maps the
   screen to the ground must go through `Player.screen_to_ground()` / `CamRig.yaw()`: movement keys (up is up
   the screen), mouse travel, the camera lead. Lighting set from the camera (zombie and raider `key_dir`) is
   worked out once at start-up from the camera as it stands, so it follows; it is unchecked on real hardware.
@@ -251,16 +253,21 @@ stand-ins until the game has a clock (`body_health.gd`, "the bite").
   stitched.
 - Gone for good (`body.missing`, until that character dies). An arm: -40% aim, reloading takes twice as long,
   no shoving or guarding, wilder blind fire. A leg: -55% speed, no running, dashing, rolling or vaulting. Hits
-  aimed at a missing limb go to the chest. Hooks, improvised hands and peg legs are for later (owner). The
-  player's model still shows the limb: the body model is approved and locked, so this needs the owner's say.
+  aimed at a missing limb go to the chest. Hooks, improvised hands and peg legs are for later (owner).
+- The lost limb shows (owner, 21 Nov 2026: the pose code may hide it). `PlayerBody.show_missing()` draws the
+  forearm or the lower leg, and all below it, down to nothing at the elbow or knee, which leaves a closed
+  stump; the approved model is not touched, and it is only set when the list of lost limbs changes. With
+  the right arm gone the left hand takes the gun's grip. Sheet: `tools/preview/missing_limbs.png`
+  (`tools/cover_pose_preview.gd` ROW=3). Stand-ins: the stump is plain skin (no wound, no dressing), a
+  one-legged character still stands and walks as if on two (no hop, crutch or lean), and every pose still
+  moves the missing arm's shoulder as before.
 - What you can tell (`bite_guess()`): Medical 0 to 1, only that you were bitten; 2, that it is infected; 4, how
   far up the limb it has got, or that the bite seems not to have taken.
 - Death (`Player._die()`): infected, your old character gets up where you fell as a fresh zombie (`Enemy`
   `was_player`, `carried`), missing the limbs you had lost, with everything you carried; killing it drops "Your
   old things". Not infected, your things lie there as "Your body". The new character starts with nothing. The
   risen zombie's skin is rolled, not yours: the player has no look of its own yet.
-- Not built: sickness other than the bite, a turned raider, more than one cutting tool, cauterising, the look of
-  a missing limb on the player, prosthetics.
+- Not built: sickness other than the bite, a turned raider, more than one cutting tool, cauterising, prosthetics.
 - Next, in order: sickness; the new needs (hygiene, morale, toilet, warmth).
 
 ## Small rules the owner has set (20 Nov 2026)
@@ -774,6 +781,12 @@ with crouching and going prone.
     zombie from 18 m); by day it makes no difference. A real `SpotLight3D` on the player gives the look. No
     batteries, it doesn't need a free hand, and lying down the beam's drawn light follows the body rather than
     the aim.
+  - The burning torch (owner, 21 Nov 2026: "both" kinds; not yet seen by the owner): `fire_torch`, also in
+    the tool box. E now steps through what you carry: hand torch, burning torch, nothing (`torch_kind`). It
+    has no beam: it lights 9 m all round you (`fire_torch_range`; a carried "beam" wider than any angle, with
+    a warm `OmniLight3D`), shows you from as far as the hand torch does, and burns away in 300 s of being
+    lit (a stand-in), then it is gone. Not built: making one, lighting it from a fire, setting things or
+    zombies alight, rain putting it out, raiders carrying one.
   - Raiders carry torches (owner, 20 Nov 2026; untested on the owner's PC). `Daylight.beams` now holds any
     number of carried beams by who carries them (`set_beam()`, `clear_beam()`); the fog shader draws the 6
     nearest the player (`BEAM_MAX`). A raider (`raider.gd` `_update_torch()`, `carries_torch`) has his on when

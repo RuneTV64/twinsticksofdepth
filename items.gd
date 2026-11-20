@@ -16,6 +16,7 @@ const DEFS := {
 	"steroids": {"name": "Steroids", "w": 0.03, "cat": "medical", "uses": 4, "for": "Holds a bite's infection back for a few minutes. It cures nothing."},
 	"hatchet": {"name": "Hatchet", "w": 1.2, "cat": "tool", "for": "Chops. In the last resort, a limb."},
 	"torch": {"name": "Torch", "w": 0.3, "cat": "tool", "for": "A hand torch: a beam of light where you point. You see by it, and everyone sees you."},
+	"fire_torch": {"name": "Burning torch", "w": 0.6, "cat": "tool", "uses": 300, "for": "A stick wound with rag and fat. Lit, it lights all round you for a few minutes and then it is gone."},
 	"rock": {"name": "Rock", "w": 0.4, "cat": "thrown", "stack": 3, "for": "Thrown, it makes a noise where it lands. It can be picked up again."},
 	"bottle": {"name": "Bottle", "w": 0.4, "cat": "thrown", "stack": 3, "for": "Thrown, it smashes: louder than a rock, and gone."},
 	"painkillers": {"name": "Painkillers", "w": 0.03, "cat": "medical", "uses": 6, "for": "Dulls pain for a few minutes: steadier hands, less slowed."},

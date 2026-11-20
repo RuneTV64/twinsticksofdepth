@@ -351,8 +351,13 @@ var held_by: Array[Enemy] = []   # zombies that have hold of you
 ## to see, and your own eyes are lower too.
 var posture := 0
 ## A torch (items.gd "torch") switched on: a beam where you face. You see by it; it shows you to everyone.
+## Or a burning one ("fire_torch"): no beam, light all round you, and it burns away as it is used.
 var torch_on := false
+var torch_kind := ""                     # "torch" or "fire_torch" while one is lit
 var _torch_light: SpotLight3D
+var _fire_light: OmniLight3D
+var _burn_t := 0.0
+@export var fire_torch_range := 9.0      # m of light all round a burning torch
 @export var torch_range := 16.0          # m the beam reaches
 @export var torch_angle_deg := 24.0      # half its width
 @export var torch_seen := 1.5            # carrying a light in the dark, you are seen from this much further than by day
@@ -2433,14 +2438,36 @@ func light_on_you() -> float:
 ## The torch: E switches it on and off, if you carry one. Dying or losing it puts it out.
 func _update_torch() -> void:
 	if Input.is_action_just_pressed("torch") and not dead:
-		if inv.has("torch"):
-			torch_on = not torch_on
-			show_status("Torch on: you see by it, and it shows you." if torch_on else "Torch off.", 1.4)
-		else:
+		# E steps through what you carry: the hand torch, the burning one, nothing.
+		var order: Array[String] = []
+		for id in ["torch", "fire_torch"]:
+			if inv.has(id):
+				order.append(id)
+		order.append("")
+		if order.size() == 1:
 			show_status("You have no torch.", 1.0)
-	if torch_on and (dead or not inv.has("torch")):
+		else:
+			torch_kind = order[(order.find(torch_kind) + 1) % order.size()]
+			torch_on = torch_kind != ""
+			show_status({"": "Torch out.", "torch": "Torch on: you see by it, and it shows you.",
+				"fire_torch": "The torch burns: light all round you, and everyone sees it."}[torch_kind], 1.4)
+	if torch_on and (dead or not inv.has(torch_kind)):
 		torch_on = false
-	if torch_on:
+		torch_kind = ""
+	if torch_on and torch_kind == "fire_torch":
+		# It burns away a second at a time, lit or not looked at.
+		_burn_t += get_physics_process_delta_time()
+		if _burn_t >= 1.0:
+			_burn_t -= 1.0
+			inv.use("fire_torch")
+			if not inv.has("fire_torch"):
+				torch_on = false
+				torch_kind = ""
+				show_status("Your torch has burned out.", 2.0)
+	if torch_on and torch_kind == "fire_torch":
+		# All round: a "beam" wider than any angle.
+		Daylight.set_beam(get_instance_id(), global_position, facing, fire_torch_range, -1.1)
+	elif torch_on:
 		Daylight.set_beam(get_instance_id(), global_position, facing, torch_range, cos(deg_to_rad(torch_angle_deg)))
 	else:
 		Daylight.clear_beam(get_instance_id())
@@ -2453,8 +2480,18 @@ func _update_torch() -> void:
 		_torch_light.position = Vector3(0.0, 1.2, 0.0)
 		_torch_light.rotation.x = deg_to_rad(-8.0)       # tipped down a little, so it falls on the ground ahead
 		_visual.add_child(_torch_light)
-	if _torch_light.visible != torch_on:
-		_torch_light.visible = torch_on
+		_fire_light = OmniLight3D.new()
+		_fire_light.light_color = Color(1.0, 0.62, 0.28)
+		_fire_light.light_energy = 2.4
+		_fire_light.omni_range = fire_torch_range
+		_fire_light.position = Vector3(0.3, 1.7, 0.2)
+		_visual.add_child(_fire_light)
+	var beam_lit := torch_on and torch_kind == "torch"
+	var fire_lit := torch_on and torch_kind == "fire_torch"
+	if _torch_light.visible != beam_lit:
+		_torch_light.visible = beam_lit
+	if _fire_light.visible != fire_lit:
+		_fire_light.visible = fire_lit
 
 
 ## How far your footsteps carry right now (0 = silent: standing still).

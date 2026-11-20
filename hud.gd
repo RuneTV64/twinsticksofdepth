@@ -38,7 +38,8 @@ Seasons  M steps the season (spring, summer, autumn, winter); K turns the rain o
   B swaps the new ground for the old plain one.
 Light and dark  N steps the time of day (day, dusk, night, dawn). In the dark you are seen from less far and see
   less far; a fire or lamp lights whoever stands in it; a gunshot shows you up for a moment.
-Torch  E switches it on and off (it is in the tool box). A beam where you face: you see by it, and it shows you.
+Torch  E steps through the hand torch (a beam where you face), the burning torch (light all round, burns away)
+       and none. Both are in the tool box. You see by them, and they show you.
 Crouch  Ctrl (again to stand)      Prone  X (again to get up)
   Prone with a gun raised: you stay put and the crosshair reaches further. Aim behind you and you roll onto your back.
 Free look (HOLD)  F or middle mouse button: the camera leaves you and follows the crosshair further out

@@ -40,6 +40,7 @@ const HINGE_L := {
 const CURL := {"Index": [1.25, 1.45, 0.9], "Middle": [1.25, 1.45, 0.9], "Ring": [1.25, 1.45, 0.9],
 	"Pinky": [1.25, 1.45, 0.9], "Thumb": [0.4, 0.45, 0.6]}
 const REACH_TIME := 0.35
+const MISSING_BIT := {"ArmL": 1, "ArmR": 2, "LegL": 4, "LegR": 8}
 
 var material: ShaderMaterial
 
@@ -89,6 +90,7 @@ var _punch_side := 1                # 0 = left jab, 1 = right cross; flips with 
 var _prev_swing := 0.0
 var _prev_flash := 0.0
 var _was_dead := false
+var _gone := 0                      # which limbs are shown cut off (bits: arm L, arm R, leg L, leg R)
 
 
 func _ready() -> void:
@@ -395,7 +397,10 @@ func animate(p, delta: float) -> void:
 			pose = _blend_arm(pose, _solve_arm(k, target, pole, Quaternion.IDENTITY), _fist_w)
 		if _gun_w > 0.001:
 			var gpose: Array[Quaternion]
-			if k == 0:
+			if k == 0 and _gone & 2 != 0:
+				# The right arm is gone: the left hand holds the gun by its grip.
+				gpose = _solve_arm(k, grip, Vector3(0.6, -0.5, -0.7), Quaternion.IDENTITY)
+			elif k == 0:
 				gpose = _solve_arm(k, fore, Vector3(0.5, -1.0, 0.1), Quaternion.IDENTITY)
 			else:
 				gpose = _solve_arm(k, grip, Vector3(-0.6, -0.5, -0.7), Quaternion.IDENTITY)
@@ -433,6 +438,15 @@ func animate(p, delta: float) -> void:
 		var half_turn := Basis(Vector3.UP, PI)
 		transform = Transform3D(half_turn * over, half_turn * (mid - over * mid))
 
+	# ---- limbs cut off (only looked at when the list changes: its length is enough, limbs don't come back)
+	var gone := 0
+	var sheet = p.get("sheet")
+	if sheet != null and sheet.body != null:
+		for part in sheet.body.missing:
+			gone |= MISSING_BIT.get(part, 0)
+	if gone != _gone:
+		show_missing(gone)
+
 	# ---- onto the skeleton
 	var kk := 1.0 - exp(-pose_sharpness * delta)
 	for i in _n:
@@ -451,6 +465,15 @@ func animate(p, delta: float) -> void:
 		amount = 0.4
 	material.set_shader_parameter("tint_color", tint)
 	material.set_shader_parameter("tint_amount", amount)
+
+
+## Show these limbs as cut off (bits as in MISSING_BIT): the forearm or the lower leg, and all below it, is
+## drawn down to nothing at the elbow or knee, which leaves a closed stump. The model itself isn't touched.
+func show_missing(gone: int) -> void:
+	_gone = gone
+	for k in 2:
+		_skel.set_bone_pose_scale(_arm[k][3], Vector3.ONE * (0.001 if gone & (1 << k) != 0 else 1.0))
+		_skel.set_bone_pose_scale(_leg[k][1], Vector3.ONE * (0.001 if gone & (4 << k) != 0 else 1.0))
 
 
 # ====================================================================== helpers

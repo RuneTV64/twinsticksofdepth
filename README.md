@@ -29,7 +29,7 @@ Mouse and keyboard only. There is no controller support. The view is turned 45 d
 | Time of day (a stand-in for the clock): day, dusk, night, dawn | N |
 | Season (spring, summer, autumn, winter) / rain on and off: the ground and grass follow | M / K |
 | The new ground / the old plain one | B |
-| Torch on and off (it is in the tool box by the spawn) | E |
+| Torch: hand torch, burning torch, none (both are in the tool box by the spawn) | E |
 | Camera in and out | Mouse wheel |
 | Free look (hold): the camera follows the crosshair further out | F or middle mouse button |
 | Character page | C |

@@ -423,7 +423,7 @@ func _build_level() -> void:
 	tools.title = "Tool box"
 	tools.tint = Color(0.7, 0.3, 0.2)
 	tools.position = Vector3(-5, 0, 4)
-	tools.contents = [Items.make("steroids"), Items.make("hatchet"), Items.make("torch")]
+	tools.contents = [Items.make("steroids"), Items.make("hatchet"), Items.make("torch"), Items.make("fire_torch")]
 	add_child(tools)
 	_place_grass.call_deferred()     # once the whole level is built, so it lands clear of everything
 	for p in [Vector3(-1.5, 0, 3), Vector3(1.5, 0, 3), Vector3(-9, 0, 9), Vector3(-14, 0, 13)]:
