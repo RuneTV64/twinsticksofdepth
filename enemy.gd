@@ -49,6 +49,17 @@ extends CharacterBody3D
 @export var corpse_time := 30.0        # s a dead zombie lies there before it fades (stand-in for the clean-up lore)
 @export var fall_apart_every := 20.0   # s: how often the most rotted get a chance to shed a part on their own
 
+@export_group("Wandering")
+# A zombie has no plan, but it has a kind of memory. A sound turns it, and it goes on walking that way for
+# minutes, long past where the sound was, until it forgets. One with nothing in its head that sees another on
+# the move falls in behind it, and so does the next: that is how a horde forms and travels on its own.
+@export var sound_memory := Vector2(120.0, 240.0)   # s it keeps going the way a sound came from
+@export var chase_memory := 30.0       # s it keeps going the way its prey went, once it has lost it
+@export var wander_speed := 0.75       # its speed when it is only wandering, as a share of its chasing speed
+@export var follow_sight := 10.0       # m: how far off it notices another zombie on the move
+@export var follow_keep := 0.85        # a follower keeps this much of its leader's purpose (so chains die away)
+@export var stuck_forget := 4.0        # walking into something it can't pass, it forgets this many times faster
+
 @export_group("Climbing")
 # Zombies get over things by accident, not by plan. One that keeps walking into something it can get its arms over
 # drags itself across and tumbles down the far side. Where they are packed densely against something taller, some
@@ -129,6 +140,13 @@ var _climb_h0 := 0.0
 var _climb_len := 2.0
 var _shown_y := 0.0
 var head_dmg := 0.0         # blows its head has taken from finishers
+var _drive := 0.0           # s of purpose left: how long it will go on walking the way it is going
+var _heading := Vector3.ZERO   # the way it is going, when it is wandering
+var _lead: Enemy = null     # the zombie it has fallen in behind
+var _follow_t := randf()      # until it next looks about for one to follow
+# Zombies on the move by 8 m cell, looked up by idle ones wondering whom to follow. Rebuilt once a second.
+static var _movers := {}
+static var _movers_frame := -1000
 var _mill := 1.0 if randf() < 0.5 else -1.0
 var _mill_t := 0.0
 var home := Vector3.ZERO
@@ -294,11 +312,18 @@ func take_headshot(dir: Vector3, knock: float) -> void:
 
 ## A loud noise (a gunshot) went off at pos. Shamblers walk to where it came from; once you are
 ## inside aggro_range they chase you as usual. Each new shot refreshes the spot and the timer.
-func hear_noise(pos: Vector3) -> void:
+func hear_noise(pos: Vector3, _by_player := true) -> void:
 	if dead or kind != "shambler":
 		return
 	_noise_pos = pos
 	_noise_t = investigate_time
+	# It turns that way, and will go on that way long after it has passed the spot.
+	var to := pos - global_position
+	to.y = 0.0
+	if to.length() > 0.2:
+		_heading = to.normalized()
+	_drive = maxf(_drive, randf_range(sound_memory.x, sound_memory.y))
+	_lead = null
 
 
 ## You only see an enemy while it's in the player's view; out of it, it fades away (it is
@@ -351,7 +376,8 @@ func _die() -> void:
 		_set_state("walk")
 		crawling = false
 		_corpse_t = corpse_time
-		_dead_t = shambler_respawn
+		# With a horde keeping count, the dead stay dead; without one (a bare test scene) they come back.
+		_dead_t = corpse_time + 2.0 if Horde.it != null else shambler_respawn
 	else:
 		visible = false
 		_dead_t = 2.0
@@ -492,7 +518,10 @@ func _tick(delta: float) -> void:
 				else:
 					_settle(delta)
 		if _dead_t <= 0.0:
-			_respawn()
+			if Horde.it != null and kind == "shambler":
+				_gone()
+			else:
+				_respawn()
 		return
 
 	var want := Vector3.ZERO
@@ -904,6 +933,55 @@ func _heap_step(delta: float) -> void:
 const HIDDEN_NOTICE := 0.35   # someone hunkered behind cover is noticed at this much of the usual range
 
 
+## With nothing in its head, it looks about once a second for another zombie that is going somewhere, and falls
+## in behind the nearest one it can see. It only follows one with more purpose than its own, so chains never loop
+## and die away down their length.
+func _look_about(delta: float) -> void:
+	_follow_t -= delta
+	if _follow_t > 0.0:
+		return
+	_follow_t = 1.0
+	var frame := Engine.get_physics_frames()
+	if frame - _movers_frame >= 60:
+		_movers_frame = frame
+		_movers.clear()
+		for n in get_tree().get_nodes_in_group("enemies"):
+			var z := n as Enemy
+			if z.kind != "shambler" or z.dead or z._drive < 10.0 or z.state != "walk":
+				continue
+			var k := Vector2i(floori(z.global_position.x / 8.0), floori(z.global_position.z / 8.0))
+			if _movers.has(k):
+				_movers[k].append(z)
+			else:
+				_movers[k] = [z]
+	var cx := floori(global_position.x / 8.0)
+	var cz := floori(global_position.z / 8.0)
+	var best: Enemy = null
+	var best_d := follow_sight
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for o: Enemy in _movers.get(Vector2i(cx + dx, cz + dz), []):
+				if o == self or not is_instance_valid(o) or o.dead:
+					continue
+				var to := o.global_position - global_position
+				to.y = 0.0
+				var dd := to.length()
+				if dd < best_d and dd > 0.3 and facing.dot(to / dd) > -0.3:
+					best_d = dd
+					best = o
+	if best == null:
+		return
+	# It has to be able to see it.
+	var eye := Vector3.UP * 1.4
+	var q := PhysicsRayQueryParameters3D.create(global_position + eye, best.global_position + eye, 1, [get_rid()])
+	if not get_world_3d().direct_space_state.intersect_ray(q).is_empty():
+		return
+	_lead = best
+	_drive = best._drive * follow_keep
+	_heading = (best.global_position - global_position).normalized()
+	_heading.y = 0.0
+
+
 ## Pick who to go for: the nearest living person it has noticed, you or a raider. With no one noticed it keeps
 ## the player in mind (it still comes to noises), as before raiders existed.
 func _pick_prey() -> void:
@@ -1033,15 +1111,44 @@ func _think(delta: float) -> Vector3:
 				_set_state("walk")
 			return facing * throw
 
-	# Walking (or crawling) toward you, or toward a noise it heard.
+	# Walking (or crawling) toward you; or, with no one in sight, wherever its memory is taking it.
 	var goal := to
 	var going := chasing
-	if not chasing and _noise_t > 0.0:
-		goal = _noise_pos - global_position
-		goal.y = 0.0
-		going = true
-		if goal.length() < 1.0:
-			_noise_t = 0.0   # got there, nothing to find
+	if chasing:
+		# While it has prey it is the most purposeful thing about: others fall in behind it. When it loses the
+		# prey it carries on the way it was going for a while.
+		_heading = d
+		_drive = maxf(_drive, chase_memory)
+		_lead = null
+	else:
+		if _drive <= 0.0:
+			_look_about(delta)
+		if _drive > 0.0:
+			_drive -= delta * (stuck_forget if _press_t > 3.0 else 1.0)
+			speed *= wander_speed
+			going = true
+			if _lead != null and (not is_instance_valid(_lead) or _lead.dead
+					or _lead.global_position.distance_to(global_position) > follow_sight * 1.5):
+				_lead = null   # lost the one it was behind: it carries on the same way
+			if _lead != null:
+				# Behind another zombie: toward it, and once close, the way it is going.
+				goal = _lead.global_position - global_position
+				goal.y = 0.0
+				if goal.length() < 1.8:
+					goal = _lead._heading if _lead._heading != Vector3.ZERO else _lead.facing
+				_heading = goal.normalized()
+				_drive = maxf(_drive, _lead._drive * follow_keep)
+			elif _noise_t > 0.0:
+				# Toward the sound itself first.
+				goal = _noise_pos - global_position
+				goal.y = 0.0
+				_noise_t -= delta
+				if goal.length() < 1.5:
+					_noise_t = 0.0   # got there, nothing to find: it keeps going the same way
+				else:
+					_heading = goal.normalized()
+			if _lead == null and _noise_t <= 0.0:
+				goal = _heading * 4.0
 	if not going or goal.length() < 0.01:
 		return Vector3.ZERO
 	var gd := goal.normalized()

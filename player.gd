@@ -154,6 +154,8 @@ var reload_time := 1.1
 @export var shot_kick := 2.6            # m/s shoved backward per shot
 @export var shot_cam_kick := 0.3        # meters the camera jolts back per shot
 @export var shot_noise_range := 30.0    # meters; enemies this close hear a shot and come looking
+@export var barge_noise_range := 14.0   # ... a door barged
+@export var stomp_noise_range := 5.0    # ... a skull stomped or clubbed
 @export var bash_damage := 12.0
 
 # ---------- Unarmed ----------
@@ -1237,10 +1239,7 @@ func _start_finisher() -> void:
 		_flash_t = 0.06
 		_fire_cd = fire_interval
 		shots_fired += 1
-		for e in get_tree().get_nodes_in_group("enemies"):
-			var en := e as Enemy
-			if en != null and en.global_position.distance_to(global_position) <= shot_noise_range:
-				en.hear_noise(global_position)
+		Earshot.make(global_position, shot_noise_range, get_tree())
 		if _finish_on != null:
 			_finish_on.take_hit(_finish_on.hp + 1.0, Vector3.DOWN, 0.0)
 			show_status("Finished it", 0.7)
@@ -1265,6 +1264,7 @@ func _land_finisher() -> void:
 	if _finish_on != null:
 		if not is_instance_valid(_finish_on) or not _finish_on.is_down():
 			return   # it got up, or it's gone
+		Earshot.make(global_position, stomp_noise_range, get_tree(), _finish_on)
 		if _finish_on.take_stomp(_blow_power(), Vector3.DOWN):
 			show_status("Skull crushed", 0.8)
 		else:
@@ -1552,6 +1552,7 @@ func _handle_collisions(pre_vel: Vector3) -> void:
 
 
 func _barge(door: Door, spd: float, into: Vector3) -> void:
+	Earshot.make(global_position, barge_noise_range, get_tree())   # a shoulder into a door carries
 	_barge_cd = 0.6
 	_dash_t = 0.0
 	var power := barge_power(spd)
@@ -1729,10 +1730,7 @@ func _shoot(dir: Vector3, from: Vector3, aimed: bool) -> void:
 	shot.position = from
 	get_parent().add_child(shot)
 	# The shot is loud: every enemy within earshot comes to where it was fired.
-	for e in get_tree().get_nodes_in_group("enemies"):
-		var en := e as Enemy
-		if en != null and en.global_position.distance_to(global_position) <= shot_noise_range:
-			en.hear_noise(global_position)
+	Earshot.make(global_position, shot_noise_range, get_tree())
 
 
 ## Throw a punch. It doesn't stop you moving. The less stamina you have, the slower and

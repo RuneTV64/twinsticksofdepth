@@ -26,6 +26,9 @@ var rig: CamRig
 var hud: Hud
 var fog: Node3D
 var cutaway: Cutaway
+var horde: Horde
+var _zone_label: Label
+var _zone_t := 0.0
 
 # Crowd test (F5 / F6 / F7): extra shamblers to find out how many the game can take, and where the time goes.
 const CROWD_STEP := 50
@@ -73,6 +76,11 @@ func _ready() -> void:
 	cutaway.player = player
 	cutaway.camera = rig.cam
 	add_child(cutaway)
+
+	# The horde: how many zombies are where, and how noise moves them about.
+	horde = Horde.new()
+	horde.player = player
+	add_child(horde)
 
 	hud = Hud.new()
 	hud.player = player
@@ -122,6 +130,18 @@ func _unhandled_input(event: InputEvent) -> void:
 						at = player.global_position + player.facing * 10.0
 					_raiders.append(_raider(Vector3(at.x, 0.05, at.z)))
 					player.show_status("Raider added (Shift+T removes them)", 1.5)
+			KEY_Z:   # the horde readout: zombies out of play / in play / warmth, area by area
+				if _zone_label == null:
+					_zone_label = Label.new()
+					_zone_label.add_theme_font_size_override("font_size", 15)
+					_zone_label.add_theme_color_override("font_outline_color", Color.BLACK)
+					_zone_label.add_theme_constant_override("outline_size", 6)
+					_zone_label.add_theme_color_override("font_color", Color(0.75, 0.9, 1.0))
+					_zone_label.position = Vector2(20, 220)
+					_zone_label.visible = false
+					hud.add_child(_zone_label)
+				_zone_label.visible = not _zone_label.visible
+				_zone_t = 0.0
 			KEY_V:   # the cutaway on / off, to compare
 				cutaway.enabled = not cutaway.enabled
 				player.show_status("Cutaway: %s" % ("ON" if cutaway.enabled else "OFF"), 1.5)
@@ -214,6 +234,11 @@ func _make_perf_label() -> void:
 ## Twice a second: frame rate, how many zombies, and where the time goes. Posing is per drawn frame; zombie AI and
 ## movement is per physics tick (60 a second, each with 16.7 ms to spare).
 func _process(delta: float) -> void:
+	if _zone_label != null and _zone_label.visible:
+		_zone_t -= delta
+		if _zone_t <= 0.0:
+			_zone_t = 1.0
+			_zone_label.text = horde.readout()
 	if _perf == null or not _perf.visible:
 		Enemy.anim_usec = 0
 		Enemy.zombie_usec = 0

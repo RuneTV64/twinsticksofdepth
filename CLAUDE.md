@@ -79,8 +79,12 @@ it). The owner said to sketch before building anything; wait for their critique 
   with the mouse are combined: the mouse picks which column fills, the hurry key speeds it. Things hidden under
   other things (layered clutter) is wanted: "exactly what I was thinking". Wording: "some clothes have pockets";
   storage mostly comes from containers and backpacks, pockets take small items.
-- Open question from the owner: how do you empty the chamber without firing, and take rounds out of a magazine?
-  Claude proposed a "make safe" key and dragging rounds out of the gun or magazine in the inventory; not agreed yet.
+- Unloading (agreed in outline): Shift+R is "make safe": the magazine comes out and the chambered round is racked
+  out; holding it strips rounds from the magazine. Racking makes a noise. In the inventory a gun opens to show its
+  chamber and magazine well, and a magazine shows its rounds, to drag out by hand. Still to settle together: the
+  rest of loading (R tap to swap magazines, R hold to thumb rounds in, where magazines are kept).
+- Order (owner): enemy AI that follows sound came first, because items will make noise. That is built (see Sound,
+  hordes and hunting). Items are next.
 - Claude's earlier layout, which the owner answered against: items are records (weight, condition, category);
   container contents are rolled when first opened; time is applied on opening (spoiling, picked over by others);
   nothing respawns in a cupboard; keepsakes unlock starting builds.
@@ -266,7 +270,7 @@ changes, update both, and keep them the same files.
   inside `lock_on_core` 0.5 m, fading to nothing at the radius, so it never sticks) and follows it; moving the
   mouse takes it off. Exports in the Lock-on group. (The stick version went with the controller.)
 - Debug keys: G adds a test gunner at the crosshair (Shift+G removes them); T adds a raider (Shift+T removes those);
-  V switches the cutaway off and on.
+  V switches the cutaway off and on; Z shows the horde readout.
 - Debug keys: F1 help, C character page, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
@@ -393,6 +397,45 @@ World War Z but mindless: an accident, not a plan. All of it is in `enemy.gd` (t
   bodies went in freshly turned and some long rotted (the tiles only vary bone colour and a few flesh colours now).
 - To come (owner): how zombies spawn and how the horde moves; the turning-undead mechanic; the pile's clean-up
   (the maggots, flies and worms lore).
+
+## Sound, hordes and hunting (built 20 Nov 2026, in review; untested on the owner's PC)
+
+The owner asked for this before items exist, because items will make noise and change how enemies behave.
+
+- Sound: every sound that matters goes through `Earshot.make(pos, radius, tree, from, by_player)` (`earshot.gd`;
+  the name `Noise` is taken by Godot). Whatever is in earshot hears it (`hear_noise`), and the horde warms that
+  area. Sources now: the player's shots and a raider's (30 m), a barged door (14 m), a finishing blow (5 m). New
+  loud things (racking a round, a hurried rummage) should call it too.
+- Zombies have a memory, not a plan (`enemy.gd`, Wandering exports). A sound turns one toward it and gives it
+  `_drive`: 2 to 4 minutes of purpose. It walks to the sound and then keeps going the same way (`_heading`) until
+  the drive runs out; stuck against something it can't pass, it forgets four times faster. Losing its prey, it
+  carries on the way the prey went for 30 s. Wandering is at 0.75 of chasing speed.
+- Hordes form by following: a zombie with nothing in its head looks about once a second (`_look_about`) and falls
+  in behind the nearest zombie it can see within 10 m that is going somewhere. It takes 0.85 of that one's drive
+  and only follows one with more drive than its own, so chains never loop and die away down their length. A zombie
+  chasing someone counts as going somewhere, so others fall in behind it. Movers are indexed by 8 m cell, rebuilt
+  once a second.
+- The horde (`horde.gd`, `Horde.it`, one node in the level): the map is cut into 20 m areas. Each has zombies in
+  play and a reserve out of play (3 each at the start; the level's own zombies are extra). The world's total is
+  fixed. Every 2 s: warmth fades (one gunshot's worth in 4 minutes); an area at 0.8 warmth or more draws up to 2
+  zombies, from its own reserve first and then from the areas round it, fullest first. They appear in the area
+  they came from, out of the player's sight and at least 14 m off, and walk to the sound. So noise fills an area
+  and empties the ones round it. A zombie gone quiet, unseen and 30 m or more away for a minute goes back into
+  the reserve where it stands; one that leaves the map goes at once. At most 160 in play.
+- Nothing respawns while a Horde exists: a killed shambler is freed once its corpse has gone. (Without one, as in
+  the preview harnesses, the old 90 s respawn still applies.) Z shows the readout: out of play / in play / warmth
+  per area.
+- Cloud run: a gunshot every 5 s in one area drew 15 zombies in from the five areas beside it in 30 s, emptying
+  their reserves; 11 ended up in the player's area; the total stayed fixed.
+- Reserves don't yet flow between areas on their own, so once the ring round a noisy area is empty no more come.
+  The owner's plan for spawning and migration across a bigger map will want that.
+- Raiders hunt (`raider.gd`): they hear every sound. A sound the player didn't make only brings in raiders who
+  are on watch. Flanking: the first raider into a fight comes straight on, the next works round one side, the
+  next the other (`_side`), each preferring cover on its own bearing from the player (`flank_angle` 70 degrees).
+  Searching: where it lost you it works out up to three places near by that are hidden from where it stands (the
+  far sides of cover) and goes round them before giving up. Getting about: it vaults low cover it walks into, and
+  goes round anything else toward the nearer end (`_get_past`). There is still no path finding.
+- Zombies do none of that: no searching, no flanking, no going round. They only remember a direction.
 
 ## Character sheet (built 20 Nov 2026, in review; untested on the owner's PC)
 

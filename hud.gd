@@ -53,6 +53,7 @@ Finisher: crosshair on a downed zombie's head, close by, then attack. Unarmed = 
   (blows by Strength), gun Ready = one shot to the head.
 Corpse piles can be walked on: slow, bad footing, and what is still alive in them grabs. Space at a wall = climb it.
 Character page: C. It shows attributes, needs, composure and conditions.
+Horde: noise warms an area and draws zombies in from round about. Z shows the readout. Killed ones don't come back.
 Cutaway: walls between the camera and you open up. V switches it off and on, to compare.
 Cover test: G test gunner at the crosshair   Shift+G remove them
 Raiders: a camp in the south-west of the yard.  T adds one at the crosshair   Shift+T removes those

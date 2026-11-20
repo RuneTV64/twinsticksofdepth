@@ -43,6 +43,10 @@ extends Enemy
 @export var melee_range := 1.5
 @export var melee_damage := 8.0
 @export var melee_gap := 1.1
+@export var flank_angle := 70.0         # degrees round you a flanker wants to be, from the way the fight began
+@export var flank_weight := 4.0         # how many meters of extra walk that bearing is worth to it
+@export var vault_time := 0.55          # s to get over low cover
+@export var search_spots := 3           # hiding places near where it lost you that it goes and looks behind
 @export var zombie_sense := 11.0        # m: it deals with zombies it can see this close
 @export var zombie_urgent := 6.0        # m: this close, a zombie comes before the fight with you
 @export var shot_noise_range := 30.0    # m: zombies this close hear its shots and come
@@ -112,6 +116,16 @@ var _look_dir := Vector3(0, 0, -1)
 var _strafe := 1.0
 var _sheet_t := 0.0
 var _weapon_mat: StandardMaterial3D
+var _side := 0                     # which way round you it works: 0 straight on, 1 / -1 round a flank
+var _from := Vector3.ZERO          # where it was when the fight started
+var _spots: Array[Vector3] = []    # hiding places it means to check while searching
+var _spots_made := false
+var _spot_t := 0.0
+var _detour_dir := Vector3.ZERO    # the way round something it walked into
+var _detour_t := 0.0
+var _vault_from := Vector3.ZERO
+var _vault_to := Vector3.ZERO
+var _vault_h := 0.0
 var held_by: Array[Enemy] = []     # zombies that have hold of it
 var _zed: Enemy = null             # the zombie it is dealing with
 var _zed_t := 0.0
@@ -213,6 +227,20 @@ func _physics_process(delta: float) -> void:
 		return
 	if player == null:
 		return
+	if _vault_t > 0.0:
+		# Going over low cover: nothing else until it is down the far side.
+		_vault_t -= delta
+		var vu := clampf(1.0 - _vault_t / maxf(vault_time, 0.01), 0.0, 1.0)
+		var vp := _vault_from.lerp(_vault_to, smoothstep(0.0, 1.0, vu))
+		vp.y += sin(PI * vu) * _vault_h
+		global_position = vp
+		velocity = Vector3.ZERO
+		cover_crouch = 0.7
+		_turn(_vault_to - _vault_from, 14.0, delta)
+		_visual.rotation.y = atan2(-facing.x, -facing.z)
+		if _vault_t <= 0.0:
+			global_position = _vault_to
+		return
 	if _reload_t > 0.0:
 		_reload_t -= delta
 		if _reload_t <= 0.0:
@@ -272,6 +300,11 @@ func _physics_process(delta: float) -> void:
 				want = _go_home(delta)
 	_pose_for_cover()
 
+	# Going round something it walked into (see below): along it for a moment, then on its way again.
+	_detour_t -= delta
+	if _detour_t > 0.0 and want.length() > 0.3:
+		want = _detour_dir * want.length()
+	var going := want.normalized() if want.length() > 0.3 else Vector3.ZERO
 	_knock = _knock.move_toward(Vector3.ZERO, 18.0 * delta)
 	velocity.x = want.x + _knock.x
 	velocity.z = want.z + _knock.z
@@ -279,10 +312,15 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	for i in get_slide_collision_count():
 		var col := get_slide_collision(i).get_collider()
-		if col != null and col.has_meta("door"):
+		if col == null:
+			continue
+		var n := get_slide_collision(i).get_normal()
+		if col.has_meta("door"):
 			var door: Door = col.get_meta("door")
-			var n := get_slide_collision(i).get_normal()
 			door.push(global_position, -Vector3(n.x, 0.0, n.z).normalized(), walk_speed)
+		elif col is StaticBody3D and absf(n.y) < 0.5 and going != Vector3.ZERO and going.dot(-n) > 0.6 \
+				and not in_cover and _detour_t <= 0.0:
+			_get_past(Cover.box_of(col), Vector3(n.x, 0.0, n.z).normalized(), going)
 
 	_visual.rotation.y = atan2(-facing.x, -facing.z)
 	_weapon_mat.emission_energy_multiplier = 4.0 if _flash_t > 0.0 else 0.0
@@ -389,17 +427,21 @@ func shove(dir: Vector3, force: float) -> void:
 		_alert()
 
 
-## A gunshot. On watch it comes to look; in a fight where it has lost you, it tells it where you are.
-func hear_noise(pos: Vector3) -> void:
+## A sound. On watch it comes to look; in a fight where it has lost you, a sound you made tells it where you
+## are. Sounds you didn't make (another raider's shots) bring it over, but don't change where it thinks you are.
+func hear_noise(pos: Vector3, by_player := true) -> void:
 	if dead:
 		return
 	if mode == "fight":
-		if not sees:
+		if not sees and by_player:
 			last_seen = pos
+	elif not by_player and mode == "search":
+		pass   # already out looking: another raider's shots don't send it off somewhere new
 	else:
 		last_seen = pos
 		mode = "search"
 		_search_t = search_time
+		_spots_made = false
 		armed = true
 
 
@@ -432,6 +474,15 @@ func _respawn() -> void:
 
 
 func _alert() -> void:
+	# Which way round you it will work: the first to join the fight comes straight on, the next goes round one
+	# side, the next the other. That is the flanking: each looks for cover on its own bearing from you.
+	var others := 0
+	for r in get_tree().get_nodes_in_group("raiders"):
+		var o := r as Raider
+		if o != null and o != self and not o.dead and o.mode == "fight":
+			others += 1
+	_side = [0, 1, -1][others % 3]
+	_from = global_position
 	mode = "fight"
 	armed = true
 	_phase = "duck"
@@ -596,9 +647,23 @@ func _search(delta: float) -> Vector3:
 	armed = true
 	var to := last_seen - global_position
 	to.y = 0.0
-	if to.length() > 1.5 and _search_t > 0.0:
+	if to.length() > 1.5 and _search_t > 0.0 and not _spots_made:
 		_search_t -= delta * 0.25   # it doesn't walk for ever at a wall
 		return _walk_to(last_seen, walk_speed, delta)
+	# Where it lost you, and you aren't there. It doesn't just stand and look: it works out where someone could be
+	# hiding from here and goes round each of those in turn.
+	if not _spots_made:
+		_spots_made = true
+		_spots = _hiding_places()
+		_spot_t = 6.0
+	if not _spots.is_empty():
+		_spot_t -= delta
+		var sp := _spots[0]
+		if _xz(sp - global_position).length() < 1.0 or _spot_t <= 0.0:
+			_spots.remove_at(0)
+			_spot_t = 6.0
+			return Vector3.ZERO
+		return _walk_to(sp, walk_speed, delta)
 	_search_t -= delta
 	_look_t -= delta
 	if _look_t <= 0.0:
@@ -608,6 +673,73 @@ func _search(delta: float) -> Vector3:
 	if _search_t <= 0.0:
 		mode = "return"
 	return Vector3.ZERO
+
+
+## It has walked straight into something. Low cover it vaults; anything else it goes round, toward the nearer
+## end. (There is no path finding in the game: this is what keeps a raider from standing against a wall.)
+func _get_past(box: Cover.Box, n: Vector3, going: Vector3) -> void:
+	if box != null and box.low:
+		var depth := box.rect.size.x if absf(n.x) > absf(n.z) else box.rect.size.y
+		var land := _xz(global_position) - Vector2(n.x, n.z) * (depth + 1.0)
+		if depth <= 2.2 and Cover.has_room(land, box) \
+				and (Cover.bounds.size == Vector2.ZERO or Cover.bounds.grow(-1.0).has_point(land)):
+			_vault_from = global_position
+			_vault_to = Vector3(land.x, global_position.y, land.y)
+			_vault_h = maxf(box.top - 0.45, 0.2)
+			_vault_t = vault_time
+			_drop_cover()
+			return
+	# Along the face, toward whichever end is nearer (or the way it was already leaning, if it can't tell).
+	var along := Vector3(-n.z, 0.0, n.x)
+	var sign_to := signf(going.dot(along))
+	if box != null:
+		var c := box.rect.get_center()
+		var off := _xz(global_position) - c
+		var t := off.dot(Vector2(along.x, along.z))
+		var half := (box.rect.size.x if absf(along.x) > absf(along.z) else box.rect.size.y) * 0.5
+		if absf(going.dot(along)) < 0.3:
+			sign_to = 1.0 if t >= 0.0 else -1.0
+		_detour_t = clampf((half - t * sign_to + 0.9) / maxf(walk_speed, 0.5), 0.4, 6.0)
+	else:
+		_detour_t = 1.0
+	if sign_to == 0.0:
+		sign_to = 1.0
+	_detour_dir = along * sign_to
+
+
+## Places near where it lost you that are out of its sight from here: the far sides of cover. Nearest first.
+func _hiding_places() -> Array[Vector3]:
+	var me := _xz(global_position)
+	var found: Array = []
+	var space := get_world_3d().direct_space_state
+	for f in Cover.faces:
+		var along := (me - f.a).dot(f.dir)
+		if absf((me - f.a).dot(f.n)) > 9.0 or along < -9.0 or along > f.length + 9.0:
+			continue
+		if (me - f.a).dot(f.n) > 0.0:
+			continue   # it can see this side of it already
+		Cover.prep(f)
+		var t := clampf(along, f.t_min, f.t_max)
+		var sp := Cover.spot(f, t)
+		if me.distance_to(sp) > 9.0 or not Cover.has_room(sp, f.box):
+			continue
+		# Stand a little out from the cover, where it would see anyone crouched against it.
+		var look := sp + f.n * 0.9
+		var p3 := Vector3(look.x, global_position.y, look.y)
+		found.append([me.distance_to(look), p3])
+	found.sort_custom(func(x, y): return x[0] < y[0])
+	var out: Array[Vector3] = []
+	for e in found:
+		if out.size() >= search_spots:
+			break
+		var p: Vector3 = e[1]
+		var near := false
+		for o in out:
+			if o.distance_to(p) < 2.5:
+				near = true
+		if not near:
+			out.append(p)
+	return out
 
 
 func _go_home(delta: float) -> Vector3:
@@ -643,6 +775,7 @@ func _fight(delta: float) -> Vector3:
 		_drop_cover()
 		mode = "search"
 		_search_t = search_time
+		_spots_made = false
 		return Vector3.ZERO
 
 	if cover_face == null:
@@ -807,11 +940,8 @@ func _fire(at: Vector3, wild: float, zombie: Enemy = null) -> void:
 		# At a zombie: a small chance of a headshot, as you have.
 		shot.aimed_at = zombie
 		shot.headshot_chance = 0.06
-	# Its gunfire carries: zombies within earshot come to it.
-	for e in get_tree().get_nodes_in_group("enemies"):
-		var en := e as Enemy
-		if en != null and en.kind == "shambler" and en.global_position.distance_to(global_position) <= shot_noise_range:
-			en.hear_noise(global_position)
+	# Its gunfire carries: zombies within earshot come to it, other raiders come to see, the area warms up.
+	Earshot.make(global_position, shot_noise_range, get_tree(), self, false)
 	shot.position = global_position + Vector3(0.0, 1.15, 0.0) + shot.dir * 0.5
 	get_parent().add_child(shot)
 
@@ -903,6 +1033,9 @@ func _pick_cover(flank: bool) -> Dictionary:
 			if _taken(f, t):
 				continue
 			var score := walk + absf(range_to - prefer_range) * 0.4
+			# Its own bearing from you: straight on for the first, round to one side or the other for the rest.
+			var want_dir := (_xz(_from) - tgt).normalized().rotated(_side * deg_to_rad(flank_angle))
+			score += (1.0 - want_dir.dot((sp - tgt).normalized())) * flank_weight
 			if score >= best_score:
 				continue
 			# A clear straight way there (nothing at shin height), and a clear line to you from where it pops out.
