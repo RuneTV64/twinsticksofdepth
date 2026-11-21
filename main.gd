@@ -629,7 +629,7 @@ func _first_aid(pos: Vector3) -> void:
 	var b := ItemPickup.new()
 	b.position = pos
 	b.contents = [Items.make("bandage", 3), Items.make("clean_rag", 2), Items.make("needle_thread"),
-		Items.make("tweezers"), Items.make("vodka"), Items.make("painkillers")]
+		Items.make("tweezers"), Items.make("vodka"), Items.make("water"), Items.make("painkillers")]
 	add_child(b)
 
 

@@ -418,6 +418,10 @@ always infects unless treated and cleaned at once. Every number here is Claude's
   never washed, it took hold at 583 s and was fully infected at 733 s; washed and bandaged once, it wanted
   washing at 30 minutes and took hold at 43; with the dressing changed every 10 minutes, nothing.
   Anyone can see a wound is "dirty"; Medical 2 says whether it wants washing or the dressing changing.
+- Water washes wounds too (owner, 21 Nov 2026): `water`, "Bottle of water", 4 washes, in the first-aid
+  boxes. In the treatment screen it is used exactly as vodka is and cleans as well; it doesn't sting
+  (vodka costs composure). The tools are now ten: keys 1 to 9 and 0. Not built: refilling it, water from
+  taps, rain or puddles, dirty water making things worse, drinking it.
 - A foot wound in boots or under a dressing still takes a quarter of the ordinary dirt of each stride
   (`covered_dirt`), and none of the blood or rot. Crawling, every open wound you have (not only feet) is
   dragged through what you crawl over: dirt, blood, rot, and the zombie-blood roll.

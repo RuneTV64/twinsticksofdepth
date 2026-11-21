@@ -13,6 +13,7 @@ const DEFS := {
 	"needle_thread": {"name": "Needle and thread", "w": 0.02, "cat": "medical", "uses": 12, "for": "Stitches a wound shut, one stitch a use."},
 	"tweezers": {"name": "Tweezers", "w": 0.02, "cat": "medical", "for": "Picks glass, grit and bullets out of a wound."},
 	"vodka": {"name": "Vodka", "w": 0.7, "cat": "medical", "uses": 4, "for": "Washes a wound clean. It stings."},
+	"water": {"name": "Bottle of water", "w": 0.5, "cat": "medical", "uses": 4, "for": "Washes a wound clean, as well as spirits do and without the sting. To drink, too, once thirst runs."},
 	"steroids": {"name": "Steroids", "w": 0.03, "cat": "medical", "uses": 4, "for": "Holds a bite's infection back for a few minutes. It cures nothing."},
 	"hatchet": {"name": "Hatchet", "w": 1.2, "cat": "tool", "for": "Chops. In the last resort, a limb."},
 	"torch": {"name": "Torch", "w": 0.3, "cat": "tool", "for": "A hand torch: a beam of light where you point. You see by it, and everyone sees you."},

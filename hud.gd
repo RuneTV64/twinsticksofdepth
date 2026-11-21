@@ -76,7 +76,7 @@ Finisher: weapon raised (Ready), crosshair on a downed zombie close by, then lef
 Corpse piles can be walked on: slow, bad footing, and what is still alive in them grabs. Space at a wall = climb it.
 Character page: C. It shows attributes, needs, composure, your body, what you carry, and conditions.
 Wounds: H sits you down to treat them by hand with what you carry (a first-aid box is by the spawn).
-  Your view closes in; hold ALT to look up. Moving puts it down. Keys 1-7 or a click pick a tool.
+  Your view closes in; hold ALT to look up. Moving puts it down. Keys 1-9 and 0 or a click pick a tool. Vodka or water washes a wound.
   J gives you a test wound (a deep cut, a gunshot, a bite in turn).
 Bites infect. Only taking the arm or leg off before it reaches the body can cure it (hatchet, in the treatment
   screen), and that takes luck. Steroids slow it. Run its course and you turn; your old self walks with your things.

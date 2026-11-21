@@ -4,7 +4,7 @@ extends Control
 ## one wound close up, which you work on with the mouse and what you carry:
 ##   bare hand / clean rag   hold on the wound to press on it (best right on the bleeder)
 ##   tweezers                grip what is in the wound, draw it out slowly and steadily, let go clear of the wound
-##   vodka                   hold and sweep along the wound to wash it
+##   vodka / water           hold and sweep along the wound to wash it (vodka stings; water doesn't)
 ##   needle and thread       hold and zigzag across the wound: every crossing is a stitch
 ##   bandage / clean rag     hold and wind round the wound, three turns, to dress it
 ##   painkillers, steroids   picked = one taken
@@ -17,7 +17,7 @@ extends Control
 ## It costs you your view: the Player sees only a short way while this is open. Hold ALT to look up (hands stop).
 ## The rules themselves are in body_health.gd; this only does them.
 
-const TOOLS: Array[String] = ["hand", "clean_rag", "tweezers", "vodka", "needle_thread", "bandage", "painkillers", "steroids", "hatchet"]
+const TOOLS: Array[String] = ["hand", "clean_rag", "tweezers", "vodka", "water", "needle_thread", "bandage", "painkillers", "steroids", "hatchet"]
 const SHORT := {"needle_thread": "Needle, thread", "painkillers": "Painkillers"}
 const BLOWS := 3
 const WRAP_TURNS := 3.0
@@ -206,8 +206,8 @@ func _input(event: InputEvent) -> void:
 			_release()
 	elif event is InputEventKey and event.pressed and not event.echo:
 		var k: int = event.physical_keycode
-		if k >= KEY_1 and k <= KEY_9:
-			_take(TOOLS[k - KEY_1])
+		if (k >= KEY_1 and k <= KEY_9) or k == KEY_0:
+			_take(TOOLS[9 if k == KEY_0 else k - KEY_1])
 			get_viewport().set_input_as_handled()
 
 
@@ -419,15 +419,16 @@ func _hold(delta: float) -> void:
 	if (tool == "hand" or tool == "clean_rag") and float(near[1]) <= 40.0:
 		var d := _at.distance_to(_bleeder())
 		b.press(wound, delta, clampf(remap(d, 28.0, 130.0, 1.0, 0.25), 0.25, 1.0), tool == "clean_rag")
-	elif tool == "vodka" and float(near[1]) <= 30.0 and not wound["clean"]:
+	elif (tool == "vodka" or tool == "water") and float(near[1]) <= 30.0 and not wound["clean"]:
 		if not _poured:
-			if not player.inv.use("vodka"):
+			if not player.inv.use(tool):
 				return
 			_poured = true
 		var i := clampi(int(float(near[0]) * WASH_PARTS), 0, WASH_PARTS - 1)
 		if not _washed[i]:
 			_washed[i] = true
-			player.sheet.composure = maxf(player.sheet.composure - 1.5, 0.0)   # it stings
+			if tool == "vodka":
+				player.sheet.composure = maxf(player.sheet.composure - 1.5, 0.0)   # it stings
 			if not _washed.has(false):
 				b.wash(wound)
 				_poured = false
@@ -648,6 +649,7 @@ func _draw_wound(b: BodyHealth, a: Rect2) -> void:
 		"clean_rag": "Hold on the wound to press. Hold and wind round it, three turns, to tie it on.",
 		"tweezers": "Grip what is in the wound, draw it out slowly, let go clear of the wound. A jerk tears it free.",
 		"hatchet": "Tie it off first (wind a rag or bandage round the line). Then click on the line: three blows.", "vodka": "Hold and sweep along the wound to wash it. It stings.",
+		"water": "Hold and sweep along the wound to wash it.",
 		"needle_thread": "Hold and zigzag across the wound: every crossing is a stitch. Keep them even.",
 		"bandage": "Hold and wind round the wound, three turns."}.get(tool, "")
 	_text(Vector2(a.position.x, _sz().y - 164.0), hint, C_DIM, 15)
