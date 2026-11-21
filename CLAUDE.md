@@ -45,8 +45,8 @@ Built 21 Nov 2026, on `main` since the owner said to push it, but not yet seen o
 the fence kit, and bodies impaled on spiked fences with their pose (see The fence kit); and the street
 kit (see The street kit). The owner has pivoted back to making assets.
 
-Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
-owner: street lamps and signs (see The street kit, Lamps and signs), the furniture kit (see The
+Built 21 Nov 2026, on `main` since the owner said to push it, but not yet seen or played by the owner:
+street lamps and signs (see The street kit, Lamps and signs), the furniture kit (see The
 furniture kit), the first working items (see The first working items), and searching furniture with
 the grid screen and a backpack (see Searching and the grid).
 
@@ -852,8 +852,8 @@ The owner: "Cool. Now make some streets." Made on the house's and the fences' pr
   the street and 8 on the bare ground beside it; in lying snow, 14 on each. A square metre: 10 sledgehammer
   blows laid sound, 6 cracked, 3 breaking up; fists get nowhere; 3 rocks left; the crosshair then finds
   nothing there. The level has 8 street tiles and 455 breakable things.
-- Lamps and signs (owner, 21 Nov 2026: "Now make street lamps and signs"; built the same day, on the
-  branch `claude/destructible-environment-6yu73c`, not on `main`, not seen by the owner). In the same
+- Lamps and signs (owner, 21 Nov 2026: "Now make street lamps and signs"; built the same day, on `main`
+  since 21 Nov 2026, not seen by the owner). In the same
   kit: `StreetKit.lamp(p, on)`, `signpost(p, face, toward, says)` ("stop", "name", "warning"; `sign` is a
   built-in name), `name_sign(p)` (two blades), and `furnish()`: a lamp on each straight on alternate sides,
   a stop sign facing what comes in on every arm of a junction, a name sign at its corner, a warning where
@@ -900,8 +900,7 @@ The owner: "Cool. Now make some streets." Made on the house's and the fences' pr
 
 The owner: "make some furniture for the home you designed". Everything is in
 `assets/buildings/furniture/` (its README has the full account) and in the **Building Assets** artifact
-(`files/Furniture/`). On the branch `claude/destructible-environment-6yu73c`, not on `main`. Every number
-is Claude's first guess.
+(`files/Furniture/`). On `main` since 21 Nov 2026. Every number is Claude's first guess.
 
 - Eleven pieces, one plain household style: couch, armchair, table, chair, kitchen counter (any length),
   stove, fridge, bed, wardrobe, dresser, bookshelf.
@@ -983,8 +982,7 @@ before building them, since that changes the slots.
 The owner: "Take into consideration what we need as far as items go to get some of the talked about
 functionality going and start there. Afterwards I will give you themes (boys room girls room bathroom
 electronics etc) and you will generate a set number of items per theme." So this batch is only the things
-that switch on what was already built or promised and was waiting for an item. On the branch
-`claude/destructible-environment-6yu73c`, not on `main`. Every number is Claude's first guess.
+that switch on what was already built or promised and was waiting for an item. On `main` since 21 Nov 2026. Every number is Claude's first guess.
 
 - An item's record (`items.gd`, `Items.DEFS`) now has: `name`, `w`, `cat` (medical, tool, material,
   clothing, food, thrown, scrap), `stack` or `uses`, `keep` (still a thing when used up), `wear` ("feet",
@@ -1052,8 +1050,7 @@ that switch on what was already built or promised and was waiting for an item. O
 
 The owner, after the first items: "dont forget that cupboards and dressers need search functionality as well
 as drawer renders for the inventory grid view. Drawers. Etc." Built to the owner's sketch and their answers
-on it (see Loot). On the branch `claude/destructible-environment-6yu73c`, not on `main`. Every number is
-Claude's first guess.
+on it (see Loot). On `main` since 21 Nov 2026. Every number is Claude's first guess.
 
 - What can be searched (`stash.gd`, `Stash`, a child of the piece: `FurnitureKit` puts one on each): a
   dresser (three drawers, 6 by 3 squares each), a wardrobe (hanging rail 5 by 5, top shelf 5 by 2), a
