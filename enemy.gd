@@ -1004,7 +1004,7 @@ func _press(delta: float, pressed: bool) -> void:
 	# What it can't get over, it beats on, if something has its attention: whatever in front of it will give
 	# soonest (glass before boards, boards before a door, a door before a wall).
 	_smash_t -= delta
-	if _smash_t <= 0.0 and (not can_climb or _barred) and (prey != null or _drive > 0.0) and Breakable.count > 0:
+	if _smash_t <= 0.0 and (not can_climb or _barred) and (chasing or _drive > 0.0) and Breakable.count > 0:
 		_smash_t = smash_every * randf_range(0.8, 1.3) * (1.0 + body.stiff)
 		var force := smash_force * body.walk_mult
 		var b := Breakable.weakest(Vector2(global_position.x, global_position.z), Vector2(-_press_n.x, -_press_n.z), smash_reach, force)

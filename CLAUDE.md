@@ -31,6 +31,9 @@ The owner's answers to what was open (21 Nov 2026):
 Built after those answers and not yet seen by the owner: the burning torch, and lost limbs showing on the
 player (sheet: `tools/preview/missing_limbs.png`).
 
+Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
+owner: everything can be broken (see Two rules for every object, and Breaking things). Tested headless only.
+
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
 with more meat than bone; spawning and horde migration; modular buildings; the clean-up lore. A session on a
@@ -352,7 +355,22 @@ This is the foundation; every number in it is Claude's first guess.
   (it is meant to show soil to dig or plant in); broken appliances give materials only, not parts; a door's
   footprint doesn't follow its swing; zombies have no pose for beating on things; wreckage is drawn whether
   or not you can see the spot.
-- Test: `tools/break_test.gd` (headless, in the real level).
+- Test: `tools/break_test.gd` (headless, in the real level; no picture: the level renders black in the
+  cloud, and the look is placeholder anyway). Cloud run, 21 Nov 2026:
+  - The level has 258 breakable things. One shot at the yard house's 14.4 m brick wall cut a 1.2 m section
+    out of it; that section takes 16 sledgehammer blows, about 370 shots or about 3,900 punches. Once it
+    went, a sight ray through the hole was clear and its cover was gone.
+  - A crate: 3 hatchet blows, 2 splintered wood left. A square metre of pavement: 10 sledgehammer blows,
+    3 rocks; fists get nowhere.
+  - A zombie pressed 0.9 m along a brick wall from a window goes for the window (1 blow against about
+    2,300 for the brick); at a door, the door (about 44 blows).
+  - A zombie outside a shut window with the player inside: the glass went in 3 to 6 s and it was climbing
+    through 2 to 3 s later. The same window boarded: one zombie took 23 to 25 s to get through the boards,
+    four took 6 to 8 s. A house door, three zombies: 31 s.
+  - Glass is trodden away in 25 footfalls. Dry, wood and plaster wreckage were a third gone at 5 minutes
+    and gone by 20; brick, pavement and glass stayed.
+  - Seen in the same run and not looked into: zombies wandering the level broke several windows and an
+    inside wall on their own, because one with a drive in its head beats on whatever stops it.
 
 ## Small rules the owner has set (20 Nov 2026)
 

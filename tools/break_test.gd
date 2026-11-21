@@ -27,6 +27,7 @@ func _zombie(pos: Vector3, fresh := true) -> Enemy:
 	e.kind = "shambler"
 	e.position = pos
 	main.add_child(e)
+	e.player = player
 	if e.body != null and e.body.has_method("set_freshness"):
 		e.body.call("set_freshness", 1.0 if fresh else 0.1)
 	return e
@@ -85,6 +86,7 @@ func _run() -> void:
 	# 3) Pavement.
 	player.inv.add(Items.make("sledgehammer"))
 	player.global_position = Vector3(0.5, 0.05, -50.5)
+	player.armed = true
 	player.reticle_offset = Vector3(0, 0, -1.0)
 	var road := Breakable.under(Vector2(0.5, -51.5))
 	_say("pavement: %s, surface %s; fists: %s; with the sledgehammer: %s" % [road.title, road.surface, road.feel(6.0, "blunt"), road.feel(player.break_tool(road)[0], player.break_tool(road)[1])])
@@ -97,19 +99,19 @@ func _run() -> void:
 	_say("  sledgehammer blows for one square metre: %d; left behind: %s; crosshair there now finds: %s" % [n, _wrecks_near(Vector3(0.5, 0, -51.5)), Breakable.under(Vector2(0.5, -51.5))])
 
 	# 4) Least resistance: what a zombie pressed at each spot would go for.
-	for spot: Array in [["yard house door (south)", Vector2(0.3, -9.4), Vector2(0, -1)], ["a house window, from outside", Vector2(-19.7, -53), Vector2(1, 0)], ["plain brick wall", Vector2(-19.7, -57), Vector2(1, 0)]]:
+	for spot: Array in [["yard house door (south)", Vector2(0.3, -9.4), Vector2(0, -1)], ["a house window, from outside", Vector2(-19.7, -55.4), Vector2(1, 0)], ["brick wall 0.9 m along from a window", Vector2(-19.7, -57), Vector2(1, 0)], ["plain brick wall", Vector2(-19.7, -53), Vector2(1, 0)]]:
 		var w := Breakable.weakest(spot[1], spot[2], 1.2, 10.0)
 		_say("zombie at %s goes for: %s (%s), about %.0f blows" % [spot[0], w.title if w != null else "nothing", w.stuff if w != null else "-", w.hits_left(10.0, "blunt") if w != null else 0.0])
 
 	# 5) A zombie that has seen you through a window.
-	player.global_position = Vector3(-15, 0.05, -53)
+	player.global_position = Vector3(-17.6, 0.05, -55.4)
 	player.armed = false
 	for e in get_nodes_in_group("enemies"):
 		if (e as Enemy).global_position.distance_to(player.global_position) < 25.0:
 			e.queue_free()
 	await _wait(0.2)
-	var z := _zombie(Vector3(-23, 0.05, -53))
-	var pane := Solid.window_near(Vector3(-19, 1, -53), 1.5)
+	var z := _zombie(Vector3(-21, 0.05, -55.4))
+	var pane := Solid.window_near(Vector3(-19, 1, -55.4), 1.5)
 	var t := 0.0
 	while is_instance_valid(pane["pane"]) and pane["pane"].alive() and t < 60.0:
 		await _wait(0.25)
@@ -124,15 +126,16 @@ func _run() -> void:
 
 	# 6) The same with the window boarded.
 	var win2 := Solid.window_near(Vector3(-14, 1, -59), 3.0)
+	_say("second window: pane %s before boarding" % ("whole" if win2["pane"].alive() else "already broken by a passing zombie"))
 	Solid.board(win2)
-	player.global_position = Vector3(win2["pos"].x, 0.05, -56)
+	player.global_position = Vector3(win2["pos"].x, 0.05, -57.4)
 	await _wait(0.2)
 	for count: int in [1, 4]:
 		if not (is_instance_valid(win2["boards"]) and win2["boards"].alive()):
 			Solid.board(win2)
 		var zs: Array[Enemy] = []
 		for i in count:
-			zs.append(_zombie(Vector3(win2["pos"].x - 1.0 + i * 0.7, 0.05, -62.5 - 0.3 * (i % 2))))
+			zs.append(_zombie(Vector3(win2["pos"].x - 1.0 + i * 0.7, 0.05, -60.6 - 0.3 * (i % 2))))
 		t = 0.0
 		var glass_t := -1.0
 		while is_instance_valid(win2["boards"]) and win2["boards"].alive() and t < 240.0:
@@ -151,13 +154,13 @@ func _run() -> void:
 		if b.title == "door" and b.rect.get_center().distance_to(Vector2(-9, -53)) < 2.0:
 			door = b
 	if door != null:
-		player.global_position = Vector3(-12, 0.05, -53)
+		player.global_position = Vector3(-10.6, 0.05, -53)
 		await _wait(0.2)
 		var zs: Array[Enemy] = []
 		for i in 3:
-			zs.append(_zombie(Vector3(-6.0, 0.05, -53.6 + i * 0.6)))
+			zs.append(_zombie(Vector3(-7.4, 0.05, -53.6 + i * 0.6)))
 		t = 0.0
-		while door.alive() and is_instance_valid(door) and t < 300.0:
+		while is_instance_valid(door) and door.alive() and t < 300.0:
 			await _wait(0.25)
 			t += 0.25
 		_say("house door, 3 zombies: broke after %.1f s" % t)
