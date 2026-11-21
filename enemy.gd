@@ -944,6 +944,55 @@ func take_part_hit(part: String, dmg: float, dir: Vector3, knock: float) -> void
 		_knock_down(dir)
 
 
+## Melee (first guesses). A blow of SKULL_BLOW on the head is a sound skull's worth (rot softens it, as for a
+## stomp); a chop gets through a skull better than a club, a point better still. On the body a club knocks it
+## about, a blade cuts it; on a limb a chop may take it off and a club on a leg may put it down.
+const SKULL_BLOW := 40.0
+const BLOW_SKULL := {"blunt": 1.0, "chop": 1.25, "pierce": 1.5}
+const BLOW_BODY := {"blunt": 1.0, "chop": 1.1, "pierce": 0.6}
+const BLOW_KNOCK := {"blunt": 0.3, "chop": 0.1, "pierce": 0.03}     # a punch of 5 knocks as it always did (1.5)
+
+
+## A blow in hand-to-hand (a punch, a club, a hatchet, a broken bottle) on one part of it: `force` as Items
+## `hit` has it (times Strength), `how` blunt, chop or pierce. Returns what it did, in a few words ("" if
+## nothing worth saying): "dead", "skull", "limb", "down".
+func take_blow(part: String, force: float, how: String, dir: Vector3) -> String:
+	if dead:
+		return ""
+	var knock: float = minf(force * float(BLOW_KNOCK.get(how, 0.1)), 9.0)
+	if kind != "shambler":
+		# The living: a blow to the head counts double. (No skulls to crack or limbs to lose on them yet.)
+		take_hit(force * (2.0 if part == "Head" else 1.0) * float(BLOW_BODY.get(how, 1.0)), dir, knock)
+		return "dead" if dead else ""
+	if part == "Head" and body != null and body.has_head():
+		head_dmg += force / SKULL_BLOW * float(BLOW_SKULL.get(how, 1.0)) * skull_softness()
+		take_hit(force * 0.3, dir, knock)
+		if dead:
+			return "dead"
+		if head_dmg >= skull:
+			take_hit(hp + 1.0, dir, 0.0)
+			return "dead"
+		# Rung: what it was about to do comes to nothing, and a club may put it down.
+		_cd = maxf(_cd, 0.5)
+		if how == "blunt" and not is_down() and randf() < knockdown_chance * lerpf(topple_by_rot.x, topple_by_rot.y, body.rot()) * force / 12.0:
+			_knock_down(dir)
+			return "down"
+		return "skull"
+	if part == "Torso" or part == "Head" or body == null:
+		take_hit(force * float(BLOW_BODY.get(how, 1.0)), dir, knock)
+		return "dead" if dead else ""
+	take_hit(force * 0.65 * float(BLOW_BODY.get(how, 1.0)), dir, 0.0)
+	if dead or body.part(part) == "Destroyed":
+		return "dead" if dead else ""
+	if how == "chop" and randf() < clampf(force / 60.0 * (0.6 + body.rot()), 0.0, 0.85):
+		_lose(part, dir * 3.0 + Vector3.UP * 1.5)
+		return "limb"
+	if how == "blunt" and part.begins_with("Leg") and not is_down() and randf() < clampf(0.15 + force / 50.0, 0.0, 0.8):
+		_knock_down(dir)
+		return "down"
+	return ""
+
+
 ## A stomp or a blow on a downed one that isn't on its head: it hurts it, no more.
 func take_body_blow(power: float, part: String, dir: Vector3) -> void:
 	take_part_hit(part, body_blow_damage * power, dir, 0.0)

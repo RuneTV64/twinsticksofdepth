@@ -191,6 +191,13 @@ var reload_time := 1.1
 @export var punch_still_speed := 0.6    # m/s; slower than this counts as holding still
 @export var punch_miss_chance := 0.2    # chance a punch in range just doesn't connect
 @export var punch_range := 1.75         # meters
+## Held weapons (items.gd `hit`; first guesses). A two-handed thing swung with the other hand full, or one arm,
+## hits this much as hard and takes this much longer. A blow aimed at a part (the crosshair on it, within reach)
+## lands there this often (times Dexterity and the sheet's aim), else on the body.
+@export var one_hand_force := 0.6
+@export var one_hand_slow := 1.35
+@export var weapon_miss_chance := 0.08
+const BLOW_PART := {"Head": 0.7, "Torso": 1.0, "ArmL": 0.8, "ArmR": 0.8, "LegL": 0.75, "LegR": 0.75}
 ## Falling (first guesses): a drop of more than `fall_safe` bruises the legs and staggers you; past `fall_hurt`
 ## it costs health too. An upstairs window is 2.7 m.
 @export var fall_safe := 2.0
@@ -206,7 +213,7 @@ var _fall_top := -INF
 ## Breaking things (first guesses): the force of a blow with each thing, times Strength (melee_mult).
 @export var break_fist := 6.0
 @export var break_butt := 14.0
-@export var break_hatchet := 30.0
+@export var break_hatchet := 30.0         # (the hatchet's and sledgehammer's own are their `smash` in items.gd; these are kept for the tests)
 @export var break_sledge := 60.0
 @export var break_reach := 1.9          # m from you to the thing
 @export var punch_arc_dot := 0.5        # target must be within this cone of your facing (dot)
@@ -289,6 +296,11 @@ var _swing_total := 0.0            # full length of the current punch
 var _swing_windup := 0.0           # windup part of the current punch
 var _swing_power := 1.0            # damage multiplier from fatigue, fixed when the punch started
 var _swing_landed := true          # the current punch has already been resolved
+var _swing_with := {}              # what the current swing is made with (wield()), {} for a fist
+## For the body: which hand holds a weapon (1 right, 0 left, -1 neither), whether it is held in both, and its look.
+var held_hand := -1
+var held_two := false
+var held_look: Array = []
 var _block_t := 0.0                # > 0 just after a shove (visual only)
 
 var camera_rig: CamRig
@@ -392,6 +404,8 @@ var _fire_light: OmniLight3D
 var _burn_t := 0.0
 # Hands at a window: "board" or "pry", how long is left, where you stood when you started.
 var _work := ""
+var _work_item := {}               # taking apart: the thing, and the slot it was in
+var _work_key := ""
 var _work_t := 0.0
 var _work_at := Vector3.ZERO
 var _work_win := {}
@@ -477,6 +491,9 @@ var _visual: Node3D
 var _body: PlayerBody          # the model, its skin shader and all its animation (player_body.gd)
 var _weapon: MeshInstance3D
 var _weapon_mesh: BoxMesh
+var _in_hand: MeshInstance3D
+var _hand_mesh: BoxMesh
+var _hand_mat: StandardMaterial3D
 var _weapon_mat: StandardMaterial3D
 var _reticle: MeshInstance3D
 var _reticle_x: MeshInstance3D
@@ -522,6 +539,13 @@ func _ready() -> void:
 	_weapon_mat.emission_energy_multiplier = 0.0
 	_weapon.material_override = _weapon_mat
 	_body.attach_weapon(_weapon)   # the body carries it: in hand when Ready, on the back otherwise
+	# What is held to hit with (a hatchet, a plank): a plain bar in the hand, for now.
+	_in_hand = MeshInstance3D.new()
+	_hand_mesh = BoxMesh.new()
+	_in_hand.mesh = _hand_mesh
+	_hand_mat = StandardMaterial3D.new()
+	_in_hand.material_override = _hand_mat
+	_in_hand.visible = false
 	_apply_weapon_look()
 
 	# The cursor: a ring on the ground. Ready, on an enemy (or something that can be broken) it gives way to a
@@ -719,7 +743,20 @@ func equip(w: String) -> void:
 	_fire_cd = maxf(_fire_cd, draw_time)
 	_apply_weapon_look()
 	_settle_camera(cam_before)
-	show_status(WEAPON_NAMES[w], 0.9)
+	show_status(weapon_name(w), 0.9)
+
+
+## What a slot on the wheel is called: the hands slot by what is in them ("Hatchet", "Plank, one-handed").
+func weapon_name(w: String) -> String:
+	if w != "fists":
+		return WEAPON_NAMES[w]
+	var was := weapon
+	weapon = "fists"
+	var h := wield()
+	weapon = was
+	if h.is_empty():
+		return WEAPON_NAMES[w]
+	return Items.name_of(h["item"]["id"]) + (", one-handed" if bool(h["one_handed"]) else "")
 
 
 ## Call after anything that makes the camera's resting spot jump (Ready, lower, weapon swap):
@@ -1147,13 +1184,26 @@ func _start_work(what: String, win: Dictionary, secs: float) -> void:
 func _update_work(delta: float) -> void:
 	if _work == "":
 		return
-	if dead or not held_by.is_empty() or _stagger > 0.0 or treating or global_position.distance_to(_work_at) > 0.5:
+	if dead or not held_by.is_empty() or _stagger > 0.0 or treating or global_position.distance_to(_work_at) > 0.5 \
+			or (_work == "apart" and (armed or inv.slots.get(_work_key) != _work_item)):
+		var was := _work
 		_work = ""
 		if not dead:
-			show_status("You leave the window as it is.", 1.5)
+			show_status("You leave it as it is." if was == "apart" else "You leave the window as it is.", 1.5)
 		return
 	_work_t -= delta
 	_work_blow -= delta
+	if _work == "apart":
+		if _work_blow <= 0.0:
+			_work_blow = 1.0
+			_body.reach()
+			var a: Dictionary = Items.DEFS[_work_item["id"]]["apart"]
+			if float(a.get("noise", 0.0)) > 0.0:
+				Earshot.make(global_position, float(a["noise"]), get_tree(), self, true)
+		if _work_t <= 0.0:
+			_work = ""
+			_finish_apart()
+		return
 	if _work_blow <= 0.0:
 		_work_blow = 0.75 if _work == "board" else 1.1
 		Earshot.make(global_position, board_noise if _work == "board" else pry_noise, get_tree(), self, true)
@@ -1180,6 +1230,64 @@ func _update_work(delta: float) -> void:
 		if not rest.is_empty():
 			_drop(rest)
 		show_status("The boards come away. You keep the planks.", 2.0)
+	recompute_stats()
+
+
+## Take apart the thing in this slot (Items `apart`): it takes time standing where you are, with the weapon down,
+## and some of it is heard. It may want a tool (something to cut with). One of a stack at a time. A bag has to
+## be empty first. Moving off, Ready, being grabbed or hit stops it and nothing is lost.
+func take_apart(key: String) -> void:
+	if dead or _work != "":
+		return
+	var it = inv.slots.get(key)
+	if it == null:
+		return
+	var d: Dictionary = Items.DEFS[it["id"]]
+	var nm := Items.name_of(it["id"]).to_lower()
+	if not d.has("apart"):
+		show_status("The %s doesn't come apart into anything useful." % nm, 1.8)
+		return
+	if it.has("grid") and not (it["grid"]["things"] as Array).is_empty():
+		show_status("Empty the %s first." % nm, 1.6)
+		return
+	var a: Dictionary = d["apart"]
+	var need := str(a.get("tool", ""))
+	if need != "":
+		var tk := inv.tool_for(need)
+		if tk == "" or tk == key and int(it.get("n", 1)) <= 1:
+			show_status("You need %s to take the %s apart." % ["something to cut with" if need == "blade" else "a " + need, nm], 2.0)
+			return
+	if armed:
+		show_status("Lower your weapon first.", 1.4)
+		return
+	_work = "apart"
+	_work_item = it
+	_work_key = key
+	_work_t = float(a.get("time", 2.0))
+	_work_at = global_position
+	_work_blow = 0.3
+	show_status("You set about taking the %s apart..." % nm, _work_t)
+
+
+func _finish_apart() -> void:
+	var it := _work_item
+	if inv.slots.get(_work_key) != it:
+		return
+	var a: Dictionary = Items.DEFS[it["id"]]["apart"]
+	var nm := Items.name_of(it["id"]).to_lower()
+	if int(it.get("n", 1)) > 1:
+		it["n"] = int(it["n"]) - 1
+		it.erase("hits")
+	else:
+		inv.slots.erase(_work_key)
+	var got: Array[String] = []
+	for pr: Array in a["into"]:
+		var bit := Items.make(pr[0], int(pr[1]))
+		got.append(Items.label(bit).to_lower())
+		var rest := inv.add(bit)
+		if not rest.is_empty():
+			_drop(rest)
+	show_status("The %s comes apart: %s." % [nm, ", ".join(got)], 2.2)
 	recompute_stats()
 
 
@@ -1382,6 +1490,21 @@ func _tick_timers(delta: float) -> void:
 			var n := mini(mag_size - mag, reserve)
 			mag += n
 			reserve -= n
+
+
+## What the body shows in hand: the weapon you would swing (wield()), whether Ready or not, unless the gun is out.
+func _update_in_hand() -> void:
+	var w := wield() if weapon == "fists" else {}
+	held_hand = -1 if w.is_empty() else (1 if w["key"] == "hand_r" else 0)
+	held_two = not w.is_empty() and int(w["hit"]["hands"]) == 2 and not bool(w["one_handed"])
+	held_look = w["hit"].get("look", []) if not w.is_empty() else []
+	if _in_hand == null:
+		return
+	_in_hand.visible = not held_look.is_empty() and not dead
+	if _in_hand.visible:
+		_hand_mesh.size = Vector3(float(held_look[1]), float(held_look[0]), float(held_look[1]))
+		_hand_mat.albedo_color = ItemArt.INK.get(str(held_look[2]), Color(0.5, 0.45, 0.4))
+	_body.hold_in(_in_hand, held_hand)
 
 
 # ---------------------------------------------------------------- stance + aim
@@ -2602,54 +2725,158 @@ func _punch() -> void:
 	var tired := 1.0 - clampf(stamina / max_stamina, 0.0, 1.0)
 	var slow := lerpf(1.0, punch_tired_slow, tired)
 	_swing_power = lerpf(1.0, punch_tired_damage, tired)
-	_swing_windup = punch_windup * slow
-	_swing_total = (punch_windup + punch_recover) * slow
+	_swing_with = wield()
+	var cost := punch_cost
+	if _swing_with.is_empty():
+		_swing_windup = punch_windup * slow
+		_swing_total = (punch_windup + punch_recover) * slow
+	else:
+		# Something in hand: its own pace, a wind-up of 40% of it. Heavier things cost more breath.
+		var t: float = _swing_with["time"] * slow
+		_swing_windup = t * 0.4
+		_swing_total = t
+		cost = 2.0 + 2.5 * float(Items.DEFS[_swing_with["item"]["id"]]["w"])
 	_swing_t = _swing_total
 	_swing_landed = false
 	_fire_cd = _swing_total
-	stamina = maxf(stamina - punch_cost, 0.0)
+	stamina = maxf(stamina - cost, 0.0)
 	_regen_delay = maxf(_regen_delay, _swing_total + 0.2)
 	if stamina <= 0.0 and not winded:
 		winded = true
 		show_status("Exhausted!", 1.2)
 
 
-## The punch arrives: it goes for the nearest enemy in reach in front of you, and may not
-## connect. Damage is a roll, a bit higher if your feet were planted.
+## The blow arrives. It goes for the one the crosshair is on, at the part it is on, if that one is in reach;
+## else for the nearest enemy in reach in front of you, at its body. It may not connect, and a part aimed at may
+## be missed for the body. A fist's damage is a roll, a weapon's its own; both a bit more with your feet planted.
+## A weapon that lands takes a blow itself (wear_weapon).
 func _land_punch() -> void:
 	_swing_landed = true
+	var w := _swing_with
+	var reach: float = w.get("reach", punch_range)
 	var target: Enemy = null
-	var best := punch_range
-	for e in get_tree().get_nodes_in_group("enemies"):
-		var en := e as Enemy
-		if en == null or en.dead:
-			continue
-		var to := en.global_position - global_position
-		to.y = 0.0
-		if to.length() < best and to.normalized().dot(facing) > punch_arc_dot:
-			best = to.length()
-			target = en
+	var part := "Torso"
+	if hover_target != null and is_instance_valid(hover_target) and not hover_target.dead \
+			and absf(hover_target.global_position.y - global_position.y) < Enemy.LEVEL_GAP \
+			and _xz(hover_target.global_position - global_position).length() < reach + 0.3:
+		target = hover_target
+		part = hover_part if hover_part != "" else "Torso"
+	else:
+		var best := reach
+		for e in get_tree().get_nodes_in_group("enemies"):
+			var en := e as Enemy
+			if en == null or en.dead or absf(en.global_position.y - global_position.y) > Enemy.LEVEL_GAP:
+				continue
+			var to := en.global_position - global_position
+			to.y = 0.0
+			if to.length() < best and to.normalized().dot(facing) > punch_arc_dot:
+				best = to.length()
+				target = en
 	if target == null:
 		_strike_breakable(_swing_power)     # no one to hit: the blow goes into whatever the crosshair is on
 		return
-	if randf() < punch_miss_chance:
+	if randf() < (punch_miss_chance if w.is_empty() else weapon_miss_chance):
 		return
-	var dmg := randf_range(punch_damage_min, punch_damage_max) * _swing_power * melee_mult
+	if part != "Torso" and randf() > blow_part_chance(part):
+		part = "Torso"
+	var force := randf_range(punch_damage_min, punch_damage_max) if w.is_empty() else float(w["force"]) * randf_range(0.85, 1.15)
+	force *= _swing_power * melee_mult
 	if Vector2(velocity.x, velocity.z).length() < punch_still_speed:
-		dmg *= punch_still_mult
-	target.take_hit(dmg, facing, punch_knock)
+		force *= punch_still_mult
+	var did := target.take_blow(part, force, "blunt" if w.is_empty() else str(w["hit"]["kind"]), facing)
+	if did == "limb":
+		show_status("It comes off.", 1.0)
+	if not w.is_empty():
+		wear_weapon(w["key"], w["item"])
+
+
+## How likely a blow aimed at this part is to land there (else it lands on the body).
+func blow_part_chance(part: String) -> float:
+	return clampf(float(BLOW_PART.get(part, 0.8)) * maxf(1.0 + 0.03 * sheet.bonus("dexterity"), 0.4) * sheet.aim_mult, 0.05, 0.97)
+
+
+## What you would hit with: the weapon in your right hand, else the one in your left (an arm gone: the other
+## hand). {} for your fists (the gun out, or nothing in your hands that is a weapon).
+## {"key", "item", "hit", "force", "time", "reach", "one_handed"}
+func wield() -> Dictionary:
+	if weapon != "fists":
+		return {}
+	var miss: Array = sheet.body.missing
+	for key in ["hand_r", "hand_l"]:
+		if miss.has("ArmR" if key == "hand_r" else "ArmL"):
+			continue
+		var it = inv.slots.get(key)
+		if it == null:
+			continue
+		var h := Items.hit_of(it["id"])
+		if h.is_empty():
+			continue
+		var other := "hand_l" if key == "hand_r" else "hand_r"
+		var short: bool = int(h["hands"]) == 2 and (inv.slots.has(other) or sheet.one_armed)
+		return {"key": key, "item": it, "hit": h, "one_handed": short, "reach": float(h["reach"]),
+			"force": float(h["force"]) * (one_hand_force if short else 1.0),
+			"time": float(h["time"]) * (one_hand_slow if short else 1.0)}
+	return {}
+
+
+## A blow struck with the thing in this slot: it takes the knock. Once it has taken all it will (`lasts`) it
+## breaks: one of it is gone, and what is left of it (`into`) stays in your hand if it is a weapon itself (a
+## broken bottle) and lies at your feet if not. Some things are heard breaking.
+func wear_weapon(key: String, it: Dictionary) -> void:
+	if inv.slots.get(key) != it:
+		return
+	var h := Items.hit_of(it["id"])
+	if h.is_empty():
+		return
+	it["hits"] = int(it.get("hits", 0)) + 1
+	if int(it["hits"]) < int(h["lasts"]):
+		return
+	var nm := Items.name_of(it["id"]).to_lower()
+	if int(it.get("n", 1)) > 1:
+		it["n"] = int(it["n"]) - 1
+		it.erase("hits")
+	else:
+		inv.slots.erase(key)
+	var kept := ""
+	for pr: Array in h.get("into", []):
+		var bit := Items.make(pr[0], int(pr[1]))
+		if kept == "" and not inv.slots.has(key) and not Items.hit_of(pr[0]).is_empty():
+			inv.slots[key] = bit
+			kept = Items.name_of(pr[0]).to_lower()
+		else:
+			_drop(bit)
+	if h.has("noise"):
+		Earshot.make(global_position, float(h["noise"]), get_tree(), self, true)
+	show_status("The %s breaks.%s" % [nm, " You are left holding a %s." % kept if kept != "" else ""], 1.8)
+	recompute_stats()
 
 
 ## What you would hit this with right now: [force, kind, what to call it]. Fists Ready, you use the best tool
 ## you carry for what it is made of (a hatchet chops, a sledgehammer pounds); gun in hand, its butt.
+## The fourth is the slot of the thing used ("" for fists or the gun): it takes the knock (wear_weapon). What is in
+## your hand is used as it is (a plank, a pot); the hatchet and the sledgehammer are got out wherever they are.
 func break_tool(b: Breakable) -> Array:
 	if armed and not is_melee():
-		return [break_butt * melee_mult, "blunt", "the butt of the gun"]
-	var best := [break_fist * melee_mult, "blunt", "your fists"]
+		return [break_butt * melee_mult, "blunt", "the butt of the gun", ""]
+	var best := [break_fist * melee_mult, "blunt", "your fists", ""]
 	if weapon == "fists":
-		for t: Array in [["hatchet", break_hatchet, "chop", "the hatchet"], ["sledgehammer", break_sledge, "pound", "the sledgehammer"]]:
-			if inv.has(t[0]) and b.dealt(t[1] * melee_mult, t[2]) > b.dealt(best[0], best[1]):
-				best = [t[1] * melee_mult, t[2], t[3]]
+		var keys: Array[String] = []
+		var w := wield()
+		if not w.is_empty():
+			keys.append(w["key"])
+		for id in ["hatchet", "sledgehammer"]:
+			var k := inv.find(id)
+			if k != "" and not keys.has(k):
+				keys.append(k)
+		for k in keys:
+			var it: Dictionary = inv.slots[k]
+			var h := Items.hit_of(it["id"])
+			var f := float(h.get("smash", h["force"])) * melee_mult
+			if not w.is_empty() and k == w["key"] and bool(w["one_handed"]):
+				f *= one_hand_force
+			var how := str(h.get("breaks", h["kind"]))
+			if b.dealt(f, how) > b.dealt(best[0], best[1]):
+				best = [f, how, "the " + Items.name_of(it["id"]).to_lower(), k]
 	return best
 
 
@@ -2674,6 +2901,8 @@ func _strike_breakable(power: float) -> void:
 	var stuff := b.stuff
 	b.hit(float(tool[0]) * power, tool[1], at, self)
 	_body.reach()
+	if str(tool[3]) != "" and inv.slots.has(tool[3]):
+		wear_weapon(tool[3], inv.slots[tool[3]])
 	if tool[1] == "pound":
 		_fire_cd = maxf(_fire_cd, 0.9)          # a sledgehammer is slow and heavy
 		stamina = maxf(stamina - 8.0, 0.0)
@@ -2791,6 +3020,17 @@ func interact_prompt() -> String:
 		var n := finisher_blows()
 		return "[%s]  %s its head (%s)" % [btn, "Stomp" if is_melee() else "Rifle-butt",
 			"one blow" if n <= 1 else "about %d blows" % n]
+	if armed and weapon == "fists" and hover_target != null and is_instance_valid(hover_target) and hover_part != "":
+		# Hand to hand: which part, with what, and how likely it is to land there. Never a number.
+		var w := wield()
+		var where := str(PART_WORDS.get(hover_part, "body"))
+		var d := _xz(hover_target.global_position - global_position).length()
+		if d > float(w.get("reach", punch_range)) + 0.3:
+			return "%s: out of reach" % where.capitalize()
+		var with := (" with the %s%s" % [Items.name_of(w["item"]["id"]).to_lower(), ", one-handed" if bool(w["one_handed"]) else ""]) if not w.is_empty() else ""
+		var ch := blow_part_chance(hover_part) if hover_part != "Torso" else 1.0
+		return "[Left-click]  %s its %s%s (%s)" % ["Punch" if w.is_empty() else "Hit", where, with,
+			"may glance off the body" if ch < 0.75 else ("likely to land" if ch < 0.95 else "can't miss")]
 	if armed and not is_melee() and reticle_target != null and hover_part != "":
 		# Aiming: which part, and roughly how good the shot is. Never a number.
 		var ch := part_chance(hover_part, _xz(reticle_target.global_position - global_position).length())
@@ -3384,6 +3624,7 @@ func _reset_vitals() -> void:
 
 # ---------------------------------------------------------------- visuals
 func _update_visuals(delta: float) -> void:
+	_update_in_hand()
 	# Standing grass parts round you: wider the lower you are (crawling flattens a swathe).
 	var push := Vector4(global_position.x, global_position.y, global_position.z, 0.0 if dead else [0.6, 0.8, 1.15][posture])
 	if push != _grass_push:

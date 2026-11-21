@@ -13,7 +13,8 @@ extends Control
 ##  - Things lie on each other as they were left. One with a gold edge has something under it: move it.
 ##  - The hand: drag a thing to move it (a slot, a square of the bag, a square of the drawer, onto your feet
 ##    or head to wear it, up out of the panel to put it on the ground). Double-click sends it across (take,
-##    or put back). Right-click uses what is in a slot, or tells you what a thing is for.
+##    or put back). Right-click uses what is in a slot, or tells you what a thing is for; Shift+right-click
+##    takes what is in a slot apart (Player.take_apart).
 ##  - 1 2 3 pick the drawer. Moving, being grabbed or being hit shuts it. Esc or I shuts it.
 ## The mouse is captured in play, so the hand is this screen's own pointer.
 
@@ -207,7 +208,12 @@ func _input(event: InputEvent) -> void:
 			else:
 				_release()
 		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and _held.is_empty():
-			_use(_hit(_ptr))
+			var h := _hit(_ptr)
+			if event.shift_pressed and str(h.get("where", "")) == "slot" and player.inv.slots.has(h["key"]):
+				player.take_apart(h["key"])       # Shift+right-click: take it apart
+				_say(player.status_text)
+			else:
+				_use(h)
 	elif event is InputEventKey and event.pressed and not event.echo:
 		var k: int = event.physical_keycode
 		var st := _stash()
@@ -436,7 +442,7 @@ func _use(h: Dictionary) -> void:
 		"bag", "box":
 			var t: Dictionary = h["thing"]
 			if not t.is_empty():
-				_say("%s. Take it in a hand, on your belt or in a pocket to use it." % str(Items.DEFS[t["item"]["id"]]["for"]))
+				_say("%s Take it in a hand, on your belt or in a pocket to use it." % Items.about(t["item"]["id"]))
 
 
 # ---------------------------------------------------------------------------------------------- searching
@@ -517,10 +523,10 @@ func _draw() -> void:
 	else:
 		var it := _item_under(hover)
 		if not it.is_empty():
-			line = "%s  (%.2f kg)   %s" % [Items.label(it), Items.weight(it), str(Items.DEFS[it["id"]]["for"])]
+			line = "%s  (%.2f kg)   %s" % [Items.label(it), Items.weight(it), Items.about(it["id"])]
 	_text(p.position + Vector2(24.0, p.size.y - 40.0), _fit(line, 15, p.size.x - 48.0), col, 15)
 	_text(p.position + Vector2(24.0, p.size.y - 14.0),
-		"Drag: move    Double-click: take / put back    Right-click: use    Drag up out of here: put on the ground    Shift: hurry (loud)    ALT: look up    Esc, I or walk away: stop",
+		"Drag: move    Double-click: take / put back    Right-click: use    Shift+right-click: take apart    Drag up out of here: put on the ground    Shift: hurry (loud)    ALT: look up    Esc, I or walk away: stop",
 		C_DIM, 13)
 	# What the hand holds.
 	if not _held.is_empty():

@@ -6,7 +6,9 @@ extends SceneTree
 ## Run from a scratch copy of the game project (copy this file to its root), software OpenGL under xvfb:
 ##   ROW=0 OUT=/tmp/cover_0.png xvfb-run -a -s "-screen 0 2400x1600x24" godot --rendering-driver opengl3 \
 ##       --resolution 2240x560 -s res://cover_pose_preview.gd
-## ROW 0 = low cover, ROW 1 = high cover and the vault, ROW 2 = crouched and prone (no cover), ROW 3 = limbs cut off. Stack the rows with any image tool.
+## ROW 0 = low cover, ROW 1 = high cover and the vault, ROW 2 = crouched and prone (no cover), ROW 3 = limbs cut off,
+## ROW 4 = things held to hit with (a swing: Ready, wound up, landing). SIDE=1 turns them side on. Stack the rows
+## with any image tool.
 ## Test-only patch for the software renderer: it skips the linear->sRGB step, so the skin shader outputs its
 ## palette colors directly.
 
@@ -50,6 +52,20 @@ func _cells(row: int) -> Array:
 			["Left leg off", 0.0, 1, {"gone": ["LegL"], "nowall": true}],
 			["Right leg off, moving", 0.0, 1, {"gone": ["LegR"], "velocity": Vector3(1.2, 0, 0), "nowall": true}],
 			["Left arm and leg off, prone", 0.0, 1, {"gone": ["ArmL", "LegL"], "prone_w": 1.0, "nowall": true}],
+		]
+	if row == 4:
+		var up := {"_swing_t": 0.61, "_swing_total": 1.0, "_swing_windup": 0.4}
+		var land := {"_swing_t": 0.55, "_swing_total": 1.0, "_swing_windup": 0.4}
+		return [
+			["Hatchet, weapon away", 0.0, 1, {"hold": "hatchet", "nowall": true}],
+			["Hatchet, Ready", 0.0, 1, {"hold": "hatchet", "armed": true, "nowall": true}],
+			["Hatchet, wound up", 0.0, 1, {"hold": "hatchet", "armed": true, "swing": up, "nowall": true}],
+			["Hatchet, landing", 0.0, 1, {"hold": "hatchet", "armed": true, "swing": land, "nowall": true}],
+			["Plank, two hands, Ready", 0.0, 1, {"hold": "plank", "armed": true, "nowall": true}],
+			["Plank, wound up", 0.0, 1, {"hold": "plank", "armed": true, "swing": up, "nowall": true}],
+			["Plank, landing", 0.0, 1, {"hold": "plank", "armed": true, "swing": land, "nowall": true}],
+			["Sledgehammer, landing", 0.0, 1, {"hold": "sledgehammer", "armed": true, "swing": land, "nowall": true}],
+			["Bottle, Ready", 0.0, 1, {"hold": "bottle", "armed": true, "nowall": true}],
 		]
 	return [
 		["Back to the wall", 2.6, 1, {}],
@@ -111,6 +127,12 @@ func _build(row: int) -> void:
 			if k == "gone":
 				for g in f[k]:
 					p.sheet.body.missing.append(g)
+			elif k == "hold":
+				p.inv.slots["hand_r"] = Items.make(f[k])
+				p.weapon = "fists"
+			elif k == "swing":
+				for sk in f[k]:
+					p.set(sk, f[k][sk])
 			elif k != "lift" and k != "over" and k != "nowall" and k != "aim_round":
 				p.set(k, f[k])
 		if f.has("prone_w"):
@@ -120,6 +142,8 @@ func _build(row: int) -> void:
 			p.facing = p.prone_dir.rotated(Vector3.UP, deg_to_rad(f.get("aim_round", 0.0)))
 			if f.has("velocity"):
 				p._body._phase = 1.2      # mid-stride
+		if OS.get_environment("SIDE") != "":
+			p.facing = Vector3(-1, 0, 0)      # seen from the side
 		for n in 90:
 			p._update_visuals(DT)
 		p._reticle.visible = false

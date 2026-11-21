@@ -180,6 +180,32 @@ func attach_weapon(node: Node3D) -> void:
 	add_child(node)
 
 
+## The thing held to hit with goes in this hand (1 right, 0 left; -1 none): a node on the hand's bone, so it
+## moves with the hand. The Player shows it or not and sizes it (a bar `length` long, along GRIP_AXIS).
+const GRIP_AXIS := Vector3(-1.0, 0.0, 0.0)    # the way a held bar runs through the right fist, in the hand bone's space
+                                              # (found by render: tools/preview/held_weapons.png; the left hand mirrors it)
+const GRIP_AT := Vector3(0.0, 0.07, 0.0)      # where the fist closes on it, from the hand bone
+var _grips: Array = [null, null]
+
+
+func hold_in(node: Node3D, hand: int) -> void:
+	if hand < 0 or _skel == null:
+		return
+	if _grips[hand] == null:
+		var ba := BoneAttachment3D.new()
+		ba.bone_name = "HandR" if hand == 1 else "HandL"
+		_skel.add_child(ba)
+		_grips[hand] = ba
+	if node.get_parent() != _grips[hand]:
+		if node.get_parent() != null:
+			node.get_parent().remove_child(node)
+		_grips[hand].add_child(node)
+	# The bar's long side is its Y: turned onto GRIP_AXIS, held a hand's width from its near end.
+	var length := (node as MeshInstance3D).mesh.get_aabb().size.y if node is MeshInstance3D else 0.3
+	var axis := GRIP_AXIS if hand == 1 else GRIP_AXIS * Vector3(-1.0, 1.0, 1.0)
+	node.transform = Transform3D(Basis(Quaternion(Vector3.UP, axis)), GRIP_AT + axis * (length * 0.5 - 0.07))
+
+
 ## Reach out with the right hand (interacting with something).
 func reach() -> void:
 	_reach_t = REACH_TIME
@@ -240,8 +266,11 @@ func animate(p, delta: float) -> void:
 	_look = _ease(_look, look_to, 9.0, delta)
 
 	# Punch: pull back during the windup, snap out as it lands, come back during the recovery.
+	var hh: int = p.held_hand
 	if p._swing_t > _prev_swing + 0.001:
 		_punch_side = 1 - _punch_side
+	if hh >= 0:
+		_punch_side = hh           # a weapon is swung with the hand that holds it
 	_prev_swing = p._swing_t
 	var pull := 0.0
 	var ext := 0.0
@@ -377,6 +406,16 @@ func animate(p, delta: float) -> void:
 
 	# ---- arms
 	var reach_w := sin(PI * (1.0 - _reach_t / REACH_TIME)) if _reach_t > 0.0 else 0.0
+	# A weapon in hand, Ready: held up by the shoulder, drawn up and back in the wind-up, brought down and across
+	# in front as it lands. Held in both hands, the other hand closes on it just below.
+	var swing_tgt := Vector3.ZERO
+	var swing_pole := Vector3.ZERO
+	if hh >= 0:
+		var hs := 1.0 if hh == 0 else -1.0
+		swing_tgt = cg * Vector3(hs * 0.24, 0.44, 0.16)
+		swing_tgt = swing_tgt.lerp(cg * Vector3(hs * 0.3, 0.62, -0.06), pull)
+		swing_tgt = swing_tgt.lerp(Vector3(-hs * 0.12, cg.origin.y - 0.05, 0.72), ext)
+		swing_pole = cg.basis * Vector3(hs * 0.8, -0.7, -0.3)
 	for k in 2:
 		var sgn := 1.0 if k == 0 else -1.0
 		var ph := _phase + k * PI
@@ -394,7 +433,13 @@ func animate(p, delta: float) -> void:
 			# Boxing guard, with the punching hand pulled back or thrown, or both hands shoving.
 			var target := cg * Vector3(0.10 if k == 0 else -0.11, 0.36, 0.27 if k == 0 else 0.19)
 			var pole := cg.basis * Vector3(sgn * 0.75, -1.0, -0.15)
-			if k == _punch_side:
+			if hh >= 0 and k == hh:
+				target = swing_tgt
+				pole = swing_pole
+			elif hh >= 0 and p.held_two:
+				target = swing_tgt + (cg.basis * Vector3(-sgn * 0.05, -0.1, -0.02))
+				pole = swing_pole * Vector3(-1.0, 1.0, 1.0)
+			elif k == _punch_side:
 				target = target.lerp(cg * Vector3(sgn * 0.2, 0.26, 0.05), pull)
 				target = target.lerp(Vector3(sgn * 0.03, cg.origin.y + 0.3, 0.8), ext)
 				pole = pole.lerp(cg.basis * Vector3(sgn, -0.35, 0.0), ext)
@@ -422,6 +467,8 @@ func animate(p, delta: float) -> void:
 		# Fingers: loose when relaxed, fists in the guard and at a run, wrapped round the gun, open to shove.
 		var curl := lerpf(0.22 + 0.45 * _run_w * m, 1.0, _fist_w * (1.0 - 0.9 * shove))
 		curl = lerpf(curl, 0.85, _gun_w)
+		if hh >= 0 and (k == hh or p.held_two and _fist_w > 0.5):
+			curl = maxf(curl, 0.95)           # closed on what it holds
 		for f in _fingers[k]:
 			_tq[f[0]] = Quaternion(f[1], f[2] * curl)
 

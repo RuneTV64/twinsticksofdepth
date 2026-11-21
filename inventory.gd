@@ -60,6 +60,16 @@ func has(id: String) -> bool:
 	return find(id) != ""
 
 
+## The slot holding something that serves as this kind of tool ("blade", "hammer", "pry": Items `does`), or "".
+## Hands first, so what you hold is what you use.
+func tool_for(what: String) -> String:
+	for key in ["hand_r", "hand_l", "belt1", "belt2", "pocket1", "pocket2", "pocket3", "pocket4"]:
+		var have = slots.get(key)
+		if have != null and (Items.DEFS[have["id"]].get("does", []) as Array).has(what):
+			return key
+	return ""
+
+
 ## Use one of these up: one from a stack, or one use. False if you have none.
 func use(id: String) -> bool:
 	var key := find(id)

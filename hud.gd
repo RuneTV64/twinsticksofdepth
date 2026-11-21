@@ -95,7 +95,8 @@ Breaking things: everything breaks. Ready, crosshair on it, close by, left-click
   double-click takes or puts back, right-click uses what is in a slot. 1 2 3 pick the drawer. You only see a
   short way in front of you; ALT looks up. I opens just what you carry. A backpack on your back is a grid.
   Things you carry: C opens the character page; PgUp PgDn pick a thing, Enter uses it (eat a tin, put on boots,
-  take a pill, fresh batteries in the torch, wash cloth into a rag), Delete puts it down. Food and water run down.
+  take a pill, fresh batteries in the torch, wash cloth into a rag), Shift+Enter takes it apart, Delete puts it down.
+  Whatever is in your hand is your weapon on the Hands slot (a hatchet, a plank, a bottle); it wears out as you hit. Food and water run down.
   Y lays the broken glass you carry: a trap for bare feet, an alarm under boots. It stays until picked up.
   Barefoot, glass goes into your feet (U puts boots on and off, if you have a pair). A cut foot takes in what you
   walk through: wash and dress it. A helmet takes most of a blow to the head.
@@ -351,6 +352,16 @@ func sheet_use() -> void:
 	_sheet_t = 0.0
 
 
+## Take apart the carried thing that is picked (Shift+Enter on the character page).
+func sheet_apart() -> void:
+	if not _sheet_panel.visible:
+		return
+	var row: String = _sheet_rows()[_sheet_row]
+	if row.begins_with("slot:"):
+		player.take_apart(row.substr(5))
+	_sheet_t = 0.0
+
+
 ## Put down the carried thing that is picked (Delete on the character page).
 func sheet_drop() -> void:
 	if not _sheet_panel.visible:
@@ -476,14 +487,14 @@ func _sheet_text2() -> String:
 		var it = player.inv.slots.get(sl[0])
 		t += "%s%s: %s\n" % [_mark("slot:" + str(sl[0])), sl[1], Items.label(it) if it != null else "[color=#777]empty[/color]"]
 		if it != null and picked == "slot:" + str(sl[0]):
-			about = str(Items.DEFS[it["id"]]["for"])
+			about = Items.about(it["id"])
 	for wr in Inventory.WORN:
 		var on = player.inv.worn.get(wr[0])
 		t += "%s%s: %s\n" % [_mark("worn:" + str(wr[0])), wr[1], Items.label(on) if on != null else "[color=#777]nothing[/color]"]
 		if on != null and picked == "worn:" + str(wr[0]):
-			about = str(Items.DEFS[on["id"]]["for"])
+			about = Items.about(on["id"])
 	if about != "":
-		t += "\n[color=#d8c27a]%s[/color]\n[color=#999]Enter uses it.  Delete puts it down.[/color]\n" % about
+		t += "\n[color=#d8c27a]%s[/color]\n[color=#999]Enter uses it.  Shift+Enter takes it apart.  Delete puts it down.[/color]\n" % about
 	t += "\n[b]CONDITIONS[/b]\n"
 	if s.conditions.is_empty():
 		t += "   [color=#999]None[/color]\n"
@@ -566,6 +577,7 @@ func _process(delta: float) -> void:
 			var l := _wheel_labels[i]
 			l.position = c + Vector2(cos(a), sin(a)) * (WHEEL_RADIUS - 80.0) - l.size * 0.5
 			l.modulate = Color(1.0, 0.8, 0.4) if i == player.wheel_choice else Color.WHITE
+			l.text = player.weapon_name(Player.WEAPONS[i])
 		_wheel.queue_redraw()
 
 	if treat.visible != player.treating:

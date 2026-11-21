@@ -123,7 +123,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				player.show_status("Test wound: %s." % tw[0])
 			KEY_PAGEUP: hud.sheet_select(-1)
 			KEY_PAGEDOWN: hud.sheet_select(1)
-			KEY_ENTER, KEY_KP_ENTER: hud.sheet_use()
+			KEY_ENTER, KEY_KP_ENTER:
+				if event.shift_pressed:
+					hud.sheet_apart()
+				else:
+					hud.sheet_use()
 			KEY_DELETE, KEY_BACKSPACE: hud.sheet_drop()
 			KEY_MINUS: hud.sheet_adjust(-1)
 			KEY_EQUAL: hud.sheet_adjust(1)

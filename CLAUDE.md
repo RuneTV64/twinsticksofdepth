@@ -52,7 +52,11 @@ street lamps and signs (see The street kit, Lamps and signs), the furniture kit 
 furniture kit), the first working items (see The first working items), and searching furniture with
 the grid screen and a backpack (see Searching and the grid).
 
-Items by theme come next (see Themed item batches). Wait for the owner to name the theme.
+Items by theme: the owner named the first theme on 21 Nov 2026, a middle-class living room. Built first, as
+planned, what all four batches share: held things as weapons that wear out, and taking things apart (see Held
+weapons and taking apart; on the session branch, not on `main`, not seen by the owner). Waiting on the owner
+for: how many items the theme gets, and their answer to the clothes proposal (see Themed item batches) before
+any clothes are built.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -1083,10 +1087,69 @@ So each item made in a batch carries, besides what every item has now (`name`, `
 kind of blow, how hard, how many blows before it breaks); what it breaks or is taken apart into; and for
 clothes, where it is worn, what it keeps out (cold, bites, glass, a blow) and whether it has pockets, and
 what it can be torn or tied into. Furniture and appliances in a batch are made with the furniture kit's
-principles (rule 1 and rule 2, `Solid`, a `Stash` if things are kept in it). Claude's plan, for the first
-session: build what the four batches share before the first items (improvised weapons that wear out with
-each blow, and taking things apart into other things), and propose how clothes are worn (layers, pockets)
-before building them, since that changes the slots.
+principles (rule 1 and rule 2, `Solid`, a `Stash` if things are kept in it). What the batches share is built
+(see Held weapons and taking apart): every item now also gets `hit`, `apart` and, if it is a tool, `does`.
+
+First theme (owner, 21 Nov 2026): a middle-class living room. No number of items given yet. Claude's proposal
+for how clothes are worn, sent to the owner the same day and waiting for an answer (build no clothes before):
+
+- Layers by body area: head; neck; torso under (t-shirt), mid (sweater, hoodie, cardigan), outer (jacket,
+  coat); legs under and outer; feet socks and shoes; hands; the back (bags, as now); a belt at the waist.
+- Slots come from what you wear: pockets from the clothes (jeans 4 small, a hoodie's pouch, a coat's 2 to 4),
+  belt slots only with a belt on. Hands are always there. So a new character starts in clothes.
+- Each garment: warmth (for the warmth need to come), and against bites, glass and cuts, and blows, per body
+  area, layers adding up; a stopped bite tears the cloth, and holes add up until it protects nothing. Dirt,
+  wet and blood on it. It tears into rags, strips to tie with (a splint, a tourniquet, a wick), or gets taken
+  apart.
+- On the character: close-fitting clothes painted by the body shader as layers; bulky things (coats, hats) as
+  simple shells later. Not settled.
+- Draft list for the living room (12): slippers, wool socks, sneakers, sweatpants, jeans, t-shirt, hoodie,
+  cardigan, dressing gown, winter parka (hall closet), knit beanie, wool scarf.
+
+## Held weapons and taking apart (built 21 Nov 2026, in review; not seen by the owner)
+
+The plumbing every themed batch needs (owner: anything held in one or two hands is a weapon, most things don't
+last long against a head; nothing is junk, everything comes apart into something). On the session branch only.
+Every number is Claude's first guess. Test `tools/melee_test.gd`; sheet `tools/preview/held_weapons.png`.
+
+- Item fields (`items.gd`, documented at the top): `hit` (hands, kind blunt/chop/pierce, force, smash and
+  breaks for things, reach, time, lasts, into, noise, look), `does` (what it serves as a tool for: "blade",
+  "hammer", "pry"; `Inventory.tool_for()`), `apart` (into, tool, time, noise). A carried thing that has been hit
+  with keeps `hits`. `Items.about(id)` is the `for` sentence plus how it does as a weapon and what it comes
+  apart into, in words; the character page and the loot screen show it. The label says "worn", "about to go".
+- Weapons now: hatchet, sledgehammer, hammer, crowbar, hand torch, burning torch, cooking pot, plank, rock,
+  bottle, and a new item, the broken bottle (pierce, 5 blows, it cuts: `does` blade). A bottle breaks on the
+  first blow and you are left holding the broken bottle.
+- How it plays (`player.gd`): no new slot on the wheel. The Hands slot swings whatever weapon is in your right
+  hand, else your left (`wield()`); the wheel and the status name it ("Plank, one-handed"). Two-handed with the
+  other hand full, or one arm, is swung one-handed (`one_hand_force` 0.6, `one_hand_slow` 1.35). Its own pace
+  (wind-up 40%), stamina by weight. Shoving and the guard work as before.
+- Part picking for all hand-to-hand, punches included (the owner's "punches using the part picking"): the blow
+  goes to the part the crosshair is on if that one is in reach (`blow_part_chance`: head 0.7, limbs 0.75 to
+  0.8, times Dexterity and aim; otherwise the body), else the nearest in front, at the body. The prompt names
+  the part, the weapon and the odds in words. `Enemy.take_blow(part, force, how, dir)`: the head is a skull
+  to crack (`SKULL_BLOW` 40 is a sound skull's worth, rot softens it, a chop 1.25 and a point 1.5 times as
+  good), a blunt blow there may knock it down; the body takes damage; a chop on a limb may take it off, a club
+  on a leg may put it down. Raiders take double in the head, nothing more yet.
+- Wear (`wear_weapon`): each blow that lands (on someone or on a thing) is a knock; at `lasts` it breaks, the
+  remains (`into`) go to your feet, or into your hand if they are a weapon. `break_tool` now considers what is
+  in your hand (a plank on a crate) besides a hatchet or sledgehammer carried anywhere, and wears what it used.
+- Taking apart (`Player.take_apart(key)`): Shift+Enter on the character page, Shift+right-click on a slot in
+  the loot screen. Standing still, weapon down, for its time; moving, Ready, a grab or a hit stops it and
+  nothing is lost. A bag must be empty. Now: plank (needs a blade: 3 splintered wood), bottle (smashed: a
+  broken bottle and glass, heard 9 m), broken bottle, hand torch, water filter, helmet, backpack.
+- In the hand: a plain bar on the hand's bone (`PlayerBody.hold_in`, `GRIP_AXIS` found by render), coloured
+  from the item's ink. Ready it is held up over the shoulder, drawn back over the head in the wind-up and
+  brought down in front; a two-handed thing gets the other hand on it.
+- Cloud run, blows to put a zombie down at Strength 10, aimed at the head (fresh / half / long rotted): fists
+  25, 14, 12; bottle then broken bottle 8, 5, 2; hammer 7, 4, 2.5; crowbar 5, 3, 2.7; plank 6, 4, 3 (it broke
+  in 2 of 6 fights with fresh ones); hatchet 2.3, 2.2, 1.5; sledgehammer 3.2, 1.5, 1.0. The hatchet took a
+  half-rotted arm off at the third blow; a crowbar on a fresh leg put it down 15 times in 20. A plank read
+  "worn" at 3 blows, "about to go" at 5, broke at 6 into 2 splintered wood. Taking a plank apart took 6.0 s.
+- Not built: a pose of its own per weapon (one overhead swing for all), the weapon's real look (a bar), what
+  it hangs like with the weapon away (it sticks out sideways from the hand), a hatchet sticking in and needing
+  a yank, a freeze on contact, sounds, raiders with weapons, the left-hand grip checked by render, part picking
+  for finishers beyond what they had, a click during a swing remembered for the next.
 
 ## The first working items (built 21 Nov 2026, in review; not seen by the owner)
 
