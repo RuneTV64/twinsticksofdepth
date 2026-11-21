@@ -3,14 +3,14 @@ extends Node3D
 ## What is left when something breaks: broken glass, splintered wood, rubble, a wrecked appliance's metal and
 ## plastic. It stays (owner, 20 Nov 2026), and it is there for a reason:
 ##   - its materials can be taken, broken as they are (interact: the scrap items in items.gd)
-##   - broken glass crunches underfoot: whoever walks on it is heard, and each step grinds it further in
+##   - broken glass crunches underfoot and cuts bare feet: whoever walks on it is heard, or hurt. It can be
+##     laid on purpose as a trap (Player.lay_glass)
 ##   - it goes away in the end by rust and rot, the way flesh goes by maggots: wood, cloth and plaster rot,
-##     metal rusts (both quicker in the wet), glass is trodden into the dirt, stone and plastic stay until
-##     someone takes them. What has rotted or rusted away can no longer be salvaged.
+##     metal rusts (both quicker in the wet); glass, stone and plastic stay until someone picks them up.
+##     What has rotted or rusted away can no longer be salvaged.
 ## Nothing here runs per frame: wear.gd steps every wreck on a slow clock, and feet report in when they land.
 
 const CRUNCH := 6.0            # how far glass underfoot is heard (m)
-const TREAD := 0.04            # share of the glass one footfall grinds away
 const BARE_CUT := 0.5          # chance a bare foot landing on glass takes a shard
 const MERGE := 0.8             # wreckage landing this close to more of the same pile joins it
 
@@ -94,9 +94,9 @@ func weather(dt: float, wet: float) -> void:
 
 
 ## A foot lands at `pos`. Returns 0 if there was no glass there. Shod (1): the glass crunches (heard `quiet`
-## times as far when going carefully) and is ground a little further in. Barefoot (`bare`): it is quieter, and
-## BARE_CUT of the time a shard goes into the foot (2): that shard is gone from the ground, which is how
-## glass goes away under bare feet (owner, 21 Nov 2026). The caller does the wounding.
+## times as far when going carefully) and stays where it is. Barefoot (`bare`): it is quieter, and BARE_CUT
+## of the time a shard goes into the foot (2) and is gone from the ground. Walking on glass never removes it
+## otherwise: it has to be picked up by hand (owner, 21 Nov 2026). The caller does the wounding.
 static func step_on(pos: Vector3, who: Node, quiet := 1.0, bare := false) -> int:
 	if glass <= 0:
 		return 0
@@ -107,8 +107,6 @@ static func step_on(pos: Vector3, who: Node, quiet := 1.0, bare := false) -> int
 			if cut:
 				var whole := maxf(float(e["area"]) * float(Materials.of("glass")["per_m2"]), 1.0)
 				e["gone"] = minf(float(e["gone"]) + 1.0 / whole, 1.0)
-			elif not bare:
-				e["gone"] = minf(float(e["gone"]) + TREAD, 1.0)
 			Earshot.make(pos, CRUNCH * quiet * (0.5 if bare else 1.0), w.get_tree(), who, who is Player)
 			w._settle()
 			return 2 if cut else 1

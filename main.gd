@@ -174,6 +174,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					player.show_status("No window by the crosshair.", 1.5)
 				else:
 					player.show_status("Boarded up." if Solid.board(win) else "It is boarded already.", 1.5)
+			KEY_Y:   # lay the broken glass you carry, as an alarm or a trap
+				player.lay_glass()
 			KEY_U:   # shoes on and off, until footwear exists
 				player.barefoot = not player.barefoot
 				player.show_status("Barefoot." if player.barefoot else "Boots on (a stand-in until footwear exists).", 1.5)

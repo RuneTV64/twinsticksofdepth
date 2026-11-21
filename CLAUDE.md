@@ -341,11 +341,12 @@ This is the foundation; every number in it is Claude's first guess.
   through it for the scrap items (`glass_shard`, `wood_scrap`, `scrap_metal`, `plastic_scrap`; brick,
   concrete and pavement give the existing `rock`). Wreckage landing within 0.8 m of more joins it.
   - Broken glass crunches under a shod foot (`Wreck.step_on`, from the player's and enemies' footfalls): heard 6 m,
-    half that crouched or crawling, and each footfall grinds 4% of it away. (Barefoot: see Bare feet.) So glass round a window is an
+    half that crouched or crawling. Walking on it never removes it (owner, 21 Nov 2026): it stays until it is
+    picked up by hand, or goes shard by shard into bare feet. (See Bare feet.) So glass round a window is an
     alarm for whoever walks on it, you included.
   - Rust and rot (`wear.gd`, `Wear`, one node, a 5 s clock): wood and plaster rot (gone in 15 minutes dry),
-    metal rusts (30 minutes dry), both up to 3 to 4 times quicker in the wet (`Seasons` wetness); glass
-    goes only by being trodden in; stone and plastic stay until taken. What has rusted or rotted away can't
+    metal rusts (30 minutes dry), both up to 3 to 4 times quicker in the wet (`Seasons` wetness); glass,
+    stone and plastic stay until taken. What has rusted or rotted away can't
     be salvaged. The times are stand-ins for the clock.
 - Debug keys: P boards the window nearest the crosshair (free and instant: a stand-in); O breaks what the
   crosshair is on; Shift+O passes ten minutes of rust and rot.
@@ -369,7 +370,7 @@ This is the foundation; every number in it is Claude's first guess.
   - A zombie outside a shut window with the player inside: the glass went in 3 to 6 s and it was climbing
     through 2 to 3 s later. The same window boarded: one zombie took 23 to 25 s to get through the boards,
     four took 6 to 8 s. A house door, three zombies: 31 s.
-  - Glass is trodden away in 25 footfalls. Dry, wood and plaster wreckage were a third gone at 5 minutes
+  - Glass is still there after 100 footfalls in boots. Dry, wood and plaster wreckage were a third gone at 5 minutes
     and gone by 20; brick, pavement and glass stayed.
   - Seen in the same run and not looked into: zombies wandering the level broke several windows and an
     inside wall on their own, because one with a drive in its head beats on whatever stops it.
@@ -385,8 +386,18 @@ always infects unless treated and cleaned at once. Every number here is Claude's
 - Barefoot (`Player.barefoot`, true: nobody has shoes until footwear exists; U toggles it for testing). A
   bare foot landing on broken glass takes a shard half the time (`Wreck.BARE_CUT`): a cut "on the sole of the
   foot" on that leg (a leg wound with `where` "foot"), with the glass in it, and that shard is gone from the
-  ground. A broken window was gone in about 5 footfalls barefoot, against 25 in boots. More shards in the
-  same foot make the one wound worse. It is quieter than in boots (3 m).
+  ground. A broken window (3 shards) was used up in about 5 barefoot footfalls; in boots it never goes.
+  More shards in the same foot make the one wound worse. It is quieter than in boots (3 m).
+- Glass as a trap (owner, 21 Nov 2026: stepping on glass must not remove it unless it sticks in a foot; it
+  must be cleaned up by hand; and it can be laid as a trap for raiders and other players).
+  `Player.lay_glass()` (Y for now) scatters one slot of the broken glass you carry just in front of you: a
+  glass `Wreck` like any other, with as many shards as you laid. It cuts you too. Raiders are barefoot like
+  everyone: one treading on glass takes a shard half the time (`Raider.cut_foot()`): 5 health, a limp at
+  0.55 speed for 25 s, and he cries out (you are told within 14 m). He doesn't learn where you are from it.
+  Cloud run: 3 shards laid, a raider took all 3 in 5 footfalls, health 62 to 47. Zombies only crunch on it
+  and never take shards, so they don't use a trap up (Claude's pick). Not built: raiders seeing and going
+  round glass, picking it up or laying it; a bloody shard keeping its blood once laid; a proper control
+  for laying (it waits for dropping and placing items).
 - Glass in a wound is drawn out with the tweezers like anything else and comes out as a `bloody_glass` item
   ("Bloody glass"). A wound with anything still in it never closes. The item does nothing yet.
 - Blood on the ground (`spill.gd`, `Spill`, one node in the level): a zombie that is hit leaves its blood

@@ -178,7 +178,7 @@ func _run() -> void:
 		while is_instance_valid(gw) and gw.lot.has("glass") and steps < 100:
 			Wreck.step_on(gw.global_position, player)
 			steps += 1
-		_say("  glass trodden away after %d footfalls on it" % steps)
+		_say("  after %d footfalls in boots the glass is %s" % [steps, "still there" if is_instance_valid(gw) and gw.lot.has("glass") else "gone"])
 	var wear := get_first_node_in_group("weathering") as Wear
 	for mins: int in [5, 10, 20, 40]:
 		wear.pass_time(300.0 if mins == 5 else (mins * 30.0))

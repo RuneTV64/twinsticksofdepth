@@ -883,6 +883,23 @@ func _update_ground() -> void:
 		_step_in_it()
 
 
+## Lay the broken glass you carry on the ground where you stand: an alarm under boots, a trap for bare feet
+## (yours too). It stays until someone picks it up or it has all gone into feet.
+func lay_glass() -> void:
+	var key := inv.find("glass_shard")
+	if key == "":
+		key = inv.find("bloody_glass")
+	if key == "":
+		show_status("You carry no broken glass.", 1.5)
+		return
+	var n := int(inv.slots[key]["n"])
+	inv.slots.erase(key)
+	recompute_stats()
+	Wreck.leave(get_parent(), global_position + facing * 0.6, 0.5, {"glass": 1.0}, n / float(Materials.of("glass")["per_m2"]), "broken glass")
+	_body.reach()
+	show_status("You scatter the glass on the ground.", 1.5)
+
+
 ## What your foot has just come down on (once a stride): glass, blood, filth.
 func _step_in_it() -> void:
 	var body := sheet.body

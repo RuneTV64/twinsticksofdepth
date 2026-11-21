@@ -246,6 +246,7 @@ func _process(delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	if cover_face != null and cover_face.box.gone:
 		_drop_cover()      # what it was behind has been broken
+	_glass_t -= delta
 	_hurt_t -= delta
 	_stagger -= delta
 	_flash_t -= delta
@@ -384,8 +385,9 @@ func _physics_process(delta: float) -> void:
 		want = _detour_dir * want.length()
 	var going := want.normalized() if want.length() > 0.3 else Vector3.ZERO
 	_knock = _knock.move_toward(Vector3.ZERO, 18.0 * delta)
-	velocity.x = want.x * _ground_slow + _knock.x
-	velocity.z = want.z * _ground_slow + _knock.z
+	var limp := glass_limp if _glass_t > 0.0 else 1.0
+	velocity.x = want.x * _ground_slow * limp + _knock.x
+	velocity.z = want.z * _ground_slow * limp + _knock.z
 	velocity.y = 0.0 if is_on_floor() else velocity.y - 25.0 * delta
 	move_and_slide()
 	_leave_tracks()
@@ -466,6 +468,23 @@ func take_hit(dmg: float, dir: Vector3, knock: float) -> void:
 
 
 ## by_player: it came from you (so it knows roughly where you are). Zombie bites don't tell it that.
+## A shard of glass in the foot (Wreck.step_on): it hurts a little, he limps for a while, and he cries out,
+## which is what a line of glass across a doorway is for.
+@export var glass_hurt := 5.0
+@export var glass_limp := 0.55         # his speed while he limps
+@export var glass_limp_time := 25.0
+var _glass_t := 0.0
+
+
+func cut_foot() -> void:
+	if dead:
+		return
+	_glass_t = glass_limp_time
+	_damage(glass_hurt, Vector3.ZERO, 0.0, false)
+	if player != null and not player.dead and global_position.distance_to(player.global_position) <= 14.0:
+		player.show_status("Someone cries out: glass underfoot.", 1.8)
+
+
 func _damage(dmg: float, dir: Vector3, knock: float, by_player: bool) -> void:
 	if dead:
 		return

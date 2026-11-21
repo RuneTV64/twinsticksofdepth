@@ -15,8 +15,8 @@ extends RefCounted
 ##   agent    what clears the wreckage away in the end:
 ##            rot    wood, cloth, plaster: quicker in the wet
 ##            rust   metal: slower than rot, quicker in the wet
-##            tread  glass: ground into the dirt by feet walking over it
-##            none   stone, plastic: it stays until someone takes it
+##            none   glass, stone, plastic: it stays until someone takes it (glass also goes shard by shard
+##                   into bare feet: wreck.gd)
 ##   noise    how far a blow on it is heard (m); it breaking is heard BREAK_NOISE times as far
 ##   tint     the colour of its wreckage
 ##
@@ -27,7 +27,7 @@ const BREAK_NOISE := 1.8
 
 const DEFS := {
 	"glass": {"name": "glass", "hp": 8.0, "hard": 0.0, "blunt": 1.0, "chop": 1.0, "pound": 1.0, "pierce": 1.0,
-		"scrap": "glass_shard", "per_m2": 2.0, "agent": "tread", "noise": 7.0, "tint": Color(0.72, 0.86, 0.92)},
+		"scrap": "glass_shard", "per_m2": 2.0, "agent": "none", "noise": 7.0, "tint": Color(0.72, 0.86, 0.92)},
 	"wood": {"name": "wood", "hp": 120.0, "hard": 5.0, "blunt": 1.0, "chop": 2.5, "pound": 1.5, "pierce": 0.2,
 		"scrap": "wood_scrap", "per_m2": 1.2, "agent": "rot", "noise": 6.0, "tint": Color(0.5, 0.38, 0.24)},
 	"plaster": {"name": "plaster", "hp": 60.0, "hard": 4.0, "blunt": 1.0, "chop": 1.5, "pound": 2.0, "pierce": 0.3,
@@ -49,7 +49,6 @@ const DEFS := {
 const AGENTS := {
 	"rot": {"rate": 1.0 / 900.0, "wet": 2.0, "word": "rotting", "tint": Color(0.16, 0.13, 0.09)},
 	"rust": {"rate": 1.0 / 1800.0, "wet": 3.0, "word": "rusting", "tint": Color(0.45, 0.22, 0.1)},
-	"tread": {"rate": 0.0, "wet": 0.0, "word": "trodden in", "tint": Color(0.5, 0.5, 0.45)},
 	"none": {"rate": 0.0, "wet": 0.0, "word": "", "tint": Color(0.4, 0.4, 0.4)},
 }
 

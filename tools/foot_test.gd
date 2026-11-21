@@ -39,7 +39,27 @@ func _run() -> void:
 	while is_instance_valid(w) and w.lot.has("glass") and steps < 200:
 		p._step_in_it()
 		steps += 1
-	_say("in boots: gone after %d footfalls, wounds %d" % [steps, b.wounds.size()])
+	_say("in boots: after %d footfalls the glass is %s, wounds %d" % [steps, "still there" if is_instance_valid(w) and w.lot.has("glass") else "gone", b.wounds.size()])
+	w.interact(p)
+	await physics_frame
+	_say("  picked up by hand: carrying %s; glass left on the ground: %s" % [p.inv.slots.values().map(func(i): return Items.label(i)), is_instance_valid(w) and w.lot.has("glass")])
+	# Laid as a trap, and a raider walks over it.
+	p.global_position = Vector3(10, 0.05, 12)
+	p.lay_glass()
+	var trap := Wreck.all[Wreck.all.size() - 1]
+	_say("laid as a trap: %s with %d shards" % [trap.title, trap.left("glass")])
+	var r: Raider = main._raider(trap.global_position)
+	await physics_frame
+	var hp0 := r.hp
+	var n := 0
+	var cuts := 0
+	while is_instance_valid(trap) and trap.lot.has("glass") and n < 100:
+		if Wreck.step_on(trap.global_position, r, 1.0, true) == 2:
+			r.cut_foot()
+			cuts += 1
+		n += 1
+	_say("  a raider walking on it: %d shards in his feet over %d footfalls, health %d -> %d, limping %s, trap %s" % [cuts, n, roundi(hp0), roundi(r.hp), r._glass_t > 0.0, "used up" if not (is_instance_valid(trap) and trap.lot.has("glass")) else "still there"])
+	r.queue_free()
 	p.barefoot = true
 
 	# How long each kind of ground takes to turn an open cut foot bad, walking (one stride 0.7 m, 2 a second).
