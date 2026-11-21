@@ -26,6 +26,19 @@ Measured in the game's test level (`tools/fence_test.gd`, cloud run, 21 Nov 2026
 Put up damaged or about to give, a fence starts at 60% or 30% of that. Across a rail fence a zombie 8 m off was
 seen, and 31 of 40 level shots reached it; across a board fence it was not seen and none did.
 
+## Spikes
+
+A picket fence has points, and bodies can be impaled on them (the owner's rule: anything with spikes). The kit
+gives each kind a `spikes` chance (picket 0.3, the others none); the game does the rest (`enemy.gd`):
+
+- A zombie flopping over the top may stick there, and so may one knocked backward onto it. It hangs on the
+  fence, hurt and thrashing, until it pulls itself off, the fence gives way under it, or someone ends it. A
+  body already on the points covers them for the next one over.
+- You can catch a leg vaulting one, and coming down on one from a height is a deep wound. Raiders are caught
+  too.
+- Cloud run (`tools/impale_test.gd`): of 14 zombies sent over one at a time, 5 stuck; of 30 knocked backward
+  onto it, 9 came down on the points; the player vaulting 60 times was caught 3 to 7 times.
+
 ## How it is made
 
 - `fence_kit.gd` (`FenceKit`). A fence is a run from one point to another along X or Z, with gates anywhere
@@ -74,6 +87,7 @@ f.run(Vector2(27, -34), Vector2(30, -34), [1.5])                   # a gate 1.5 
 | `preview/fence_house.png` | Round the kit house |
 | `source/fence_preview.gd` | The harness that renders the sheets (in the repository: `tools/fence_preview.gd`) |
 | `source/fence_test.gd` | The headless test of what each fence does in play (in the repository: `tools/fence_test.gd`) |
+| `source/impale_test.gd` | The headless test of impaling (in the repository: `tools/impale_test.gd`) |
 
 What the game itself needed for it, outside this folder: `Breakable.gaps` and `thin` (`breakable.gd`),
 `Solid.open_up()` (`solid.gd`), `Cover.Box.open` (`cover.gd`), a shot going through gaps (`projectile.gd`),
@@ -90,4 +104,6 @@ and `Door.noun` (`door.gd`).
 - A worn fence is worn all over, not where it was hit. A broken section leaves a clean edge.
 - Raiders don't know a rail fence gives no cover (they just never pick it). Nothing is built to mend or put
   up a fence in play.
+- An impaled zombie has no pose of its own and leaves no blood on the points; nothing made for impaling
+  (sharpened stakes, iron railings) exists yet.
 - One style only: no chain link, iron railings, walls or hedges yet.

@@ -117,6 +117,15 @@ extends CharacterBody3D
 @export var smash_force := 10.0        # a blow from an ordinary zombie; times walk_mult (1.2 fresh .. 0.6 rotted)
 @export var smash_every := 1.1         # s between blows, longer when stiff
 @export var smash_reach := 1.2         # m: how far in front of it it can beat on something
+@export_group("Impaling")
+## Bodies can be impaled on anything with spikes (owner, 21 Nov 2026): a zombie flopping over a picket fence,
+## or knocked backward onto one, may stick on the points (Breakable.spikes is the chance). It hangs there
+## alive, thrashing, and can be finished like any downed one; the fence takes its weight. All first guesses.
+@export var impale_hurt := 20.0                   # what going onto the points costs it
+@export var impale_struggle := Vector2(2.5, 5.0)  # s between its tries to pull itself off
+@export var impale_free := Vector2(0.35, 0.1)     # the chance a try gets it off: fresh .. rotted
+@export var impale_tear := 0.4                    # a failed try may tear a limb off a rotten one (times its rot)
+@export var impale_shove := 1.3                   # knocked onto the points, it is this much likelier to stick
 @export_group("Crowd")
 ## Zombies closer than this (m, centre to centre) push apart; crawlers, lying longer, keep a bit more room.
 @export var personal_space := 0.75
@@ -168,6 +177,14 @@ var _climb_from := Vector3.ZERO
 var _climb_to := Vector3.ZERO
 var _climb_top := 0.0
 var _climb_h0 := 0.0
+## Everyone hanging on spikes now, alive or dead: a body on the points covers them for the next one over.
+static var impaled: Array[Enemy] = []
+var hung := false                # it is on the spikes (it stays there when it dies, until the corpse goes)
+var _spiked: Breakable           # what it is climbing over, or hanging on
+var _spike_rolled := false
+var _struggle_t := 0.0
+var _impale_at := Vector3.ZERO
+var _impale_to := Vector3.ZERO   # where it comes down when it gets off
 var _climb_len := 2.0
 var _shown_y := 0.0
 var head_dmg := 0.0         # blows its head has taken from finishers
@@ -427,8 +444,8 @@ func _update_fade(delta: float) -> void:
 func shove(dir: Vector3, force: float) -> void:
 	if dead or kind == "dummy":
 		return
-	if state == "climb" or state == "heap":
-		return   # half over a wall, or under a pile of others: there's no shoving it
+	if state == "climb" or state == "heap" or state == "impaled":
+		return   # half over a wall, under a pile of others, or stuck on a fence: there's no shoving it
 	_knock += Vector3(dir.x, 0.0, dir.z) * force
 	_cd = maxf(_cd, 0.6)
 	if state != "down" and state != "getup":
@@ -488,7 +505,7 @@ func _die() -> void:
 	collision_layer = 0
 	_let_go()
 	# Dying against a wall, or on a heap, it becomes part of the heap until the corpse is gone.
-	if body != null and not _in_heap and state != "climb" and (_press_t > 0.5 or perch > 0.1):
+	if body != null and not _in_heap and state != "climb" and not hung and (_press_t > 0.5 or perch > 0.1):
 		_join_heap()
 	_label.visible = false
 	if body != null:
@@ -510,6 +527,8 @@ func _die() -> void:
 
 func _respawn() -> void:
 	_leave_heap()
+	hung = false
+	impaled.erase(self)
 	perch = 0.0
 	_press_t = 0.0
 	head_dmg = 0.0
@@ -542,7 +561,9 @@ func _set_state(s: String) -> void:
 ## `push` is the way the blow sent it (zero = it just went over): backward and it lands on its back, forward or
 ## sideways on its front.
 func _knock_down(push := Vector3.ZERO) -> void:
-	if dead or state == "down" or state == "climb" or state == "heap":
+	if dead or state == "down" or state == "climb" or state == "heap" or state == "impaled":
+		return
+	if not crawling and _onto_spikes(push):
 		return
 	_let_go()
 	var was_up := not crawling
@@ -572,7 +593,7 @@ func _lose(slot: String, impulse: Vector3) -> void:
 	if slot.begins_with("Leg"):
 		_let_go()
 		crawling = true
-		if state != "down":
+		if state != "down" and state != "impaled":
 			_set_state("walk")
 	elif body.hands() == 0 and (state == "hold" or state == "bite" or state == "reach"):
 		_let_go()
@@ -676,6 +697,9 @@ func _tick(delta: float) -> void:
 	if kind == "shambler":
 		if state == "climb":
 			_climb_step()
+			moving = false
+		elif state == "impaled":
+			_impaled_step(delta)
 			moving = false
 		elif state == "heap":
 			_heap_step(delta)
@@ -842,7 +866,7 @@ static func heap_height(p: Vector3) -> float:
 ## Where to aim at it: its middle, or its head when it is on the ground (for finishers).
 func aim_point() -> Vector3:
 	if body != null and not dead and (crawling or state == "down" or state == "heap"):
-		return global_position + facing * (-0.7 if on_back else 0.7)      # on its back its head lies the other way
+		return global_position + facing * (-0.7 if on_back else 0.7) + Vector3(0.0, perch if hung else 0.0, 0.0)      # on its back its head lies the other way
 	return global_position
 
 
@@ -894,7 +918,7 @@ func take_body_blow(power: float, part: String, dir: Vector3) -> void:
 
 ## Is it on the ground, where its head can be stomped?
 func is_down() -> bool:
-	return body != null and not dead and (crawling or state == "down" or state == "heap") and state != "climb"
+	return body != null and not dead and (crawling or state == "down" or state == "heap" or state == "impaled") and state != "climb"
 
 
 ## How much of a blow gets through to its skull: little on a fresh body, a lot on a rotted one.
@@ -942,6 +966,7 @@ func _crushed() -> void:
 
 ## Out of the game for good. It is taken out of the crowd grid first, so nothing this tick trips over it.
 func _gone() -> void:
+	impaled.erase(self)
 	var cell: Array = _grid.get(Vector2i(floori(global_position.x / CELL), floori(global_position.z / CELL)), [])
 	cell.erase(self)
 	dead = true
@@ -1070,6 +1095,8 @@ func _start_climb() -> bool:
 	_climb_to = Vector3(land.x, global_position.y, land.y)
 	_climb_top = _press_box.top
 	_climb_h0 = perch
+	_spiked = Breakable.of(_press_box.body)
+	_spike_rolled = false
 	_climb_len = climb_time * (1.0 + 0.8 * body.stiff) * (0.7 + 0.3 * maxf(_climb_top - perch, 0.3))
 	crawling = true
 	facing = dir
@@ -1084,6 +1111,16 @@ func _climb_step() -> void:
 	var p := _climb_from.lerp(_climb_to, smoothstep(0.2, 0.9, u))
 	global_position = p
 	velocity = Vector3.ZERO
+	# On its belly across the top: if the top has points, it may stick on them (not over a body already
+	# hanging there, and not when it came up off a heap, which is higher than the points).
+	if not _spike_rolled and u >= 0.5:
+		_spike_rolled = true
+		if _spiked != null and is_instance_valid(_spiked) and _spiked.spikes > 0.0 and _climb_h0 < 0.3:
+			var over := (_climb_from + _climb_to) * 0.5
+			if not _points_covered(over) and randf() < _spiked.spikes * (0.7 + 0.6 * body.rot()):
+				global_position = over
+				_impale(_spiked, _climb_to, false)
+				return
 	if u < 0.6:
 		perch = lerpf(_climb_h0, _climb_top, smoothstep(0.0, 0.4, u))
 	else:
@@ -1098,6 +1135,90 @@ func _climb_step() -> void:
 		# A long drop can shake a rotten one apart.
 		if _climb_top >= fall_break and randf() < 0.3 + 0.5 * body.rot():
 			_shed_part()
+
+
+## Is there already a body on the points here?
+static func _points_covered(at: Vector3) -> bool:
+	for e in impaled:
+		if is_instance_valid(e) and e.hung and _xz2(e.global_position - at) < 0.5:
+			return true
+	return false
+
+
+## Knocked off its feet toward something with spikes no higher than its chest: it may come down on them.
+func _onto_spikes(push: Vector3) -> bool:
+	push.y = 0.0
+	if push.length() < 0.01 or kind != "shambler" or body == null:
+		return false
+	var dir := push.normalized()
+	var at := global_position + dir * 0.6
+	var b := Breakable.spiked(Vector2(at.x, at.z), 0.6, global_position.y)
+	if b == null or b.top - global_position.y > 1.4:
+		return false
+	var on := Vector3(clampf(at.x, b.rect.position.x, b.rect.end.x), global_position.y, clampf(at.z, b.rect.position.y, b.rect.end.y))
+	if _points_covered(on) or randf() >= minf(b.spikes * impale_shove, 0.95):
+		return false
+	var back := dir.dot(facing) < -0.25
+	global_position = on
+	_impale(b, on + dir * 0.9, back)
+	return true
+
+
+## Onto the points. It hangs there, hurt, until it pulls itself off, the fence gives way, or someone ends it.
+func _impale(b: Breakable, drop_to: Vector3, back: bool) -> void:
+	_let_go()
+	_spiked = b
+	_impale_at = global_position
+	_impale_to = drop_to
+	crawling = true
+	_set_state("impaled")
+	on_back = back
+	hung = true
+	perch = maxf(b.top - global_position.y - 0.3, 0.2)
+	velocity = Vector3.ZERO
+	_knock = Vector3.ZERO
+	_press_t = 0.0
+	_struggle_t = randf_range(impale_struggle.x, impale_struggle.y)
+	if not impaled.has(self):
+		impaled.append(self)
+	Spill.leave(global_position, true)
+	b.hit(smash_force, "blunt", global_position + Vector3(0.0, perch, 0.0), self)     # its weight comes down on the fence
+	take_hit(impale_hurt, Vector3.ZERO, 0.0)                                           # (this may be the end of it: it hangs there dead)
+
+
+func _impaled_step(delta: float) -> void:
+	global_position = _impale_at
+	velocity = Vector3.ZERO
+	_knock = Vector3.ZERO
+	if _spiked == null or not is_instance_valid(_spiked) or not _spiked.alive():
+		# What held it was cut where it was hit, or has gone: is there still a fence under it?
+		_spiked = Breakable.spiked(Vector2(_impale_at.x, _impale_at.z), 0.3, _impale_at.y)
+		if _spiked == null:
+			_off_spikes(_impale_at)
+			return
+	_struggle_t -= delta
+	if _struggle_t > 0.0:
+		return
+	_struggle_t = randf_range(impale_struggle.x, impale_struggle.y)
+	var rot := body.rot()
+	_spiked.hit(smash_force * body.walk_mult * 0.5, "blunt", _impale_at + Vector3(0.0, perch, 0.0), self)   # thrashing shakes the fence
+	if randf() < lerpf(impale_free.x, impale_free.y, rot):
+		_off_spikes(_impale_to)
+	elif randf() < impale_tear * rot:
+		_tear(1.0, 1)
+
+
+## Off the points and onto the ground, in a heap.
+func _off_spikes(to: Vector3) -> void:
+	hung = false
+	impaled.erase(self)
+	_spiked = null
+	global_position = Vector3(to.x, _impale_at.y, to.z)
+	perch = 0.0
+	if dead:
+		return
+	_set_state("down")
+	_down_t = randf_range(0.8, 2.5)
 
 
 ## Each limb it still has comes off with `chance`, up to `most` of them: torn away in the press.

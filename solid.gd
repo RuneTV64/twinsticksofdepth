@@ -105,6 +105,7 @@ static func _split(b: Breakable, at: Vector3) -> Breakable:
 			piece.thin_to(b.thin)
 		piece.hp = piece.max_hp * share
 		piece.salvage_mult = b.salvage_mult
+		piece.spikes = b.spikes
 		if b.gaps > 0.0:
 			open_up(piece.host, b.gaps)
 		if b.stage > 0:

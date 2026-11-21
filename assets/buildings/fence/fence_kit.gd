@@ -3,7 +3,8 @@ extends RefCounted
 ## Timber fences, and a way to put them up. One style, three kinds, each with its own job:
 ##
 ##   picket   1.0 m, painted. Low cover: you crouch behind it, vault it, shoot over it. A zombie climbs it,
-##            slowly, and lands on its face. It marks a yard and buys a few seconds.
+##            slowly, and lands on its face. It marks a yard and buys a few seconds. It has points: a body
+##            going over it, or knocked back onto it, can be impaled there.
 ##   board    1.875 m, bare boards. It stops sight as well as bodies, and nobody vaults it; one zombie can't
 ##            climb it alone, so it has to be beaten down (it is thin: it doesn't take long) or gone round.
 ##            The way through is a gate.
@@ -27,12 +28,13 @@ const GATE_W := 1.25
 ## A fence built worn starts with this share of its strength.
 const WEAR_HP := [1.0, 0.6, 0.3]
 ## h: its height. strength: its share of the strength of a solid wooden wall its size. gaps: the share of it
-## that is air (0 = it stops sight and shots like anything solid). paint: what it wears unless told otherwise
+## that is air (0 = it stops sight and shots like anything solid). spikes: the chance a body going over it
+## is impaled on its points (owner, 21 Nov 2026: "if its got spikes bodies can be impaled on them"). paint: what it wears unless told otherwise
 ## (-1 bare timber, 0 cream, 1 sage, 2 slate, 3 white). bash: how hard its gate is to barge.
 const KINDS := {
-	"picket": {"id": 0, "h": 1.0, "strength": 0.25, "gaps": 0.0, "paint": 3, "what": "picket fence", "bash": 5.0},
-	"board": {"id": 1, "h": 1.875, "strength": 0.4, "gaps": 0.0, "paint": -1, "what": "board fence", "bash": 9.0},
-	"rail": {"id": 2, "h": 1.25, "strength": 0.3, "gaps": 0.8, "paint": -1, "what": "rail fence", "bash": 7.0},
+	"picket": {"id": 0, "h": 1.0, "strength": 0.25, "gaps": 0.0, "spikes": 0.3, "paint": 3, "what": "picket fence", "bash": 5.0},
+	"board": {"id": 1, "h": 1.875, "strength": 0.4, "gaps": 0.0, "spikes": 0.0, "paint": -1, "what": "board fence", "bash": 9.0},
+	"rail": {"id": 2, "h": 1.25, "strength": 0.3, "gaps": 0.8, "spikes": 0.0, "paint": -1, "what": "rail fence", "bash": 7.0},
 }
 ## The colour of each paint, for the plain stand-ins (wreckage).
 const TINTS := {-1: Color(0.55, 0.45, 0.34), 0: Color(0.85, 0.8, 0.7), 1: Color(0.64, 0.71, 0.6),
@@ -146,7 +148,7 @@ func _panel(u0: float, u1: float, line: float, along_x: bool, outward: Vector2) 
 	var body := Solid.box(level, pos, size, TINTS[_paint()], "wood", k["what"], {}, 0.0, look, ground_y)
 	if float(k["gaps"]) > 0.0:
 		Solid.open_up(body, float(k["gaps"]))
-	_worn(Breakable.of(body))
+	_worn(Breakable.of(body)).spikes = float(k["spikes"])
 
 
 func _gate(u0: float, line: float, along_x: bool, outward: Vector2) -> void:

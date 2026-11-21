@@ -106,6 +106,7 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 @export var vault_time := 0.42          # s to vault low cover
 @export var vault_max_depth := 2.2      # m: cover deeper than this can't be vaulted
 @export var vault_cost := 6.0           # stamina
+@export var vault_spike_share := 0.2    # your share of a spiked thing's chance of catching whoever goes over it
 @export_group("Roll")
 # Double-tap Cover when not in cover: a roll the way you are moving (or the way you face, standing still),
 # whichever way you were facing. You turn into it, go over in a burst, and come up facing the way you rolled;
@@ -327,6 +328,7 @@ var _vault_t := 0.0                # > 0 while vaulting
 var _vault_from := Vector3.ZERO
 var _vault_to := Vector3.ZERO
 var _vault_h := 0.0
+var _vault_spiked: Breakable       # what you are vaulting, if it might have points
 var _cover_mark: MeshInstance3D
 var perch := 0.0                   # how far above the ground you stand (on a heap or the corpse pile)
 var _wall_box: Cover.Box = null    # the solid thing you are walking into, if any (for climbing it from the pile)
@@ -960,6 +962,15 @@ func _land_hard(drop: float) -> void:
 	if dead or invulnerable:
 		return
 	_stagger = maxf(_stagger, 0.6)
+	# Coming down on something with points (out of an upstairs window onto a picket fence): impaled.
+	var sp := Breakable.spiked(_xz(global_position), 0.6, global_position.y)
+	if sp != null and _fall_top > sp.top:
+		_wound("deep cut", 45.0, _pick(["Torso", "LegL", "LegR"]))
+		take_damage(15.0, Vector3.ZERO, 0.0)
+		_stagger = maxf(_stagger, 1.4)
+		sp.hit(40.0, "blunt", global_position, self)
+		Spill.leave(global_position, false)
+		show_status("You come down on the points of the fence.", 2.2)
 	_wound("bruise", minf((drop - 1.2) * 12.0, 40.0), "LegL")
 	_wound("bruise", minf((drop - 1.2) * 12.0, 40.0), "LegR")
 	if drop > fall_hurt:
@@ -1515,6 +1526,7 @@ func _try_vault() -> void:
 	_vault_to = Vector3(land.x, global_position.y, land.y)
 	_vault_h = maxf(f.top - 0.45, 0.2)
 	_vault_t = vault_time
+	_vault_spiked = Breakable.of(f.box.body)
 	stamina = maxf(stamina - vault_cost, 0.0)
 	_regen_delay = maxf(_regen_delay, 0.6)
 	leave_cover()
@@ -1699,6 +1711,16 @@ func _vault_step(delta: float) -> void:
 	p.y += sin(PI * u) * _vault_h
 	global_position = p
 	velocity = Vector3.ZERO
+	# Going over something with points (a picket fence): now and then you catch a leg on them, more often
+	# when your nerve has gone.
+	if u >= 0.5 and _vault_spiked != null:
+		var sp := _vault_spiked
+		_vault_spiked = null
+		if is_instance_valid(sp) and sp.spikes > 0.0 and not invulnerable \
+				and randf() < sp.spikes * vault_spike_share * (2.0 if sheet.composure < 50.0 else 1.0):
+			_wound("cut", 12.0, _pick(["LegL", "LegR"]))
+			_stagger = maxf(_stagger, 0.4)
+			show_status("You catch your leg on the points going over.", 1.8)
 	if _vault_t <= 0.0:
 		global_position = _vault_to
 		velocity = (_vault_to - _vault_from).normalized() * walk_speed

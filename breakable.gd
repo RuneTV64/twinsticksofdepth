@@ -42,6 +42,8 @@ var barrier := false             # fills an opening someone could otherwise clim
 var lets_shots := false          # a shot goes through it (and breaks it): glass
 var gaps := 0.0                  # the share of it that is air (a rail fence 0.8): it stops bodies, not sight,
                                  # and that share of the shots that cross it go through untouched (Solid.open_up)
+var spikes := 0.0                # it has points along its top (a picket fence): the chance a body going over it,
+                                 # or thrown onto it, is impaled there (enemy.gd, Impaling; less for the careful)
 var thin := 1.0                  # its strength as a share of a solid thing of its size (a fence is not a wall)
 var surface := false             # a floor or pavement: worked a square metre at a time
 var radius := 0.0                # a round surface: only this far from its middle is really there
@@ -84,6 +86,21 @@ static func of(body: Object) -> Breakable:
 		return null
 	var b = body.get_meta("breakable")
 	return b if is_instance_valid(b) else null
+
+
+## The nearest thing with spikes that someone with their feet at `feet` is beside or standing on, within
+## `radius` of `p` on the map, or null.
+static func spiked(p: Vector2, radius: float, feet: float) -> Breakable:
+	var best: Breakable = null
+	var best_d := radius
+	for b in near(p, radius):
+		if b.spikes <= 0.0 or b.surface or not b.alive() or b.top < feet - 0.25 or b.foot > feet + 0.5:
+			continue
+		var d := p.distance_to(Vector2(clampf(p.x, b.rect.position.x, b.rect.end.x), clampf(p.y, b.rect.position.y, b.rect.end.y)))
+		if d <= best_d:
+			best_d = d
+			best = b
+	return best
 
 
 ## Make it this much weaker than a solid thing its size (fence boards against a framed wall).

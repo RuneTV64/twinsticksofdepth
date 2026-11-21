@@ -42,7 +42,7 @@ half strength in a cut wall, and the cursor cutaway (see Camera). Review sheets 
 `assets/buildings/house/preview/` and `tools/preview/cursor_cutaway.png`.
 
 Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
-owner: the fence kit (see The fence kit). The owner has pivoted back to making assets.
+owner: the fence kit, and bodies impaled on spiked fences (see The fence kit). The owner has pivoted back to making assets.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -746,6 +746,32 @@ account) and in the **Building Assets** artifact (`files/Fence/`). On the branch
   Put up damaged or about to give: 60% and 30% of that. Across the rail fence a zombie 8 m off was seen
   and 31 of 40 level shots reached it; across the board fence it was not seen and none did. The player got
   over the picket and the rail with the cover button, not the board. The level has 449 breakable things.
+- Impaling (owner, 21 Nov 2026: "if its got spikes bodies can be impaled on them"; built the same day, not
+  seen by the owner). Anything can have spikes: `Breakable.spikes` is the chance a body going over it sticks
+  on its points (`Breakable.spiked(p, radius, feet)` finds one). Of the fences only the picket has them
+  (0.3). `enemy.gd`, the Impaling exports; test `tools/impale_test.gd`.
+  - A zombie climbing over rolls once as it crosses the top (the chance times 0.7 fresh to 1.3 rotted). One
+    knocked off its feet toward spikes no higher than its chest (a shove, a hard hit) may come down on them
+    (times `impale_shove` 1.3), on its back if it went over backward.
+  - Impaled (`state` "impaled", `hung`): it hangs on the fence, hurt (`impale_hurt` 20), thrashing. It can't
+    be shoved or knocked down and attacks nobody. It counts as down, so it can be finished like any downed
+    one, aimed at where it hangs. Every 2.5 to 5 s it tries to pull itself off: a fresh one gets off 35% of
+    the time, a rotted one 10%, and a rotted one that fails may tear a limb off. Each try shakes the fence;
+    if the section under it goes, down it comes. One that dies there hangs until the corpse fades.
+  - A body on the points covers them: the next one over that spot (within 0.7 m) is not caught.
+  - The player vaulting something spiked catches a leg on it now and then (`vault_spike_share` 0.2 of the
+    chance, doubled when Shaken): a cut and a stumble. Falling onto one (out of an upstairs window onto a
+    picket fence) is a deep cut in the chest or a leg, 15 health and a long stagger, and the fence takes
+    the weight. Raiders vaulting one are caught a quarter as often as a zombie (`Raider.spiked()`: hurt, a
+    limp, a cry).
+  - Cloud run: 14 zombies over a sound picket fence one at a time, 5 stuck; 4 pulled themselves off after
+    6 s on average and 1 was still hanging after half a minute. 30 zombies with their backs to the fence
+    knocked down backward: 9 on the points. The player vaulting 60 times, calm: caught 7 times in one run
+    and 3 in another. Dropped 3.4 m onto the fence: a deep leg wound, health 100 to 85, the section broke.
+  - Not built: an impaled one biting whoever comes close; a pose of its own (it uses the crawl pose, hung
+    at the fence's height) and blood on the points; the player or a raider actually stuck and having to
+    pull free; a dead body dropping when its fence goes; pushing or throwing a body onto spikes on purpose
+    with a move of its own; fences made for it (sharpened stakes, iron railings).
 - Not done: Forward+ unchecked (and the shadows the cut-out throws); posts are drawn, not modelled; fences
   only run along X or Z on level ground; a bullet stops at a board fence as at a house wall; a gate is a
   plain door underneath (it blocks sight to its own height even in a rail fence, has no latch or lock,

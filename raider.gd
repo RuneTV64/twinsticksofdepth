@@ -476,6 +476,16 @@ func take_hit(dmg: float, dir: Vector3, knock: float) -> void:
 var _glass_t := 0.0
 
 
+## Caught on the points of a fence going over it: hurt, limping for a while, and he cries out.
+func spiked() -> void:
+	if dead:
+		return
+	_glass_t = glass_limp_time
+	_damage(glass_hurt * 2.0, Vector3.ZERO, 0.0, false)
+	if player != null and not player.dead and global_position.distance_to(player.global_position) <= 14.0:
+		player.show_status("Someone cries out: caught on a fence.", 1.8)
+
+
 func cut_foot() -> void:
 	if dead:
 		return
@@ -878,6 +888,10 @@ func _get_past(box: Cover.Box, n: Vector3, going: Vector3) -> void:
 			_vault_to = Vector3(land.x, global_position.y, land.y)
 			_vault_h = maxf(box.top - 0.45, 0.2)
 			_vault_t = vault_time
+			# Over something with points, he may catch himself on them, as you may.
+			var sp := Breakable.of(box.body)
+			if sp != null and sp.spikes > 0.0 and randf() < sp.spikes * 0.25:
+				spiked()
 			_drop_cover()
 			return
 	# Along the face, toward whichever end is nearer (or the way it was already leaning, if it can't tell).
