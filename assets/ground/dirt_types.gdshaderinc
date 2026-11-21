@@ -6,6 +6,7 @@
 //   2 road   a dirt road: ruts, a crown, loose stones at the edges; the ruts hold the water and the ice
 //   3 clay   bare clay: cracked when dry or frozen, slick when wet
 //   4 mud    a wet place: dark, puddled; dries to cracked flats in a drought, freezes in ridges
+//   5 bed    what lies under a street: packed stone and grit (it shows where the paving has been broken up)
 #include "res://assets/ground/dirt_modules.gdshaderinc"
 
 const int DIRT_SOIL = 0;
@@ -13,6 +14,7 @@ const int DIRT_FARM = 1;
 const int DIRT_ROAD = 2;
 const int DIRT_CLAY = 3;
 const int DIRT_MUD = 4;
+const int DIRT_BED = 5;
 
 // How much water stands about for a wetness: nothing until it is properly wet, and in a frost there is always
 // some ice in the low places.
@@ -146,7 +148,29 @@ Ground dirt_mud(vec2 p, vec2 texel, GroundEnv e) {
 }
 
 // One kind by number. `dir` is the way rows or a road run (unit); `lat` and `half` are for the road.
+Ground dirt_bed(vec2 p, vec2 texel, GroundEnv e) {
+	Ground g;
+	g.ramp = R_ROAD;
+	float high = dirt_base(p, 5.0, 0.4, g);
+	g.v -= 0.08;
+	float low = dirt_low(p);
+	float stone = dirt_pebbles(p, 0.95, g);
+	if (stone < 0.5) {
+		dirt_wet(p, texel, max(e.wet, 0.2 * e.spring), g);
+		dirt_leaves(p, 0.5 * e.autumn, g);
+	}
+	float water = dirt_puddles(p, texel, _dirt_water(e), low, e.frost, _dirt_rain(e), R_MUD, g);
+	if (water < 0.5) {
+		dirt_frost(p, texel, e.frost, high, g);
+	}
+	dirt_snow(p, texel, e.snow, low, g);
+	return g;
+}
+
 Ground dirt_pick(int kind, vec2 p, vec2 texel, vec2 dir, float lat, float half, GroundEnv e) {
+	if (kind == DIRT_BED) {
+		return dirt_bed(p, texel, e);
+	}
 	if (kind == DIRT_FARM) {
 		return dirt_farm(p, texel, dir, e);
 	}

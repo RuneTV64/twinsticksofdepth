@@ -3,7 +3,7 @@ extends Node3D
 ##  - Training yard (z -40..40): a small house with a normal door (south) and a heavy locked
 ##    door (east), training dummies, a few shamblers, the tutorial ammo crate.
 ##  - Cul-de-sac (north of the yard, through the gap in the wall): a short street ending in a
-##    turning circle, seven houses with doors and windows, a lot of zombies, and ammo hidden
+##    crossroads of dead ends, seven houses with doors and windows, a lot of zombies, and ammo hidden
 ##    inside some of the houses.
 ## North is -Z.
 
@@ -50,6 +50,7 @@ func _ready() -> void:
 	Solid.reset()
 	HouseKit.reset()
 	FenceKit.reset()
+	StreetKit.reset()
 	Cutaway.reset()
 	add_child(Wear.new())
 	add_child(Spill.new())
@@ -516,23 +517,18 @@ func _build_level() -> void:
 
 # ------------------------------------------------------------------ cul-de-sac
 func _build_culdesac() -> void:
-	# Road in from the yard, ending in a turning circle.
-	var asphalt := Color(0.2, 0.2, 0.22)
-	var bulb := Vector3(0, 0, -78)
-	_flat_box(Vector3(0, 0.02, -51.5), Vector3(8, 0.04, 31), asphalt, "asphalt", "pavement")
-	var circle := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
-	cm.top_radius = 14.0
-	cm.bottom_radius = 14.0
-	cm.height = 0.04
-	circle.mesh = cm
-	var cmat := StandardMaterial3D.new()
-	cmat.albedo_color = asphalt
-	cmat.roughness = 0.95
-	circle.material_override = cmat
-	circle.position = bulb + Vector3(0, 0.02, 0)
-	add_child(circle)
-	Solid.surface(circle, circle.position, Vector3(28, 0.04, 28), "asphalt", "pavement").radius = 14.0
+	# The street in from the yard (assets/buildings/street): four tiles north from the gap in the yard's wall
+	# to a crossroads, with a short dead end off it to the west, the east and the north. It is firm in all
+	# weather and takes no prints (except in snow); it is pavement, to be broken up for rock.
+	var street := StreetKit.new(self, Vector3(-14, 0, -94), 1)
+	street.plan([" # ",
+				 "###",
+				 " # ",
+				 " # ",
+				 " # ",
+				 " # "])
+	street.open(Vector2i(1, 5), "S")          # it carries on through the gap, to the yard's dirt road
+	street.build()
 
 	# Houses: center (x, z), width (x), depth (z), which wall the front door is on.
 	_house(Vector2(-14, -53), 10, 12, "E", Color(0.66, 0.6, 0.5))          # street, west side

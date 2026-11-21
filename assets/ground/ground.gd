@@ -17,7 +17,7 @@ extends StaticBody3D
 const CELL := 0.25      # metres to a map texel
 const TRACK_CELL := 0.125   # metres to a texel of the tracks map: a footprint is two of them long
 ## Dirt is 0 to 7, grass from 8 (dirt_types.gdshaderinc, grass_types.gdshaderinc).
-const KINDS := {"soil": 0, "farm": 1, "road": 2, "clay": 3, "mud": 4, "lawn": 8, "meadow": 9, "rough": 10}
+const KINDS := {"soil": 0, "farm": 1, "road": 2, "clay": 3, "mud": 4, "bed": 5, "lawn": 8, "meadow": 9, "rough": 10}
 
 static var it: Ground
 
@@ -107,6 +107,28 @@ func rect(kind: String, r: Rect2, dir_deg := 0.0) -> void:
 	_img.fill_rect(Rect2i(a, b - a).intersection(Rect2i(0, 0, _w, _h)), _px(kind, 0.5, Vector2.from_angle(deg_to_rad(dir_deg))))
 
 
+## One kind wherever `test` (a spot on the ground, x and z -> bool) says so, inside a rectangle. A street
+## lays its bed under itself this way (assets/buildings/street).
+func paint(kind: String, r: Rect2, test: Callable) -> void:
+	var px := _px(kind)
+	var a := _cell(r.position)
+	var b := _cell(r.end)
+	for y in range(maxi(a.y, 0), mini(b.y + 1, _h)):
+		for x in range(maxi(a.x, 0), mini(b.x + 1, _w)):
+			if test.call(area.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * CELL):
+				_img.set_pixel(x, y, px)
+
+
+## The tracks map and what it covers (x, z, width, depth), for anything laid over the ground that should show
+## prints in the snow lying on it (a street).
+func tracks_texture() -> Texture2D:
+	return _tracks_tex
+
+
+func tracks_rect() -> Vector4:
+	return Vector4(area.position.x, area.position.y, _tw * TRACK_CELL, _th * TRACK_CELL)
+
+
 ## A round patch of one kind.
 func blob(kind: String, centre: Vector2, radius: float, dir_deg := 0.0) -> void:
 	var px := _px(kind, 0.5, Vector2.from_angle(deg_to_rad(dir_deg)))
@@ -182,7 +204,7 @@ func softness(pos: Vector3) -> float:
 	elif not frozen:
 		if kind == "farm":
 			soft = 0.3 + 0.3 * s.y
-		elif kind != "lawn" and kind != "meadow":
+		elif kind != "lawn" and kind != "meadow" and kind != "bed":       # (a street's bed is packed hard)
 			soft = 0.45 * smoothstep(0.55, 1.0, s.y)
 	return soft
 

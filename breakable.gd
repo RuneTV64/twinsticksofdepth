@@ -55,6 +55,7 @@ var look := Callable()           # (stage) -> Material, for things drawn with th
 var splitter := Callable()       # set by Solid for something long: (breakable, at) -> the Breakable for that section
 var on_stage := Callable()       # (stage): the thing shows its damage
 var on_cell := Callable()        # (cell: Vector2i): a surface shows a hole
+var on_shape := Callable()       # (p: Vector2) -> bool: a surface that isn't its whole footprint (a street tile)
 
 var _cells: Array[Vector2i] = []
 var _work := {}                  # surface: Vector2i (1 m cell) -> hp left
@@ -195,7 +196,7 @@ func hits_left(force: float, kind: String) -> float:
 	var d := dealt(force, kind)
 	var left := hp
 	if surface:
-		left = float(Materials.of(stuff)["hp"])
+		left = float(Materials.of(stuff)["hp"]) * thin
 	elif splitter.is_valid():
 		left = hp * minf(section / maxf(maxf(rect.size.x, rect.size.y), 0.01), 1.0)   # only a section of it has to go
 	return left / d if d > 0.0 else INF
@@ -280,7 +281,8 @@ func _cell_of(at: Vector3) -> Vector2i:
 
 ## Is this spot on it (a round surface is smaller than its footprint)?
 func on_it(p: Vector2) -> bool:
-	return rect.has_point(p) and (radius <= 0.0 or p.distance_to(rect.get_center()) <= radius)
+	return rect.has_point(p) and (radius <= 0.0 or p.distance_to(rect.get_center()) <= radius) \
+		and (not on_shape.is_valid() or on_shape.call(p))
 
 
 ## Is this square metre of it already broken up?
@@ -296,7 +298,7 @@ func _hit_surface(force: float, kind: String, at: Vector3, by: Node) -> float:
 	if d <= 0.0:
 		return 0.0
 	var m := Materials.of(stuff)
-	var left: float = float(_work.get(c, float(m["hp"]))) - d
+	var left: float = float(_work.get(c, float(m["hp"]) * thin)) - d
 	if left > 0.0:
 		_work[c] = left
 		Earshot.make(at, float(m["noise"]), get_tree(), by, by is Player)

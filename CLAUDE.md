@@ -42,7 +42,8 @@ half strength in a cut wall, and the cursor cutaway (see Camera). Review sheets 
 `assets/buildings/house/preview/` and `tools/preview/cursor_cutaway.png`.
 
 Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
-owner: the fence kit, and bodies impaled on spiked fences (see The fence kit). The owner has pivoted back to making assets.
+owner: the fence kit, and bodies impaled on spiked fences with their pose (see The fence kit); and the street
+kit (see The street kit). The owner has pivoted back to making assets.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -370,7 +371,7 @@ This is the foundation; every number in it is Claude's first guess.
     Nobody vaults or climbs through an opening with a pane or boards across it (`Breakable.barrier_between`).
   - Floors and pavement are worked a square metre at a time and leave a hole showing dirt.
 - In the test level: house walls brick, inside walls plaster, crates wood, cars metal with glass and
-  plastic, the street asphalt, floors wood, doors wood (the locked one twice as strong, part metal); a
+  plastic, the street asphalt (since 21 Nov 2026 the street kit's tiles: see The street kit), floors wood, doors wood (the locked one twice as strong, part metal); a
   table, a fridge and a street sign as one of each sort; a sledgehammer in the tool box.
 - The player (`player.gd`, `_strike_breakable()`, `break_tool()`): Ready, crosshair on the thing (the red x),
   within `break_reach` 1.9 m, left-click. Fists Ready you use the best tool you carry for that material
@@ -793,6 +794,62 @@ account) and in the **Building Assets** artifact (`files/Fence/`). On the branch
   rail fences; nothing to build or mend a fence in play; no other styles (chain link, railings, walls,
   hedges).
 
+## The street kit (built 21 Nov 2026, in review; not seen by the owner)
+
+The owner: "Cool. Now make some streets." Made on the house's and the fences' principle. Everything is in
+`assets/buildings/street/` (its README has the full account) and in the **Building Assets** artifact
+(`files/Street/`). On the branch `claude/destructible-environment-6yu73c`, not on `main`. Every number is
+Claude's first guess.
+
+- One style: a 6 m asphalt carriageway with a concrete kerb and a 1.5 m sidewalk each side, laid as flat
+  9 m tiles on a grid (three of the house kit's cells, so houses, fences and streets line up).
+- `street_kit.gd` (`StreetKit`): `StreetKit.new(level, origin, wear)`; mark cells with `plan(rows)` ("#" =
+  street, rows north to south), `add(cells)` or `line(a, b)`; `open(cell, side)` where a street carries on
+  off the plan; `build()`. Each tile works out which neighbours it joins (`links_of`), and so its shape:
+  straight, bend, T, crossroads, dead end with a rounded head. `what_at(p)`: "road", "kerb", "sidewalk" or
+  "". The origin is rounded to whole metres so a tile's 81 square metres are the breaking code's own.
+  `StreetKit.edge()` and the shader's `street_d()` are the same sum (the shape): keep them in step.
+- `street.gdshader`, one shader for every tile (shape from `links`): asphalt with its stone showing, wheel
+  paths, a dashed yellow centre line, a white crossing and stop line on every arm of a junction, a manhole
+  on some straights, drain grates in the gutter, the kerb, sidewalk slabs. Its texels are the world's own,
+  square to the street (as a house floor's are), not the ground's turned ones. Ramps:
+  `street_ramps.gdshaderinc` from `source/gen_street_ramps.py` (numbered from 100, so one spot can be on a
+  street ramp or one of the ground's). The same three things change it as change the house:
+  - the season and weather (`ground_season`, using the ground's own puddle, leaf, frost and snow modules):
+    wet asphalt nearly black, water in the gutters and potholes (ice in a frost, rain rings), a bleached
+    summer, leaves along the kerbs, frost, lying snow with footprints in it (it reads the ground's tracks
+    map);
+  - `wear` 0, 1, 2: cracks and tar seals and fading paint; then crazing, potholes to the bed, weeds in
+    every crack and joint (green in the growing seasons, straw after);
+  - the cutaway.
+  One shared material a shape, stage and weather (`StreetKit.mat`); a tile that has been broken into gets
+  one of its own, with its holes in it (`holes`, 81 bits).
+- What a street does (rule 2):
+  - Firm in all weather: under itself it lays a new kind of ground, `bed` (packed stone and grit:
+    `Ground.paint()`, `dirt_bed()` in `dirt_types.gdshaderinc`), which is never soft. So no mud and no
+    prints on a street, and nothing follows a trail along it; in lying snow it takes prints like anywhere.
+  - Open: no cover, nothing to hide in.
+  - Pavement (rule 1): each tile is a `Solid.surface` ("street", asphalt), broken up a square metre at a
+    time; the square metre is cut out of the tile (ragged) and the bed shows. `Breakable.on_shape` keeps
+    the corners of a tile that aren't street out of it; `Breakable.thin` makes a worn street weaker.
+  - Water stands in its gutters and potholes in rain (the look only: it does nothing yet).
+- In the test level the cul-de-sac's plain asphalt and turning circle are gone: a cracked street (wear 1)
+  runs four tiles north from the gap in the yard's wall to a crossroads with a dead end west, east and
+  north. It is centred on x -0.5 (tiles are whole metres).
+- Review sheets (software renderer; `tools/street_preview.gd`, MODE shape, scene, plan or town; HOLES=1):
+  `preview/street_shapes.png`, `street_seasons.png`, `street_wear.png`, `street_town.png`.
+- Cloud run (`tools/street_test.gd`): a plan of 13 cells worked itself out as 5 straights, 3 bends, 3 dead
+  ends, a T and a crossroads. Walking 10 m: dry, no prints on the street or beside it; in rain, none on
+  the street and 8 on the bare ground beside it; in lying snow, 14 on each. A square metre: 10 sledgehammer
+  blows laid sound, 6 cracked, 3 breaking up; fists get nowhere; 3 rocks left; the crosshair then finds
+  nothing there. The level has 8 street tiles and 455 breakable things.
+- Not done: Forward+ unchecked; it is flat (the kerb is drawn, not raised); north-south and east-west
+  only, one width, no curves, lanes or parking; the whole tile breaks as pavement (a sidewalk slab is as
+  hard as the carriageway); nothing stands on it (no street lamps, signs, hydrants or parked cars come
+  with the kit); footsteps are no louder on it; potholes and puddles do nothing to whoever walks in them;
+  worn all over, not where used; weeds are drawn, not grown; two streets side by side join into one slab;
+  the old "street sign" test object and the cars were left where they were.
+
 ## Small rules the owner has set (20 Nov 2026)
 
 - The mind goes with the body (owner: zombies follow tracks too, but "the more they rot they lose the ability
@@ -862,9 +919,10 @@ changes, update both, and keep them the same files.
 - Ground assets (dirt, grass, seasons): the **Ground Assets** artifact,
   https://claude.ai/artifact/UJoHeBzm47cZoGwVgMa3xU (`files/Ground/`; in review). The same files as
   `assets/ground/`.
-- Building assets (the house kit and the fence kit): the **Building Assets** artifact,
-  https://claude.ai/artifact/T6hgheyYpqh5JaiJSvoCwr (`files/House/` and `files/Fence/`; in review). The same
-  files as `assets/buildings/house/` and `assets/buildings/fence/` (the harnesses are in `tools/`).
+- Building assets (the house kit, the fence kit and the street kit): the **Building Assets** artifact,
+  https://claude.ai/artifact/T6hgheyYpqh5JaiJSvoCwr (`files/House/`, `files/Fence/` and `files/Street/`; in
+  review). The same files as `assets/buildings/house/`, `assets/buildings/fence/` and
+  `assets/buildings/street/` (the harnesses are in `tools/`).
 - Before starting asset work, check the Artifacts first. Work done in an earlier chat may only be there, not in git.
 - Layout inside an asset artifact: `files/<AssetName>/`. Models are `.glb.b64.txt` (base64 of the .glb, since
   artifacts can't hold .glb). Godot scripts and shaders are `.gd.txt` / `.gdshader.txt`, Python `.py.txt`. The
