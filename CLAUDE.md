@@ -32,8 +32,8 @@ Built after those answers and not yet seen by the owner: the burning torch, and 
 player (sheet: `tools/preview/missing_limbs.png`).
 
 Built 21 Nov 2026, on `main` since the owner said to push it, but not yet seen or played by the
-owner: everything can be broken (see Two rules for every object, and Breaking things), and bare feet, blood
-on the ground and ordinary infection. Tested headless only.
+owner: everything can be broken (see Two rules for every object, and Breaking things); bare feet, blood
+on the ground and ordinary infection; and how clean water is. Tested headless only.
 
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
