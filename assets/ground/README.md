@@ -25,6 +25,7 @@ weather. **Status: in review** (made 20 Nov 2026; never seen on Forward+, only o
 | 2 | road | a dirt road: two ruts, a crown, loose stones at the edges; the ruts hold the water and the ice |
 | 3 | clay | bare clay: cracked when dry or frozen, slick when wet |
 | 4 | mud | a wet place: dark and puddled; dries to cracked flats in a drought, freezes hard |
+| 5 | bed | what lies under a street: packed stone and grit, never soft (the street kit lays it; it shows where paving is broken up) |
 
 ## Kinds of grass
 
