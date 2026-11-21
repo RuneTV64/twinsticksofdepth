@@ -41,8 +41,8 @@ aiming at things above you (see The house kit); buildings that open while you ar
 half strength in a cut wall, and the cursor cutaway (see Camera). Review sheets in
 `assets/buildings/house/preview/` and `tools/preview/cursor_cutaway.png`.
 
-Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
-owner: the fence kit, and bodies impaled on spiked fences with their pose (see The fence kit); and the street
+Built 21 Nov 2026, on `main` since the owner said to push it, but not yet seen or played by the owner:
+the fence kit, and bodies impaled on spiked fences with their pose (see The fence kit); and the street
 kit (see The street kit). The owner has pivoted back to making assets.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
@@ -703,8 +703,8 @@ artifact (see Where game design assets live).
 
 The owner: "We will pivot back to making assets. You made dirt. Now make fences. Same design principle as
 the house, just fences this time." Everything is in `assets/buildings/fence/` (its README has the full
-account) and in the **Building Assets** artifact (`files/Fence/`). On the branch
-`claude/destructible-environment-6yu73c`, not on `main`. Every number is Claude's first guess.
+account) and in the **Building Assets** artifact (`files/Fence/`). On `main` since 21 Nov 2026. Every
+number is Claude's first guess.
 
 - One style, timber, three kinds, each with a job of its own (rule 2):
   - `picket`, 1.0 m, painted white: low cover. You crouch behind it, vault it, shoot over it; a zombie
@@ -798,8 +798,7 @@ account) and in the **Building Assets** artifact (`files/Fence/`). On the branch
 
 The owner: "Cool. Now make some streets." Made on the house's and the fences' principle. Everything is in
 `assets/buildings/street/` (its README has the full account) and in the **Building Assets** artifact
-(`files/Street/`). On the branch `claude/destructible-environment-6yu73c`, not on `main`. Every number is
-Claude's first guess.
+(`files/Street/`). On `main` since 21 Nov 2026. Every number is Claude's first guess.
 
 - One style: a 6 m asphalt carriageway with a concrete kerb and a 1.5 m sidewalk each side, laid as flat
   9 m tiles on a grid (three of the house kit's cells, so houses, fences and streets line up).
