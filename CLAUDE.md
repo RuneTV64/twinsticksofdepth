@@ -45,6 +45,9 @@ Built 21 Nov 2026, on `main` since the owner said to push it, but not yet seen o
 the fence kit, and bodies impaled on spiked fences with their pose (see The fence kit); and the street
 kit (see The street kit). The owner has pivoted back to making assets.
 
+Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
+owner: street lamps and signs (see The street kit, Lamps and signs).
+
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
 before then. Claude's answer, for when it comes up again: keep the free cursor when Ready (windows, walls,
@@ -372,7 +375,8 @@ This is the foundation; every number in it is Claude's first guess.
   - Floors and pavement are worked a square metre at a time and leave a hole showing dirt.
 - In the test level: house walls brick, inside walls plaster, crates wood, cars metal with glass and
   plastic, the street asphalt (since 21 Nov 2026 the street kit's tiles: see The street kit), floors wood, doors wood (the locked one twice as strong, part metal); a
-  table, a fridge and a street sign as one of each sort; a sledgehammer in the tool box.
+  table and a fridge as one of each sort (the plain street sign that stood with them gave way to the
+  street kit's signs); a sledgehammer in the tool box.
 - The player (`player.gd`, `_strike_breakable()`, `break_tool()`): Ready, crosshair on the thing (the red x),
   within `break_reach` 1.9 m, left-click. Fists Ready you use the best tool you carry for that material
   (hatchet chops, sledgehammer pounds); gun in hand it is shot, or butted when empty. The prompt names the
@@ -842,12 +846,47 @@ The owner: "Cool. Now make some streets." Made on the house's and the fences' pr
   the street and 8 on the bare ground beside it; in lying snow, 14 on each. A square metre: 10 sledgehammer
   blows laid sound, 6 cracked, 3 breaking up; fists get nowhere; 3 rocks left; the crosshair then finds
   nothing there. The level has 8 street tiles and 455 breakable things.
+- Lamps and signs (owner, 21 Nov 2026: "Now make street lamps and signs"; built the same day, on the
+  branch `claude/destructible-environment-6yu73c`, not on `main`, not seen by the owner). In the same
+  kit: `StreetKit.lamp(p, on)`, `signpost(p, face, toward, says)` ("stop", "name", "warning"; `sign` is a
+  built-in name), `name_sign(p)` (two blades), and `furnish()`: a lamp on each straight on alternate sides,
+  a stop sign facing what comes in on every arm of a junction, a name sign at its corner, a warning where
+  a dead end begins. Test `tools/lamp_test.gd`; sheets `preview/street_props.png`,
+  `street_furnished.png`.
+  - A lamp: a steel post (3.5 m, a `Solid.box`, "lamp post") with a glass lantern on top (its own body on
+    the glass layer, a `Breakable` "street lamp", `lets_shots`). Lit, it is a `Daylight` lamp (8 m) and an
+    `OmniLight3D`: at night whoever stands in it is seen from as far as by day. The lantern is above your
+    storey, so the crosshair picks it by the "hits what it covers" rule: a shot or a thrown rock breaks
+    it, `Daylight.remove_lamp()` puts the light out, and its glass falls to the ground under it. The
+    post's `broke` takes the lantern with it. Power is a stand-in: `StreetKit.lit` (true), and one put up
+    worn out (wear 2) is dark.
+  - A sign: a thin steel post (a `Solid.box` named by its face) with a plate that is only drawn (it goes
+    with the post). `StreetSign` (`street_sign.gd`, an interactable) reads it out: "STOP", "Dead end",
+    "Cedar Lane / Maple Street" (`StreetKit.names`). It is no cover, and it rings when hit (metal, 11 m):
+    a noise made on purpose without a shot.
+  - `street_prop.gdshader`: posts, the lantern (frame, cap, glass glowing when lit), sign faces (a stop
+    sign's corners and a warning's diamond are cut away); wet, frost and snow on caps; wear rusts posts,
+    fades paint, shoots holes in signs, breaks the lantern's glass. New ramps: steel, red, sign green, glow.
+  - `fog.gd` now sends the shader the 8 lamps nearest the player when there are more (picked twice a
+    second), and resends when one goes out (`Daylight.lamps_rev`).
+  - In the test level: `street.furnish()`: 4 lamps, 4 stop signs, a name sign, 3 dead-end warnings. The
+    old plain "street sign" box by the yard's gap is gone. 7 lit lamps in the level now; 470 breakable
+    things.
+  - Cloud run: at night the light under a lamp is 1.00 and you are seen from the full daytime distance;
+    in the dark of the crossroads 0.08 and 0.36. Its light: full to 2 m, 0.86 at 4 m, 0.33 at 6 m, gone
+    by 8 m. One shot from 7.5 m with the crosshair on the lantern broke it: light out, 1 glass under it,
+    post standing. A rock from 6.5 m did the same. A lamp post: 3 sledgehammer blows, 18 hatchet, about
+    330 zombie blows; its lantern went with it and left metal and glass. A sign post: 2, 9, about 165.
+    A sign punched once: zombies 5 m and 9 m off turned to it, one at 14 m did not.
+  - Not done: power (no grid, no flicker, nothing switches a street off); the lit look was only rendered
+    with the daylight turned down, not with the game's darkness; a plate can't be hit or taken on its
+    own and shots pass through it; signs face the four ways only and show marks, not letters; raiders and
+    zombies make nothing of lamps beyond the light; no hydrants, benches, bins or parked cars.
 - Not done: Forward+ unchecked; it is flat (the kerb is drawn, not raised); north-south and east-west
   only, one width, no curves, lanes or parking; the whole tile breaks as pavement (a sidewalk slab is as
-  hard as the carriageway); nothing stands on it (no street lamps, signs, hydrants or parked cars come
-  with the kit); footsteps are no louder on it; potholes and puddles do nothing to whoever walks in them;
+  hard as the carriageway); footsteps are no louder on it; potholes and puddles do nothing to whoever walks in them;
   worn all over, not where used; weeds are drawn, not grown; two streets side by side join into one slab;
-  the old "street sign" test object and the cars were left where they were.
+  the cars were left where they were.
 
 ## Small rules the owner has set (20 Nov 2026)
 
