@@ -46,7 +46,8 @@ the fence kit, and bodies impaled on spiked fences with their pose (see The fenc
 kit (see The street kit). The owner has pivoted back to making assets.
 
 Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
-owner: street lamps and signs (see The street kit, Lamps and signs).
+owner: street lamps and signs (see The street kit, Lamps and signs), and the furniture kit (see The
+furniture kit).
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -878,6 +879,8 @@ The owner: "Cool. Now make some streets." Made on the house's and the fences' pr
     post standing. A rock from 6.5 m did the same. A lamp post: 3 sledgehammer blows, 18 hatchet, about
     330 zombie blows; its lantern went with it and left metal and glass. A sign post: 2, 9, about 165.
     A sign punched once: zombies 5 m and 9 m off turned to it, one at 14 m did not.
+  - To come with sound (owner, 21 Nov 2026: "When we make sounds we will make it so you can shoot the
+    signs"): a sign's plate is to be something a shot hits, with its own ring. Not before there are sounds.
   - Not done: power (no grid, no flicker, nothing switches a street off); the lit look was only rendered
     with the daylight turned down, not with the game's darkness; a plate can't be hit or taken on its
     own and shots pass through it; signs face the four ways only and show marks, not letters; raiders and
@@ -887,6 +890,57 @@ The owner: "Cool. Now make some streets." Made on the house's and the fences' pr
   hard as the carriageway); footsteps are no louder on it; potholes and puddles do nothing to whoever walks in them;
   worn all over, not where used; weeds are drawn, not grown; two streets side by side join into one slab;
   the cars were left where they were.
+
+## The furniture kit (built 21 Nov 2026, in review; not seen by the owner)
+
+The owner: "make some furniture for the home you designed". Everything is in
+`assets/buildings/furniture/` (its README has the full account) and in the **Building Assets** artifact
+(`files/Furniture/`). On the branch `claude/destructible-environment-6yu73c`, not on `main`. Every number
+is Claude's first guess.
+
+- Eleven pieces, one plain household style: couch, armchair, table, chair, kitchen counter (any length),
+  stove, fridge, bed, wardrobe, dresser, bookshelf.
+- `furniture_kit.gd` (`FurnitureKit`): `FurnitureKit.new(level, wear, stain, fabric)`, `put(kind, at,
+  facing)` (`at` is the middle of the piece on its floor, y the floor's height), `counter(a, b, floor_y,
+  facing)`, and `FurnitureKit.furnish(level, house_origin, storeys, wear, stain, fabric, pin)` for the
+  ordinary 3 by 2 `HouseKit.house`: a living room inside the front door, a kitchen in the east room, a
+  dresser in the back room, two bedrooms upstairs. `KINDS` has each piece's size and what it is made of;
+  `LATER` what it is meant to do once loot, sleep and food exist (none of that is built).
+- A piece is a few boxes joined into one mesh (`mesh_of`, built once a kind and shared): UV is the spot on a
+  face, UV2 the face's size, COLOR.r the part the face plays, COLOR.g a number of its own.
+  `furniture.gdshader` paints by part: boards, drawers, doors, shelves of books, upholstery, sheet,
+  blanket, pillow, cast iron (with the fire behind the stove's door), enamel, worktop, cupboards. Ramps:
+  the house's, and eight of its own from 16 up (`furniture_ramps.gdshaderinc`,
+  `source/gen_furniture_ramps.py`). One shared material for each wood, cloth, stage and weather.
+- Rule 1: each piece is a `Solid.box` round the whole of it (Solid's own plain mesh is hidden; the piece's
+  mesh is a child), so it is cover on its floor and breaks like anything. `thin_to` makes furniture lighter
+  than walls; a piece breaks whole (no splitter). New material `cloth` (`materials.gd`: soft, chopped not
+  pounded, it rots) with its scrap `cloth_scrap`, "Torn cloth" (`items.gd`): couch, armchair and bed are
+  wood and cloth. The fridge is steel and plastic, the stove cast iron.
+- Rule 2, what works now: low pieces (everything but the fridge, wardrobe and bookshelf) are low cover to
+  crouch behind and vault, and a zombie climbs them; the three tall ones are high cover and stop sight; a
+  stove put down not worn out is lit and has a `Campfire` on it, so water boils on it. Each body carries
+  the meta "furniture" (its kind) for the systems to come.
+- What changes the look: `wear` 0, 1, 2 (scuffs, fading, books and a drawer gone; then cloth torn to the
+  stuffing, drawers and doors out, rust); the season, but indoors only the damp and only on a worn piece
+  (mould in the wet and the cold); `stain` (pine, oak, walnut) and `fabric` (brick red, olive, blue); and
+  the cutaway, where furniture stands while you are indoors as the stairs do (`cutaway_hidden_standing`).
+- In the test level: the sound kit house is furnished on both floors; the derelict one has a worn-out
+  couch, table and dresser. 490 breakable things.
+- Review sheets (software renderer; `tools/furniture_preview.gd`, MODE pieces, backs or house):
+  `preview/furniture_pieces.png`, `furniture_wear.png`, `furniture_colours.png`, `furniture_house.png`.
+- Cloud run (`tools/furniture_test.gd`), zombie blows to break each sound piece: chair 2, armchair 4,
+  dresser 5, table 6, counter 7, bookshelf 8, couch 9, wardrobe 11, bed 15, fridge 315, stove 600. A
+  wardrobe put down sound, damaged, about to give: 11, 7, 4. Hunkered in front of the couch you are hidden
+  from across it; the fridge stops sight, the table doesn't; a zombie with a chair or the kitchen table
+  between it and the player climbed over in under 3 s; water put on the kitchen stove had boiled 20 s
+  later. The stairs, floors and aiming tests still pass in the furnished house.
+- Not done: Forward+ unchecked; nothing can be searched, sat on, slept in or cooked on; nothing can be
+  pushed, tipped or stood on (no blocking a door with a wardrobe); the stove is always lit, needs no fuel,
+  gives no light or warmth; no bathroom, and no small things (lamps, rugs, low tables, a television); what
+  you walk into is one box round the piece (no stepping between a chair's legs, no seeing under a table);
+  one size of each; `furnish` only knows the 3 by 2 house and leaves the basement empty; worn all over,
+  not where hit.
 
 ## Small rules the owner has set (20 Nov 2026)
 
@@ -957,10 +1011,11 @@ changes, update both, and keep them the same files.
 - Ground assets (dirt, grass, seasons): the **Ground Assets** artifact,
   https://claude.ai/artifact/UJoHeBzm47cZoGwVgMa3xU (`files/Ground/`; in review). The same files as
   `assets/ground/`.
-- Building assets (the house kit, the fence kit and the street kit): the **Building Assets** artifact,
-  https://claude.ai/artifact/T6hgheyYpqh5JaiJSvoCwr (`files/House/`, `files/Fence/` and `files/Street/`; in
-  review). The same files as `assets/buildings/house/`, `assets/buildings/fence/` and
-  `assets/buildings/street/` (the harnesses are in `tools/`).
+- Building assets (the house kit, the fence kit, the street kit and the furniture kit): the **Building
+  Assets** artifact, https://claude.ai/artifact/T6hgheyYpqh5JaiJSvoCwr (`files/House/`, `files/Fence/`,
+  `files/Street/` and `files/Furniture/`; in review). The same files as `assets/buildings/house/`,
+  `assets/buildings/fence/`, `assets/buildings/street/` and `assets/buildings/furniture/` (the harnesses
+  are in `tools/`).
 - Before starting asset work, check the Artifacts first. Work done in an earlier chat may only be there, not in git.
 - Layout inside an asset artifact: `files/<AssetName>/`. Models are `.glb.b64.txt` (base64 of the .glb, since
   artifacts can't hold .glb). Godot scripts and shaders are `.gd.txt` / `.gdshader.txt`, Python `.py.txt`. The

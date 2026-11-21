@@ -40,6 +40,8 @@ const DEFS := {
 		"scrap": "rock", "per_m2": 3.0, "agent": "none", "noise": 9.0, "tint": Color(0.3, 0.3, 0.32)},
 	"metal": {"name": "metal", "hp": 400.0, "hard": 30.0, "blunt": 1.0, "chop": 0.3, "pound": 1.0, "pierce": 0.15,
 		"scrap": "scrap_metal", "per_m2": 1.0, "agent": "rust", "noise": 11.0, "tint": Color(0.5, 0.52, 0.55)},
+	"cloth": {"name": "cloth", "hp": 30.0, "hard": 0.0, "blunt": 0.4, "chop": 2.0, "pound": 0.4, "pierce": 0.6,
+		"scrap": "cloth_scrap", "per_m2": 1.0, "agent": "rot", "noise": 2.0, "tint": Color(0.5, 0.42, 0.4)},
 	"plastic": {"name": "plastic", "hp": 50.0, "hard": 4.0, "blunt": 1.0, "chop": 1.5, "pound": 1.5, "pierce": 0.4,
 		"scrap": "plastic_scrap", "per_m2": 1.0, "agent": "none", "noise": 5.0, "tint": Color(0.85, 0.85, 0.8)},
 }

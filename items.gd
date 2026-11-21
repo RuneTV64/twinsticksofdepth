@@ -25,6 +25,7 @@ const DEFS := {
 	"sledgehammer": {"name": "Sledgehammer", "w": 4.5, "cat": "tool", "for": "Pounds. The tool for brick, concrete and pavement; slow and tiring."},
 	"glass_shard": {"name": "Broken glass", "w": 0.1, "cat": "scrap", "stack": 5, "for": "Shards from something glass that broke. Sharp."},
 	"bloody_glass": {"name": "Bloody glass", "w": 0.1, "cat": "scrap", "stack": 5, "for": "A shard drawn out of a wound. The blood stays on it."},
+	"cloth_scrap": {"name": "Torn cloth", "w": 0.1, "cat": "scrap", "stack": 5, "for": "Ripped from a couch or a mattress. Filthy as it is; washed, it would be rags."},
 	"wood_scrap": {"name": "Splintered wood", "w": 0.4, "cat": "scrap", "stack": 3, "for": "Broken wood: no use as a plank any more, but it is still wood."},
 	"scrap_metal": {"name": "Scrap metal", "w": 0.6, "cat": "scrap", "stack": 2, "for": "Bent and torn metal from something that broke."},
 	"plastic_scrap": {"name": "Broken plastic", "w": 0.15, "cat": "scrap", "stack": 4, "for": "Cracked pieces of something plastic."},

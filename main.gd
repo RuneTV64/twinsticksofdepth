@@ -51,6 +51,7 @@ func _ready() -> void:
 	HouseKit.reset()
 	FenceKit.reset()
 	StreetKit.reset()
+	FurnitureKit.reset()
 	Cutaway.reset()
 	add_child(Wear.new())
 	add_child(Spill.new())
@@ -494,6 +495,13 @@ func _build_level() -> void:
 	# it, to compare. Every part of them is a Solid like the rest of the level.
 	HouseKit.house(self, Vector3(18, 0, -34), 3, 2, 2, 0, 0, Vector4(-1.0, 0.0, 0.0, 0.0), true)
 	HouseKit.house(self, Vector3(30, 0, -34), 2, 2, 1, 2, 1)
+	# Furniture (assets/buildings/furniture): the sound house furnished room by room; the derelict one has
+	# what is left of its own. Low pieces are cover, tall ones stop sight, and the stove boils water.
+	FurnitureKit.furnish(self, Vector3(18, 0, -34), 2, 0)
+	var left := FurnitureKit.new(self, 2, 1, 1)
+	left.put("couch", Vector3(31.5, 0, -28.6), "N")
+	left.put("table", Vector3(34.4, 0, -32.4), "S")
+	left.put("dresser", Vector3(31.5, 0, -33.6), "S")
 	# Fences (assets/buildings/fence): one of each kind, each doing its own job.
 	# A picket front yard for the derelict house, as worn as the house: low cover, and a zombie has to climb it.
 	var picket_yard := FenceKit.new(self, "picket", 2)
