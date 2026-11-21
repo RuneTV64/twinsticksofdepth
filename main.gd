@@ -123,6 +123,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				player.show_status("Test wound: %s." % tw[0])
 			KEY_PAGEUP: hud.sheet_select(-1)
 			KEY_PAGEDOWN: hud.sheet_select(1)
+			KEY_ENTER, KEY_KP_ENTER: hud.sheet_use()
+			KEY_DELETE, KEY_BACKSPACE: hud.sheet_drop()
 			KEY_MINUS: hud.sheet_adjust(-1)
 			KEY_EQUAL: hud.sheet_adjust(1)
 			KEY_1: _stat("strength", -1)
@@ -173,12 +175,16 @@ func _unhandled_input(event: InputEvent) -> void:
 					hud.add_child(_zone_label)
 				_zone_label.visible = not _zone_label.visible
 				_zone_t = 0.0
-			KEY_P:   # board up the window nearest the crosshair (a stand-in until planks, nails and a hammer exist)
-				var win := Solid.window_near(player.global_position + player.reticle_offset, 2.5)
-				if win.is_empty():
-					player.show_status("No window by the crosshair.", 1.5)
+			KEY_P:   # board up the window by the crosshair (hammer, nails, planks), or prise its boards off (crowbar)
+				if event.shift_pressed:
+					# The old stand-in, for testing: boarded at once, for nothing.
+					var win := Solid.window_near(player.global_position + player.reticle_offset, 2.5)
+					if win.is_empty():
+						player.show_status("No window by the crosshair.", 1.5)
+					else:
+						player.show_status("Boarded up (for nothing: a test key)." if Solid.board(win) else "It is boarded already.", 1.5)
 				else:
-					player.show_status("Boarded up." if Solid.board(win) else "It is boarded already.", 1.5)
+					player.work_window()
 			KEY_Y:   # lay the broken glass you carry, as an alarm or a trap
 				player.lay_glass()
 			KEY_I:   # drink from your bottle; Shift+I: filter or treat the water you carry
@@ -186,9 +192,16 @@ func _unhandled_input(event: InputEvent) -> void:
 					player.purify_water()
 				else:
 					player.drink_water()
-			KEY_U:   # shoes on and off, until footwear exists
-				player.barefoot = not player.barefoot
-				player.show_status("Barefoot." if player.barefoot else "Boots on (a stand-in until footwear exists).", 1.5)
+			KEY_U:   # boots on and off, if you have a pair. Shift+U: the old test switch, boots or no boots
+				if event.shift_pressed:
+					player.barefoot = not player.barefoot
+					player.show_status("Barefoot." if player.barefoot else "Shod (a test key: no boots needed).", 1.5)
+				elif player.inv.worn.has("feet"):
+					player.use_item("worn:feet")
+				elif player.inv.has("boots"):
+					player.use_item(player.inv.find("boots"))
+				else:
+					player.show_status("You have no boots.", 1.5)
 			KEY_O:   # break what the crosshair is on; Shift+O: ten minutes of rust and rot
 				if event.shift_pressed:
 					for w in get_tree().get_nodes_in_group("weathering"):
@@ -458,8 +471,21 @@ func _build_level() -> void:
 	tools.title = "Tool box"
 	tools.tint = Color(0.7, 0.3, 0.2)
 	tools.position = Vector3(-5, 0, 4)
-	tools.contents = [Items.make("steroids"), Items.make("hatchet"), Items.make("torch"), Items.make("fire_torch"), Items.make("sledgehammer")]
+	tools.contents = [Items.make("steroids"), Items.make("hatchet"), Items.make("torch"), Items.make("battery", 2), Items.make("fire_torch"), Items.make("sledgehammer")]
 	add_child(tools)
+	# What the things already in the game were waiting for (items.gd): boards for a window, boots and a helmet.
+	var joiner := ItemPickup.new()
+	joiner.title = "Carpenter's box"
+	joiner.tint = Color(0.62, 0.48, 0.3)
+	joiner.position = Vector3(-5, 0, 6)
+	joiner.contents = [Items.make("hammer"), Items.make("nails"), Items.make("plank", 4), Items.make("crowbar")]
+	add_child(joiner)
+	var kit_box := ItemPickup.new()
+	kit_box.title = "Boots and a helmet"
+	kit_box.tint = Color(0.4, 0.42, 0.36)
+	kit_box.position = Vector3(-7, 0, 6)
+	kit_box.contents = [Items.make("boots"), Items.make("helmet")]
+	add_child(kit_box)
 	_place_grass.call_deferred()     # once the whole level is built, so it lands clear of everything
 	for p in [Vector3(-1.5, 0, 3), Vector3(1.5, 0, 3), Vector3(-9, 0, 9), Vector3(-14, 0, 13)]:
 		_throwable("rock", p)
@@ -488,8 +514,8 @@ func _build_level() -> void:
 	kit.position = Vector3(-7, 0, 4)
 	kit.contents = [Items.make("purify_tabs"), Items.make("water_filter")]
 	add_child(kit)
-	_sign(Vector3(-9, 2.2, 6), "Water: fill a bottle here. Boil it on the fire, or Shift+I treats it. I drinks")
-	_sign(Vector3(0, 2.6, 5), "Break things: Ready, crosshair on it, left-click (P boards a window)")
+	_sign(Vector3(-9, 2.2, 6), "Water: fill a bottle here. Boil it on the fire (with a pot), or Shift+I treats it. I drinks")
+	_sign(Vector3(0, 2.6, 5), "Break things: Ready, crosshair on it, left-click. P boards a window: hammer, nails, planks")
 
 	# Houses from the kit (assets/buildings/house): a sound two-storey one, and a small derelict one beside
 	# it, to compare. Every part of them is a Solid like the rest of the level.
@@ -498,6 +524,13 @@ func _build_level() -> void:
 	# Furniture (assets/buildings/furniture): the sound house furnished room by room; the derelict one has
 	# what is left of its own. Low pieces are cover, tall ones stop sight, and the stove boils water.
 	FurnitureKit.furnish(self, Vector3(18, 0, -34), 2, 0)
+	# In its kitchen: what a stove wants and what you eat (the stove is cold: lay wood on it and light it).
+	var larder := ItemPickup.new()
+	larder.title = "Kitchen things"
+	larder.tint = Color(0.8, 0.74, 0.5)
+	larder.position = Vector3(25.2, 0, -29.3)
+	larder.contents = [Items.make("cooking_pot"), Items.make("matches"), Items.make("canned_food", 3), Items.make("can_opener")]
+	add_child(larder)
 	var left := FurnitureKit.new(self, 2, 1, 1)
 	left.put("couch", Vector3(31.5, 0, -28.6), "N")
 	left.put("table", Vector3(34.4, 0, -32.4), "S")
@@ -685,7 +718,7 @@ func _first_aid(pos: Vector3) -> void:
 	var b := ItemPickup.new()
 	b.position = pos
 	b.contents = [Items.make("bandage", 3), Items.make("clean_rag", 2), Items.make("needle_thread"),
-		Items.make("tweezers"), Items.make("vodka"), Items.make("water"), Items.make("painkillers")]
+		Items.make("tweezers"), Items.make("vodka"), Items.make("water"), Items.make("painkillers"), Items.make("antibiotics")]
 	add_child(b)
 
 

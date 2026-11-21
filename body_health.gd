@@ -71,6 +71,11 @@ var infect_part := ""        # where it went in
 var spread := 0.0            # 0 just bitten .. 1 it is in the body
 var sickness := 0.0          # 0 .. 1 you turn
 var steroid_t := 0.0
+## Antibiotics: a dose fights an ordinary infection for a while. They do nothing to a bite.
+var abx_time := 300.0        # s one dose works for
+var abx_slow := 0.25         # an infection that has hold feeds itself at this share of its pace
+var abx_fight := 3.0         # and the body beats it this much faster
+var abx_t := 0.0
 # ---- ordinary infection (owner, 21 Nov 2026). Not the zombie kind: it can kill you, it never turns you.
 ## Dirt gets into an open wound (`germs`), most of all through a cut foot walked on (soil()). Left there it
 ## takes hold (`inf` 0 to 1); washed in time, it doesn't. A wound it has taken hold of poisons the blood
@@ -104,6 +109,7 @@ func reset() -> void:
 	blood = 100.0
 	painkiller_t = 0.0
 	steroid_t = 0.0
+	abx_t = 0.0
 	infected = false
 	infect_part = ""
 	spread = 0.0
@@ -197,6 +203,9 @@ func blood_in(part: String) -> void:
 
 func _tick_infection(dt: float) -> void:
 	var bad := 0
+	abx_t = maxf(abx_t - dt, 0.0)
+	var slow := abx_slow if abx_t > 0.0 else 1.0
+	var fight := abx_fight if abx_t > 0.0 else 1.0
 	for w in wounds:
 		var germs := float(w.get("germs", 0.0))
 		var inf := float(w.get("inf", 0.0))
@@ -208,19 +217,21 @@ func _tick_infection(dt: float) -> void:
 		var over := germs - (dressed_shrug if covered else shrug)
 		if over > 0.0:
 			w["clean"] = false                           # it wants washing again
-		if inf >= hold and not (over <= 0.0 and covered):
-			inf = minf(inf + dt * maxf(over, 0.3) / infect_time, 1.0)    # it has taken hold: it feeds itself
+		if abx_t > 0.0 and inf >= hold and over <= 0.3:
+			inf = maxf(inf - dt * fight / fight_time, 0.0)                   # on antibiotics a wound that isn't filthy mends, dressed or not
+		elif inf >= hold and not (over <= 0.0 and covered):
+			inf = minf(inf + dt * slow * maxf(over, 0.3) / infect_time, 1.0)    # it has taken hold: it feeds itself
 		elif over > 0.0:
-			inf = minf(inf + dt * over / infect_time, 1.0)
+			inf = minf(inf + dt * slow * over / infect_time, 1.0)
 		elif inf > 0.0:
-			inf = maxf(inf - dt / fight_time, 0.0)      # clean enough, and the body gets on top of it
+			inf = maxf(inf - dt * fight / fight_time, 0.0)      # clean enough, and the body gets on top of it
 		w["inf"] = inf
 		if inf >= 1.0:
 			bad += 1
 	if bad > 0:
-		septic = minf(septic + dt * minf(bad, 2.0) / septic_time, 1.0)
+		septic = minf(septic + dt * slow * minf(bad, 2.0) / septic_time, 1.0)
 	else:
-		septic = maxf(septic - dt / septic_back, 0.0)
+		septic = maxf(septic - dt * fight / septic_back, 0.0)
 
 
 func dead_from_sepsis() -> bool:
@@ -258,6 +269,10 @@ func turned() -> bool:
 
 func take_steroid() -> void:
 	steroid_t = steroid_time
+
+
+func take_antibiotic() -> void:
+	abx_t = abx_time
 
 
 ## Can this part come off? (An arm or a leg that is still there.)

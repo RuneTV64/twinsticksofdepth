@@ -10,7 +10,8 @@ var _ammo: Label
 var _prompt: Label
 var _status: Label
 var _conds: RichTextLabel      # conditions affecting you now, right edge of the screen
-var _sheet: RichTextLabel      # the character page (C / Back)
+var _sheet: RichTextLabel      # the character page (C): who they are
+var _sheet2: RichTextLabel     # ... and beside it, how they are and what they carry
 var _sheet_panel: PanelContainer
 var _sheet_row := 0            # which row test editing changes
 var _sheet_t := 0.0
@@ -85,16 +86,22 @@ Breaking things: everything breaks. Ready, crosshair on it, close by, left-click
   sledgehammer (brick, pavement) if you carry one; a gun shoots it. Zombies beat on what is in their way, weakest
   first. What is left can be picked through, and rusts and rots away. Broken glass crunches underfoot.
   Water: fill a bottle at a barrel or trough. It may be dirty, and clear water can still be bad. Boil it on a
-  fire (interact, stay by it), or Shift+I filters it and then treats it with tablets. I drinks. Dirty water
-  fouls a wound washed with it and can make you ill.
+  fire (interact with a cooking pot, stay by it), or Shift+I filters it and then treats it with tablets. I drinks.
+  Dirty water fouls a wound washed with it and can make you ill. A stove is a fire too: lay wood on it, light it
+  with a match, feed it or it burns out.
+  Things you carry: C opens the character page; PgUp PgDn pick a thing, Enter uses it (eat a tin, put on boots,
+  take a pill, fresh batteries in the torch, wash cloth into a rag), Delete puts it down. Food and water run down.
   Y lays the broken glass you carry: a trap for bare feet, an alarm under boots. It stays until picked up.
-  Barefoot (U toggles boots), glass goes into your feet. A cut foot takes in what you walk through: wash and dress it.
+  Barefoot, glass goes into your feet (U puts boots on and off, if you have a pair). A cut foot takes in what you
+  walk through: wash and dress it. A helmet takes most of a blow to the head.
   Floors: stairs, upstairs and basements can be walked. Cover works on the floor you are on. A shot is a straight
   line: from an upstairs window the ground near the wall is hidden unless you take cover at the sill and pop up
   (Ready) to lean out; from below, only what shows over a sill can be hit. A drop of over 2 m bruises your legs.
   The crosshair hits what it covers: put it over an upstairs window, a wall or a roof and a shot or a thrown rock
   goes there. Glass breaks; a rock through an upstairs window lands, and is heard, upstairs.
-  P boards the window by the crosshair   O breaks what the crosshair is on   Shift+O ten minutes of rust and rot
+  P at a window by the crosshair: boards it up (a hammer, 4 nails, 2 planks; it takes a while and is heard), or
+  with a crowbar prises the boards off again. Shift+P boards it for nothing (a test key).
+  O breaks what the crosshair is on   Shift+O ten minutes of rust and rot
 Cutaway: walls between the camera and you open up; indoors the whole building opens (windows stay, faint); Ready, it opens to the crosshair too. V switches it off and on.
 Cover test: G test gunner at the crosshair   Shift+G remove them
 Raiders: a camp in the south-west of the yard.  T adds one at the crosshair   Shift+T removes those
@@ -184,27 +191,36 @@ func _ready() -> void:
 	_conds.offset_right = -20
 	root.add_child(_conds)
 
-	# The character page: everything on the sheet, in one panel over the middle of the screen.
+	# The character page: everything on the sheet, in one panel over the screen. Two columns: who they are on
+	# the left; how they are and what they carry on the right.
 	_sheet_panel = PanelContainer.new()
 	_sheet_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_sheet_panel.set_anchors_preset(Control.PRESET_CENTER)
-	_sheet_panel.offset_left = -560
-	_sheet_panel.offset_right = 560
-	_sheet_panel.offset_top = -400
-	_sheet_panel.offset_bottom = 400
+	_sheet_panel.offset_left = -780
+	_sheet_panel.offset_right = 780
+	_sheet_panel.offset_top = -430
+	_sheet_panel.offset_bottom = 430
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0.05, 0.06, 0.07, 0.9)
 	bg.set_content_margin_all(22)
 	_sheet_panel.add_theme_stylebox_override("panel", bg)
 	_sheet_panel.visible = false
 	root.add_child(_sheet_panel)
+	var cols := HBoxContainer.new()
+	cols.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cols.add_theme_constant_override("separation", 28)
+	_sheet_panel.add_child(cols)
 	_sheet = RichTextLabel.new()
-	_sheet.bbcode_enabled = true
-	_sheet.scroll_active = false
-	_sheet.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_sheet.add_theme_font_size_override("normal_font_size", 17)
-	_sheet.add_theme_font_size_override("bold_font_size", 17)
-	_sheet_panel.add_child(_sheet)
+	_sheet2 = RichTextLabel.new()
+	for col: RichTextLabel in [_sheet, _sheet2]:
+		col.bbcode_enabled = true
+		col.scroll_active = false
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_theme_font_size_override("normal_font_size", 17)
+		col.add_theme_font_size_override("bold_font_size", 17)
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		cols.add_child(col)
+	_sheet.size_flags_stretch_ratio = 1.7
 
 	treat = TreatmentScreen.new()
 	treat.player = player
@@ -307,7 +323,36 @@ func _sheet_rows() -> Array:
 	rows.append("weight")
 	rows.append_array(CharacterSheet.NEEDS)
 	rows.append("medical")
+	# What you carry and wear: Enter uses the picked thing, Delete puts it down.
+	for sl in Inventory.SLOTS:
+		rows.append("slot:" + str(sl[0]))
+	for wr in Inventory.WORN:
+		rows.append("worn:" + str(wr[0]))
 	return rows
+
+
+## Use the carried thing that is picked (Enter on the character page).
+func sheet_use() -> void:
+	if not _sheet_panel.visible:
+		return
+	var row: String = _sheet_rows()[_sheet_row]
+	if row.begins_with("slot:"):
+		player.use_item(row.substr(5))
+	elif row.begins_with("worn:"):
+		player.use_item(row)
+	_sheet_t = 0.0
+
+
+## Put down the carried thing that is picked (Delete on the character page).
+func sheet_drop() -> void:
+	if not _sheet_panel.visible:
+		return
+	var row: String = _sheet_rows()[_sheet_row]
+	if row.begins_with("slot:"):
+		player.drop_item(row.substr(5))
+	elif row.begins_with("worn:"):
+		player.use_item(row)
+	_sheet_t = 0.0
 
 
 func toggle_sheet() -> void:
@@ -327,6 +372,8 @@ func sheet_adjust(d: int) -> void:
 		return
 	var row: String = _sheet_rows()[_sheet_row]
 	var s := player.sheet
+	if row.begins_with("slot:") or row.begins_with("worn:"):
+		return
 	if row == "weight":
 		player.weight = maxf(player.weight + d, 1.0)
 	elif row == "medical":
@@ -354,7 +401,7 @@ func _cell(text: String) -> String:
 
 func _sheet_text() -> String:
 	var s := player.sheet
-	var t := "[b]CHARACTER[/b]      [color=#999]C closes.   PgUp PgDn picks a row.   - = changes it (test editing).[/color]\n\n"
+	var t := "[b]CHARACTER[/b]      [color=#999]C closes.   PgUp PgDn picks a row.   - = changes it (test editing).   H treats wounds.[/color]\n\n"
 	t += "[b]ATTRIBUTES[/b]   [color=#999]1 to 20; 10 is an ordinary adult[/color]\n[table=4]"
 	for a in CharacterSheet.ATTRS:
 		var does: String = CharacterSheet.GOVERNS[a]
@@ -373,12 +420,22 @@ func _sheet_text() -> String:
 		player.shove_force, player.sight_near, roundi(player.barge_power(player.run_speed)),
 		roundi(player.barge_power(player.dash_speed))]
 	t += "[b]NEEDS[/b]   [color=#999]%s[/color]\n[table=3]" % (
-		"not running down yet: waits for the clock and for things to eat and drink" if s.needs_rate <= 0.0 else "running down with time")
+		"not running down" if s.needs_rate <= 0.0 else "food and water run down with time (a day is three hours); rest waits for sleep")
 	for n in CharacterSheet.NEEDS:
 		t += _cell(_mark(n) + CharacterSheet.NEED_NAMES[n]) + _cell(_meter(s.needs[n])) + _cell("%d" % roundi(s.needs[n]))
 	t += "[/table]\n"
 	t += "[b]COMPOSURE[/b]   %s  %d   [color=#999]danger wears it down; quiet brings it back, cover faster[/color]\n\n" % [
 		_meter(s.composure), roundi(s.composure)]
+	t += "[b]TRAITS[/b]\n"
+	for tr in s.traits:
+		t += "   [color=#d8c27a]%s[/color]   %s\n" % [tr["name"], tr["text"]]
+	return t
+
+
+## The right-hand column of the page: the body, what is carried and worn, and the conditions.
+func _sheet_text2() -> String:
+	var s := player.sheet
+	var t := ""
 	# The body: what you can tell about it, which depends on what you know.
 	var b := s.body
 	t += "[b]BODY[/b]   %s   [color=#999]%s[/color]\n" % [player.death_feel(),
@@ -404,20 +461,26 @@ func _sheet_text() -> String:
 	var guess := b.time_left_guess()
 	if guess != "":
 		t += "   [color=#d6a04a]%s[/color]\n" % guess
-	t += "\n[b]CARRYING[/b]   [color=#999]no bag: slots, each up to a weight.  %.1f kg in all.  H treats wounds.[/color]\n   " % player.inv.weight()
+	t += "\n[b]CARRYING[/b]   [color=#999]no bag: slots, each up to a weight.  %.1f kg in all.[/color]\n" % player.inv.weight()
+	var picked: String = _sheet_rows()[_sheet_row]
+	var about := ""
 	for sl in Inventory.SLOTS:
 		var it = player.inv.slots.get(sl[0])
-		t += "%s: %s      " % [sl[1], Items.label(it) if it != null else "[color=#777]empty[/color]"]
-		if sl[0] == "pocket4" or sl[0] == "belt2":
-			t += "\n   "
-	t += "\n\n[b]CONDITIONS[/b]\n"
+		t += "%s%s: %s\n" % [_mark("slot:" + str(sl[0])), sl[1], Items.label(it) if it != null else "[color=#777]empty[/color]"]
+		if it != null and picked == "slot:" + str(sl[0]):
+			about = str(Items.DEFS[it["id"]]["for"])
+	for wr in Inventory.WORN:
+		var on = player.inv.worn.get(wr[0])
+		t += "%s%s: %s\n" % [_mark("worn:" + str(wr[0])), wr[1], Items.label(on) if on != null else "[color=#777]nothing[/color]"]
+		if on != null and picked == "worn:" + str(wr[0]):
+			about = str(Items.DEFS[on["id"]]["for"])
+	if about != "":
+		t += "\n[color=#d8c27a]%s[/color]\n[color=#999]Enter uses it.  Delete puts it down.[/color]\n" % about
+	t += "\n[b]CONDITIONS[/b]\n"
 	if s.conditions.is_empty():
 		t += "   [color=#999]None[/color]\n"
 	for c in s.conditions:
 		t += "   [color=%s]%s[/color]   %s\n" % ["#e8836b" if c["bad"] else "#8fd18f", c["name"], c["text"]]
-	t += "\n[b]TRAITS[/b]\n"
-	for tr in s.traits:
-		t += "   [color=#d8c27a]%s[/color]   %s\n" % [tr["name"], tr["text"]]
 	return t
 
 
@@ -434,6 +497,7 @@ func _process(delta: float) -> void:
 		_conds.text = lines
 		if _sheet_panel.visible:
 			_sheet.text = _sheet_text()
+			_sheet2.text = _sheet_text2()
 	var stance := "READY" if player.armed else "WEAPON AWAY"
 	if player.armed and player.weapon == "fists":
 		if not player.is_guarding():

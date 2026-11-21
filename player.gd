@@ -99,6 +99,15 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 # (Zombies notice someone hidden behind cover at Enemy.HIDDEN_NOTICE of their usual range.)
 @export var cover_peek_hit_chance := 0.15   # chance a shot crossing your cover hits while you peek
 @export var head_hit_fraction := 0.75   # a head hit on you takes this much of full health
+@export var helmet_share := 0.4         # ... and through a helmet, this share of that
+@export var board_time := 6.0           # s to board a window up
+@export var board_planks := 2
+@export var board_nails := 4
+@export var board_noise := 12.0         # m: how far each blow of the hammer is heard
+@export var pry_time := 3.0             # s to prise the boards off with a crowbar
+@export var pry_noise := 4.0
+@export var meal := 45.0                # what a tin does for the food need
+@export var day_seconds := 10800.0      # a game day in real seconds, for the needs (a stand-in for the clock)
 @export var blind_fire_spread_deg := 14.0   # blind fire goes this far either side of the crosshair
 @export var blind_fire_slow := 1.6      # blind fire's interval is the gun's times this
 @export var cover_hold_time := 0.25     # s holding Cover before you go to the marked cover
@@ -377,6 +386,12 @@ var torch_kind := ""                     # "torch" or "fire_torch" while one is 
 var _torch_light: SpotLight3D
 var _fire_light: OmniLight3D
 var _burn_t := 0.0
+# Hands at a window: "board" or "pry", how long is left, where you stood when you started.
+var _work := ""
+var _work_t := 0.0
+var _work_at := Vector3.ZERO
+var _work_win := {}
+var _work_blow := 0.0
 @export var fire_torch_range := 9.0      # m of light all round a burning torch
 @export var torch_range := 16.0          # m the beam reaches
 @export var torch_angle_deg := 24.0      # half its width
@@ -465,6 +480,7 @@ var _reticle_mat: StandardMaterial3D
 
 func _ready() -> void:
 	add_to_group("player")
+	sheet.needs_rate = 24.0 / maxf(day_seconds, 1.0)      # food and water run down (character_sheet.gd)
 	collision_layer = 2
 	collision_mask = 1 | 4 | Solid.GLASS_LAYER
 	floor_snap_length = 0.3
@@ -803,6 +819,7 @@ func _physics_process(delta: float) -> void:
 
 	_update_wheel()
 	_update_torch()
+	_update_work(delta)
 	_update_posture()
 	_update_stance()
 	_update_aim(delta)
@@ -902,6 +919,233 @@ func _update_ground() -> void:
 		if absf(global_position.y) < 0.5:       # (not on an upper floor or in a basement)
 			Ground.it.stamp(global_position, moved, _step_side, crawl, true)
 		_step_in_it()
+
+
+# ---------------------------------------------------------------- using what you carry
+## Use what is in a slot (the character page's Enter; until there is an inventory screen). `key` is a slot's
+## key, or "worn:feet" / "worn:head" for something you have on (it comes off).
+func use_item(key: String) -> void:
+	if dead:
+		return
+	if key.begins_with("worn:"):
+		var place := key.substr(5)
+		if inv.worn.has(place):
+			var what := Items.name_of(inv.worn[place]["id"]).to_lower()
+			if inv.take_off(place):
+				_worn_changed()
+				show_status("You take off the %s." % what, 1.6)
+			else:
+				show_status("No room to put the %s: your pockets, belt and hands are full." % what, 2.0)
+		return
+	var it = inv.slots.get(key)
+	if it == null:
+		return
+	var id: String = it["id"]
+	var def: Dictionary = Items.DEFS[id]
+	if def.has("wear"):
+		var name_was := Items.name_of(id).to_lower()
+		if inv.wear(key) != "":
+			_worn_changed()
+			show_status("You put on the %s." % name_was, 1.6)
+		return
+	match id:
+		"water":
+			drink_water()
+		"canned_food":
+			eat()
+		"painkillers":
+			inv.use(id)
+			sheet.body.take_painkiller()
+			show_status("You swallow a painkiller. It will take the edge off for a few minutes.", 2.2)
+		"steroids":
+			inv.use(id)
+			sheet.body.take_steroid()
+			show_status("You take a steroid. If something is in you, it will slow it. It cures nothing.", 2.4)
+		"antibiotics":
+			inv.use(id)
+			sheet.body.take_antibiotic()
+			show_status("You take an antibiotic. For a few minutes a bad wound will mend and not worsen.", 2.4)
+		"battery":
+			load_battery()
+		"purify_tabs", "water_filter":
+			purify_water()
+		"glass_shard", "bloody_glass":
+			lay_glass()
+		"cloth_scrap":
+			wash_cloth()
+		"plank", "nails", "hammer", "crowbar":
+			work_window()
+		"torch", "fire_torch":
+			show_status("E lights it and puts it out.", 1.6)
+		"matches", "cooking_pot", "wood_scrap":
+			show_status("That is for a fire. Go up to one.", 1.8)
+		_:
+			show_status(str(def["for"]), 3.0)
+	recompute_stats()
+
+
+## Put down what is in a slot (the character page's Delete): it lies at your feet to be picked up again.
+func drop_item(key: String) -> void:
+	var it := inv.take(key)
+	if it.is_empty():
+		return
+	if torch_kind == it["id"]:
+		torch_on = false
+		torch_kind = ""
+	_drop(it)
+	recompute_stats()
+	show_status("You put down the %s." % Items.name_of(it["id"]).to_lower(), 1.5)
+
+
+func _drop(it: Dictionary) -> void:
+	var box := ItemPickup.new()
+	box.title = Items.name_of(it["id"])
+	box.small = true
+	box.tint = Color(0.72, 0.7, 0.62)
+	box.contents = [it]
+	box.position = global_position + facing * 0.55
+	get_parent().add_child(box)
+
+
+## What you wear has changed: bare feet or not.
+func _worn_changed() -> void:
+	barefoot = not inv.worn.has("feet")
+	recompute_stats()
+
+
+## Eat a tin. With a tin opener, all of it; hacked open with a hatchet, half is lost; with neither, nothing.
+func eat() -> void:
+	if not inv.has("canned_food"):
+		show_status("You have nothing to eat.", 1.5)
+		return
+	var whole := inv.has("can_opener")
+	if not whole and not inv.has("hatchet"):
+		show_status("You have nothing to open the tin with.", 2.0)
+		return
+	inv.use("canned_food")
+	sheet.set_need("food", float(sheet.needs["food"]) + (meal if whole else meal * 0.5))
+	if not whole:
+		Earshot.make(global_position, 6.0, get_tree(), self, true)
+	show_status("You eat it cold from the tin." if whole else "You hack the tin open. Half of it ends up on the ground.", 2.2)
+
+
+## Fresh batteries into the torch.
+func load_battery() -> void:
+	var tk := inv.find("torch")
+	if tk == "":
+		show_status("You have no torch to put them in.", 1.6)
+		return
+	if not inv.use("battery"):
+		show_status("You have no batteries.", 1.6)
+		return
+	inv.slots[tk]["uses"] = int(Items.DEFS["torch"]["uses"])
+	show_status("Fresh batteries in the torch.", 1.6)
+
+
+## Wash torn cloth into a clean rag: a wash of your water for each, and only water clean enough to wash a wound.
+func wash_cloth() -> void:
+	var wk := inv.find("water")
+	if not inv.has("cloth_scrap"):
+		show_status("You have no cloth to wash.", 1.5)
+		return
+	if wk == "" or int(inv.slots[wk]["uses"]) <= 0:
+		show_status("You need water to wash it in.", 1.8)
+		return
+	if Water.wash_germs(inv.slots[wk]) > sheet.body.shrug:
+		show_status("That water would leave it dirtier than it is.", 2.0)
+		return
+	inv.use("water")
+	inv.use("cloth_scrap")
+	var rest := inv.add(Items.make("clean_rag", 1))
+	if not rest.is_empty():
+		_drop(rest)
+	show_status("You wash the cloth and wring it out: a clean rag.", 2.0)
+
+
+# ---------------------------------------------------------------- boarding a window up, and prising boards off
+## Start work on the window the crosshair is by: board it up (a hammer, nails and planks), or, if it is
+## boarded and you carry a crowbar, prise the boards off and keep the planks. It takes time, standing at the
+## window; every hammer blow is heard. Moving off, being grabbed or being hit stops it and nothing is used.
+func work_window() -> void:
+	if dead or _work != "":
+		return
+	var win := Solid.window_near(global_position + reticle_offset, 2.5)
+	if win.is_empty():
+		show_status("No window by the crosshair.", 1.5)
+		return
+	var at: Vector3 = win["pos"]
+	if _xz(at).distance_to(_xz(global_position)) > 2.2 or absf(at.y - global_position.y - 1.45) > 1.2:
+		show_status("You have to be at the window.", 1.6)
+		return
+	var boarded: bool = win["boards"] != null and is_instance_valid(win["boards"]) and win["boards"].alive()
+	if boarded:
+		if not inv.has("crowbar"):
+			show_status("It is boarded already. A crowbar would have the boards off.", 2.2)
+			return
+		_start_work("pry", win, pry_time)
+		show_status("You work the crowbar under a board...", pry_time)
+		return
+	var lack: Array[String] = []
+	if not inv.has("hammer"):
+		lack.append("a hammer")
+	var nk := inv.find("nails")
+	if nk == "" or int(inv.slots[nk]["uses"]) < board_nails:
+		lack.append("%d nails" % board_nails)
+	var pk := inv.find("plank")
+	if pk == "" or int(inv.slots[pk]["n"]) < board_planks:
+		lack.append("%d planks" % board_planks)
+	if not lack.is_empty():
+		show_status("To board it up you need %s." % " and ".join(lack), 2.6)
+		return
+	_start_work("board", win, board_time)
+	show_status("You hold a plank across the window and start nailing...", board_time)
+
+
+func _start_work(what: String, win: Dictionary, secs: float) -> void:
+	_work = what
+	_work_win = win
+	_work_t = secs
+	_work_at = global_position
+	_work_blow = 0.4
+
+
+func _update_work(delta: float) -> void:
+	if _work == "":
+		return
+	if dead or not held_by.is_empty() or _stagger > 0.0 or treating or global_position.distance_to(_work_at) > 0.5:
+		_work = ""
+		if not dead:
+			show_status("You leave the window as it is.", 1.5)
+		return
+	_work_t -= delta
+	_work_blow -= delta
+	if _work_blow <= 0.0:
+		_work_blow = 0.75 if _work == "board" else 1.1
+		Earshot.make(global_position, board_noise if _work == "board" else pry_noise, get_tree(), self, true)
+		_body.reach()
+	if _work_t > 0.0:
+		return
+	var what := _work
+	_work = ""
+	if what == "board":
+		for i in board_planks:
+			inv.use("plank")
+		for i in board_nails:
+			inv.use("nails")
+		Solid.board(_work_win)
+		show_status("Boarded up.", 1.8)
+	else:
+		var br: Breakable = _work_win["boards"]
+		if is_instance_valid(br) and br.alive():
+			br._unindex()
+			Cover.remove_box(br.host)
+			br.host.queue_free()
+		_work_win["boards"] = null
+		var rest := inv.add(Items.make("plank", board_planks))
+		if not rest.is_empty():
+			_drop(rest)
+		show_status("The boards come away. You keep the planks.", 2.0)
+	recompute_stats()
 
 
 ## Lay the broken glass you carry on the ground where you stand: an alarm under boots, a trap for bare feet
@@ -2683,7 +2927,7 @@ func take_shot(amount: float, dir: Vector3, knock: float, from: Vector3) -> Stri
 	if in_cover and cover_mode != "pop" and hidden_from(from, true):
 		if cover_mode == "hunker" or randf() >= cover_peek_hit_chance:
 			return "cover"
-		var dmg := max_health * head_hit_fraction
+		var dmg := max_health * head_hit_fraction * (helmet_share if inv.worn.has("head") else 1.0)
 		take_damage(dmg, dir, knock)
 		_wound("gunshot", dmg, "Head")
 		if not dead and not invulnerable:
@@ -2710,7 +2954,10 @@ func _die(text: String) -> void:
 	var things: Array[Dictionary] = []
 	for k in inv.slots:
 		things.append(inv.slots[k])
+	for k in inv.worn:
+		things.append(inv.worn[k])
 	inv = Inventory.new()
+	barefoot = true
 	if sheet.body.infected:
 		_rise(things)
 		text += " What was you gets up again."
@@ -2805,6 +3052,22 @@ func _update_torch() -> void:
 	if torch_on and (dead or not inv.has(torch_kind)):
 		torch_on = false
 		torch_kind = ""
+	if torch_on and torch_kind == "torch":
+		# The hand torch runs its batteries down, a second at a time.
+		var tk := inv.find("torch")
+		if int(inv.slots[tk]["uses"]) <= 0:
+			torch_on = false
+			torch_kind = ""
+			show_status("The torch is flat. It wants batteries.", 2.0)
+		else:
+			_burn_t += get_physics_process_delta_time()
+			if _burn_t >= 1.0:
+				_burn_t -= 1.0
+				inv.slots[tk]["uses"] = int(inv.slots[tk]["uses"]) - 1
+				if int(inv.slots[tk]["uses"]) <= 0:
+					torch_on = false
+					torch_kind = ""
+					show_status("The torch flickers and dies. It wants batteries.", 2.2)
 	if torch_on and torch_kind == "fire_torch":
 		# It burns away a second at a time, lit or not looked at.
 		_burn_t += get_physics_process_delta_time()

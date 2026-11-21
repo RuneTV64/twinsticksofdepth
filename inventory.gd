@@ -13,6 +13,10 @@ const SLOTS := [
 ]
 
 var slots := {}     # key -> item Dictionary, or absent when empty
+## What is worn: place ("feet", "head") -> item. Worn things take no slot. (Clothes proper come later; these are
+## the two that already matter: boots keep glass and dirt out of your feet, a helmet takes a blow to the head.)
+const WORN := [["feet", "On your feet"], ["head", "On your head"]]
+var worn := {}
 
 
 ## Put this in: onto a stack of the same thing if there is room, else into the first empty slot it fits
@@ -75,4 +79,48 @@ func weight() -> float:
 	var w := 0.0
 	for k in slots:
 		w += Items.weight(slots[k])
+	for k in worn:
+		w += Items.weight(worn[k])
 	return w
+
+
+## Put on what is in this slot. Whatever was worn there comes off into the slot. Returns where it went
+## ("feet", "head"), or "" if it isn't something you wear.
+func wear(key: String) -> String:
+	var it = slots.get(key)
+	if it == null:
+		return ""
+	var place := str(Items.DEFS[it["id"]].get("wear", ""))
+	if place == "":
+		return ""
+	var one := {"id": it["id"], "n": 1}
+	if int(it.get("n", 1)) > 1:
+		it["n"] = int(it["n"]) - 1
+	else:
+		slots.erase(key)
+	var was = worn.get(place)
+	worn[place] = one
+	if was != null:
+		add(was)
+	return place
+
+
+## Take off what is worn there, into a free slot. False if there is nothing there or no room for it.
+func take_off(place: String) -> bool:
+	var it = worn.get(place)
+	if it == null:
+		return false
+	worn.erase(place)
+	if not add(it).is_empty():
+		worn[place] = it
+		return false
+	return true
+
+
+## Everything of this slot comes out of it: what you are about to drop. {} if the slot is empty.
+func take(key: String) -> Dictionary:
+	var it = slots.get(key)
+	if it == null:
+		return {}
+	slots.erase(key)
+	return it

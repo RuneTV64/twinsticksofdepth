@@ -7,7 +7,7 @@ extends RefCounted
 ##   couch, armchair     low cover you can crouch behind and vault; wood and cloth when broken up
 ##   table, chair        low cover (a table hides you crouched); wood
 ##   counter             low cover along a kitchen wall; cupboards to search, when there is loot
-##   stove               a cast-iron wood stove: it is lit, and you can boil water on it now (water.gd)
+##   stove               a cast-iron wood stove: lay wood on it, light it, and water boils on it (campfire.gd)
 ##   fridge              high cover: it stops sight; steel and plastic
 ##   bed                 low cover; cloth and wood; somewhere to sleep, when there is sleep
 ##   wardrobe, bookshelf high cover: they stop sight, and a zombie has to beat them down or go round
@@ -48,7 +48,7 @@ const LATER := {
 	"table": "a surface things are left on",
 	"chair": "sitting; something to wedge under a door handle",
 	"counter": "cupboards to search",
-	"stove": "feeding and lighting the fire; cooking; warmth",
+	"stove": "cooking; warmth and light from it",
 	"fridge": "a container: food, and what the food has turned into",
 	"bed": "sleep; something under the mattress",
 	"wardrobe": "a container: clothes",
@@ -249,7 +249,7 @@ func _piece(kind: String, at: Vector3, facing: String, width: float, mesh: Array
 	for c in body.get_children():
 		if c is MeshInstance3D:
 			(c as MeshInstance3D).visible = false
-	var burning := kind == "stove" and wear < 2
+	var burning := false                        # a stove is cold until someone lays wood on it and lights it
 	var look := MeshInstance3D.new()
 	look.mesh = mesh
 	look.position = Vector3(0.0, -h * 0.5, 0.0)
@@ -264,13 +264,19 @@ func _piece(kind: String, at: Vector3, facing: String, width: float, mesh: Array
 	br.thin_to(float(k["thin"]))
 	br.hp = br.max_hp * float(WEAR_HP[wear])
 	br.stage = wear
-	br.on_stage = func(stage: int) -> void: look.material_override = FurnitureKit.mat(wood, cloth, stage, burning and stage < 2, pin)
-	if burning:
-		# A lit stove is a fire: water boils on it (campfire.gd).
-		var fire := Campfire.new()
+	var fire: Campfire = null
+	br.on_stage = func(stage: int) -> void:
+		look.material_override = FurnitureKit.mat(wood, cloth, stage, fire != null and is_instance_valid(fire) and fire.lit, pin)
+	if kind == "stove" and wear < 2:
+		# A stove is a fire (campfire.gd): cold as it stands; with wood on it and a match to it, water boils
+		# on it. Its door glows while it burns.
+		fire = Campfire.new()
+		fire.kept = false
+		fire.lit = false
 		var front := Vector3(0, 0, 1).rotated(Vector3.UP, turns * PI * 0.5)
-		fire.position = Vector3(0.0, 0.0, 0.0) + front * (d * 0.5 + 0.35)
+		fire.position = front * (d * 0.5 + 0.35)
 		body.add_child(fire)
+		fire.changed.connect(func(now: bool) -> void: look.material_override = FurnitureKit.mat(wood, cloth, br.stage, now, pin))
 	parts.append(br)
 	return br
 

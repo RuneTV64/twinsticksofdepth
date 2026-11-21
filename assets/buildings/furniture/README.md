@@ -15,7 +15,7 @@ Every object has to do something to the player (the owner's rule). Measured in t
 | Table | 0.78 m | low | 6 | 1 | wood | hides you crouched; a zombie climbs over it |
 | Chair | 0.9 m | low | 2 | 1 | wood | in the way; a zombie climbs over it |
 | Kitchen counter | 0.9 m | low | 7 | 2 | wood | cover along a wall, any length |
-| Stove | 0.9 m | low | 600 | 32 | metal | cast iron, and lit: **water boils on it** |
+| Stove | 0.9 m | low | 600 | 32 | metal | cast iron; lay wood on it and light it, and **water boils on it** |
 | Fridge | 1.8 m | high | 315 | 17 | metal, plastic | stops sight |
 | Bed | 0.8 m | low | 15 | 3 | wood, cloth | crouch behind it, vault it |
 | Wardrobe | 1.9 m | high | 11 | 2 | wood | stops sight; has to be beaten down or gone round |
@@ -25,12 +25,12 @@ Every object has to do something to the player (the owner's rule). Measured in t
 A piece put down damaged or about to give starts at 60% or 30% of that (a wardrobe: 11, 7, 4 zombie blows).
 In the furnished kit house: hunkered in front of the couch you are hidden from across it; someone the far
 side of the fridge is not seen, someone the far side of the table is; a zombie with a chair or the kitchen
-table between it and you climbed over in under 3 s; a bottle of water put on the kitchen stove had boiled 20 s
-later.
+table between it and you climbed over in under 3 s; a bottle of water put on the kitchen stove, once it had wood, a
+match and a pot, had boiled 20 s later.
 
 What each is meant to do once the system it waits for exists (`FurnitureKit.LATER`; none of it is built): the
 fridge, wardrobe, dresser and counter are containers to search; the bed is for sleep; the couch and chairs for
-sitting to rest; the bookshelf for books; the stove for cooking, warmth, and a fire you have to feed.
+sitting to rest; the bookshelf for books; the stove for cooking and warmth (the fire you have to feed is built).
 
 ## How it is made
 
@@ -91,7 +91,7 @@ FurnitureKit.furnish(level, house_origin, 2)             # the house's origin, h
 - Nothing can be searched, sat on, slept in or cooked on yet. Those wait for loot, rest and food.
 - Nothing can be pushed, dragged, tipped over or stood on, so furniture can't be used to block a door or a
   window.
-- The stove is always lit and needs no fuel. It gives no light or warmth.
+- The stove is cold until wood is laid on it and lit with a match, and burns the wood down (campfire.gd); its door glows while it burns. It gives no light or warmth.
 - There is no bathroom (bath, sink, toilet): those wait for water from taps and for the hygiene and toilet
   needs. No small things either: lamps, rugs, pictures, a television, low tables.
 - What you walk into is one plain box round the whole piece, so you can't step between a chair's legs or

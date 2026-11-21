@@ -49,9 +49,11 @@ var needs := {}
 ## Where they are hurt, their blood and their pain (body_health.gd).
 var body := BodyHealth.new()
 var composure := 100.0
-## Game hours per real second. 0 = needs don't run down: there is no clock and nothing to eat yet. The time
-## system sets this.
+## Game hours per real second. 0 = needs don't run down. The Player sets it to a stand-in (a game day of three
+## real hours) until the time system does; raiders' stay at 0.
 var needs_rate := 0.0
+## Which needs run down. Rest waits for somewhere to sleep: a need with nothing to meet it would only punish.
+const RUNS_DOWN: Array[String] = ["food", "water"]
 ## Innate to every person. Picked traits (good and bad, chosen at character creation) are to come.
 var traits: Array[Dictionary] = [
 	{"name": "Fight-or-flight", "text": "Grabbed or hurt, adrenaline hits: faster, tireless, pain ignored. Then the crash."},
@@ -122,9 +124,9 @@ func tick(dt: float, threat: float, held: bool, hidden: bool, health_frac: float
 	_health_frac = health_frac
 	_winded = winded
 	_burden = burden
-	# Needs run down with game time (not at all until the time system sets needs_rate).
+	# Needs run down with game time.
 	if needs_rate > 0.0:
-		for n in NEEDS:
+		for n in RUNS_DOWN:
 			needs[n] = maxf(float(needs[n]) - float(NEED_DRAIN[n]) * needs_rate * dt, 0.0)
 	# Composure: danger wears it down, slower for the wise; quiet brings it back, faster behind cover.
 	var steady := clampf(1.0 - 0.04 * bonus("wisdom"), 0.5, 1.5)

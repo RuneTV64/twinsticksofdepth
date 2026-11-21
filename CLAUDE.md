@@ -46,8 +46,12 @@ the fence kit, and bodies impaled on spiked fences with their pose (see The fenc
 kit (see The street kit). The owner has pivoted back to making assets.
 
 Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
-owner: street lamps and signs (see The street kit, Lamps and signs), and the furniture kit (see The
-furniture kit).
+owner: street lamps and signs (see The street kit, Lamps and signs), the furniture kit (see The
+furniture kit), and the first working items (see The first working items).
+
+Items by theme come next (owner, 21 Nov 2026: "Afterwards I will give you themes (boys room girls room
+bathroom electronics etc) and you will generate a set number of items per theme"). Wait for the themes and
+the number. Each item made then still has to do something (rule 2) and carry its `found` places.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -197,8 +201,9 @@ it). The owner said to sketch before building anything; wait for their critique 
   chamber and magazine well, and a magazine shows its rounds, to drag out by hand. Still to settle together: the
   rest of loading (R tap to swap magazines, R hold to thumb rounds in, where magazines are kept).
 - Order (owner): enemy AI that follows sound came first, because items will make noise. That is built (see Sound,
-  hordes and hunting). Of items, only the medical ones, a torch, a hatchet, rocks and bottles exist so far
-  (`items.gd`), with the slot inventory; the loot screen, containers and everything else here are not built.
+  hordes and hunting). The items that exist are the medical ones, the tools and the rest listed under The
+  first working items (`items.gd`), with the slot inventory; the loot screen, containers, bags, guns and
+  loading are not built.
 - Claude's earlier layout, which the owner answered against: items are records (weight, condition, category);
   container contents are rolled when first opened; time is applied on opening (spoiling, picked over by others);
   nothing respawns in a cupboard; keepsakes unlock starting builds.
@@ -290,7 +295,7 @@ build the items needed to test the kits, so only medical items exist.
 - J gives a test wound (deep cut, gunshot, bite in turn). Review sheet: `tools/preview/treatment_screen.png`
   (flat placeholder shapes, not the 8-shade look; the skin is one fixed colour, not the character's).
 - Not built: splints and breaks (nothing causes a break yet), the wound's own look per body part, treating
-  other people, dropping or moving items between slots.
+  other people, moving items between slots (dropping exists: see The first working items).
 
 The bite, amputation and turning (built 20 Nov 2026, in review; untested on the owner's PC). All the times are
 stand-ins until the game has a clock (`body_health.gd`, "the bite").
@@ -401,11 +406,11 @@ This is the foundation; every number in it is Claude's first guess.
     metal rusts (30 minutes dry), both up to 3 to 4 times quicker in the wet (`Seasons` wetness); glass,
     stone and plastic stay until taken. What has rusted or rotted away can't
     be salvaged. The times are stand-ins for the clock.
-- Debug keys: P boards the window nearest the crosshair (free and instant: a stand-in); O breaks what the
-  crosshair is on; Shift+O passes ten minutes of rust and rot.
+- Debug keys: Shift+P boards the window nearest the crosshair (free and instant: the old stand-in; plain P is
+  now the real thing, see The first working items); O breaks what the crosshair is on; Shift+O passes ten
+  minutes of rust and rot.
 - Stand-ins and not built: the wreckage's look (a scatter of plain bits, not the 8-shade look) and the
-  damage stages (a darker colour); no cracks, dust or flying bits; boarding costs nothing (planks, nails, a
-  hammer and the time come with items); nothing falls when what held it up goes (a wall over a broken
+  damage stages (a darker colour); no cracks, dust or flying bits; nothing falls when what held it up goes (a wall over a broken
   section stays, no collapse); ceilings, stairs and upper floors don't exist yet; raiders don't break
   things on purpose (their shots do damage walls); no fire; a hole in a floor or pavement does nothing yet
   (it is meant to show soil to dig or plant in); broken appliances give materials only, not parts; a door's
@@ -436,7 +441,8 @@ wounds can infect you. Stepping on anything with untreated, uncovered foot wound
 ordinary infection, which can kill you but won't turn you. Old blood or anything particularly gross almost
 always infects unless treated and cleaned at once. Every number here is Claude's first guess.
 
-- Barefoot (`Player.barefoot`, true: nobody has shoes until footwear exists; U toggles it for testing). A
+- Barefoot (`Player.barefoot`: true until you put boots on; U puts them on and off, Shift+U is the old test
+  switch). A
   bare foot landing on broken glass takes a shard half the time (`Wreck.BARE_CUT`): a cut "on the sole of the
   foot" on that leg (a leg wound with `where` "foot"), with the glass in it, and that shard is gone from the
   ground. A broken window (3 shards) was used up in about 5 barefoot footfalls; in boots it never goes.
@@ -499,9 +505,9 @@ always infects unless treated and cleaned at once. Every number here is Claude's
   stopping on ordinary ground with an open cut foot: took hold at 106 s.
 - The owner's "almost always gets you infected" for old blood and gross things is built as the ordinary
   infection, since it can be cleaned away at once and the zombie kind can't. Ask if that was wrong.
-- Not built: footwear; glass hurting more as you walk on it; cuts from crawling or falling on glass; the
+- Not built: footwear other than one pair of boots; glass hurting more as you walk on it; cuts from crawling or falling on glass; the
   player's own blood on the ground; raiders and zombies being cut; anything to do with the bloody shard;
-  antibiotics, or maggots cleaning an infected wound; "gross" things other than old blood and the corpse
+  maggots cleaning an infected wound (antibiotics exist: see The first working items); "gross" things other than old blood and the corpse
   pile (rotting bodies, sewage, the toilet need).
 
 ## How clean water is (built 21 Nov 2026, in review; not seen by the owner)
@@ -514,7 +520,8 @@ with heat, fire, chemicals or a water filter, all to be added. Every number is C
   and what has been done to it ("cloudy, boiled"), never the bugs. A bottle as found is clean.
 - Each way of making it safe does what it really does, so each has a use:
   - Heat: a fire (`campfire.gd`, `Campfire`; `main.gd` `_lamp(pos, radius, true)`). Interact with water in
-    your bottle and stay within 2.5 m for `BOIL_TIME` 20 s. It kills the bugs; the mud stays.
+    your bottle and a cooking pot, and stay within 2.5 m for `BOIL_TIME` 20 s. It kills the bugs; the mud
+    stays. (The pot, and fires that want wood and a match: see The first working items.)
   - Chemicals: `purify_tabs` (6). They work after `TAB_WAIT` 60 s and kill everything in clear water, but
     leave about a third of the bugs in water that is still cloudy.
   - A filter: `water_filter` (20 uses). It takes out the dirt and most of the bugs (0.15 left), not all.
@@ -539,8 +546,7 @@ with heat, fire, chemicals or a water filter, all to be added. Every number is C
   | Rain barrel | 180, not clean | 0, clean | 0, clean | 33, clean | 0, clean |
   | Standing water | 367, not clean | 0, not clean (mud) | 120, not clean | 49, not clean | 0, clean |
 
-- Not built: a pot or anything to boil in (the bottle goes on the fire), making and feeding a fire, a stove
-  or other heat, rain filling barrels, taps, puddles and rivers, more than one bottle being treated at a
+- Not built: building a fire where there is no hearth, rain filling barrels, taps, puddles and rivers, more than one bottle being treated at a
   time, water going bad again, chemicals other than tablets (bleach, iodine), filters wearing by how dirty
   the water was, zombie blood or bodies fouling a water source, food.
 
@@ -919,7 +925,8 @@ is Claude's first guess.
   wood and cloth. The fridge is steel and plastic, the stove cast iron.
 - Rule 2, what works now: low pieces (everything but the fridge, wardrobe and bookshelf) are low cover to
   crouch behind and vault, and a zombie climbs them; the three tall ones are high cover and stop sight; a
-  stove put down not worn out is lit and has a `Campfire` on it, so water boils on it. Each body carries
+  stove put down not worn out has a `Campfire` on it, cold until wood is laid on it and lit (see The first
+  working items), and then water boils on it and its door glows. Each body carries
   the meta "furniture" (its kind) for the systems to come.
 - What changes the look: `wear` 0, 1, 2 (scuffs, fading, books and a drawer gone; then cloth torn to the
   stuffing, drawers and doors out, rust); the season, but indoors only the damp and only on a worn piece
@@ -933,14 +940,84 @@ is Claude's first guess.
   dresser 5, table 6, counter 7, bookshelf 8, couch 9, wardrobe 11, bed 15, fridge 315, stove 600. A
   wardrobe put down sound, damaged, about to give: 11, 7, 4. Hunkered in front of the couch you are hidden
   from across it; the fridge stops sight, the table doesn't; a zombie with a chair or the kitchen table
-  between it and the player climbed over in under 3 s; water put on the kitchen stove had boiled 20 s
-  later. The stairs, floors and aiming tests still pass in the furnished house.
+  between it and the player climbed over in under 3 s; water put on the kitchen stove, once it had wood, a
+  match and a pot, had boiled 20 s later. The stairs, floors and aiming tests still pass in the furnished house.
 - Not done: Forward+ unchecked; nothing can be searched, sat on, slept in or cooked on; nothing can be
-  pushed, tipped or stood on (no blocking a door with a wardrobe); the stove is always lit, needs no fuel,
-  gives no light or warmth; no bathroom, and no small things (lamps, rugs, low tables, a television); what
+  pushed, tipped or stood on (no blocking a door with a wardrobe); the stove gives no light or warmth; no bathroom, and no small things (lamps, rugs, low tables, a television); what
   you walk into is one box round the piece (no stepping between a chair's legs, no seeing under a table);
   one size of each; `furnish` only knows the 3 by 2 house and leaves the basement empty; worn all over,
   not where hit.
+
+## The first working items (built 21 Nov 2026, in review; not seen by the owner)
+
+The owner: "Take into consideration what we need as far as items go to get some of the talked about
+functionality going and start there. Afterwards I will give you themes (boys room girls room bathroom
+electronics etc) and you will generate a set number of items per theme." So this batch is only the things
+that switch on what was already built or promised and was waiting for an item. On the branch
+`claude/destructible-environment-6yu73c`, not on `main`. Every number is Claude's first guess.
+
+- An item's record (`items.gd`, `Items.DEFS`) now has: `name`, `w`, `cat` (medical, tool, material,
+  clothing, food, thrown, scrap), `stack` or `uses`, `keep` (still a thing when used up), `wear` ("feet",
+  "head"), `found` (the kinds of place it turns up in, for the loot tables to come: kitchen, bathroom,
+  bedroom, living room, garage, yard, shop, anywhere; `Items.found_in(place)`), and `for` (what it is for,
+  in a sentence the player reads on the character page). 34 items. An item with nothing in the game to use
+  it doesn't go in (rule 2 holds for things you carry). The themed batches must fill in all of these.
+- What each new one switches on:
+  - `hammer`, `nails` (a box of 20), `plank` (stack of 4): boarding a window. P at a window by the
+    crosshair, standing at it (`Player.work_window()`): 2 planks, 4 nails, `board_time` 6 s of standing
+    there; every hammer blow is heard 12 m. Walk off, be grabbed or be hit and nothing is used.
+  - `crowbar`: at a boarded window P prises the boards off in 3 s, heard 4 m, and you keep the planks.
+  - `boots`, `helmet`: worn (`Inventory.worn`, places "feet" and "head", `wear()`, `take_off()`). Boots end
+    `barefoot`. A helmet takes a head hit from 75 to 30 of 100 health. Nobody starts with either. What you
+    wear lies with your body when you die. Not drawn on the character (no clothes on the model yet).
+  - `matches` (10), `cooking_pot`, and wood (`Items.FUEL`: splintered wood 240 s, a plank 480 s): a fire is
+    real now (`campfire.gd`). A stove is cold: lay wood on it, light it with a match, feed it or it burns
+    out (`fuel`, `lit`, signal `changed`; the stove's door glows while it burns). Water only boils with a
+    pot. The level's camp fires are `kept` (somebody else keeps them in: always alight), a stand-in.
+  - `battery` (a set; stack of 4): the hand torch has 600 s of light in it, drained a second at a time
+    while lit; flat, it wants a fresh set.
+  - `canned_food` ("Tin of beans") and `can_opener`: a tin is `meal` 45 of the food need; hacked open with
+    a hatchet half is lost and it is heard 6 m; with neither it stays shut.
+  - `antibiotics` (6): for `abx_time` 300 s a wound that isn't filthy mends (three times as fast, dressed
+    or not) and a filthy one worsens at a quarter of the pace (`BodyHealth.take_antibiotic()`). Nothing
+    against a bite. Painkillers and steroids can now be taken outside the treatment screen too.
+  - `cloth_scrap` (from couches and beds): washed in water clean enough for a wound it becomes a
+    `clean_rag` (`Player.wash_cloth()`); a wash of the bottle each.
+- Food and water run down (`CharacterSheet.RUNS_DOWN`, `needs_rate` set from `Player.day_seconds` 10800: a
+  game day of three real hours, the middle of the owner's 2 to 4). Over a day food falls 96 of 100 and
+  water 144, so about two tins and six drinks a day. Rest does not run down: there is nowhere to sleep.
+- Using and dropping (`Player.use_item(key)`, `drop_item(key)`): the character page (C) is now two columns,
+  who you are on the left, and on the right your body, what you carry and wear a slot to a line, and your
+  conditions. PgUp PgDn reach the carried rows; the picked thing shows what it is for; Enter uses it (eats,
+  drinks, wears, takes a pill, loads batteries, washes cloth, lays glass), Delete puts it down at your feet
+  as a small pickup. A stand-in until the loot screen. Sheet: `tools/preview/items_page.png`
+  (`tools/items_preview.gd`; the page only: the level behind it is black in the cloud).
+- Keys: P boards or prises (Shift+P the old free boarding); U boots on and off (Shift+U the old test
+  switch); I and Shift+I as before.
+- In the test level: a "Carpenter's box" (hammer, nails, 4 planks, crowbar) and "Boots and a helmet" by the
+  spawn; batteries in the tool box; antibiotics in every first-aid box; "Kitchen things" (pot, matches, 3
+  tins, tin opener) by the kit house's stove.
+- Cloud run (`tools/items_test.gd`):
+  - Boarding took 6.0 s and used 2 planks and 4 nails; a zombie 10 m off heard it and one 15 m off did not.
+    The boards stand 9 zombie blows. Started and left after 2 s: nothing used. Prised off in 3.0 s: heard
+    at 3 m, not at 10 m, planks back.
+  - In boots, 3 shards were still there after 60 footfalls, no wounds; boots off, they were in the feet
+    within 7.
+  - The stove: cold and useless with nothing; wood laid, "it wants a match"; lit; no pot, no boiling; with
+    a pot the water had boiled 20 s later; one piece of splintered wood burned 240 s and it went out.
+  - A torch lit 10 s used 10 of its 600; run flat it went out and read "flat"; a set of batteries filled it.
+  - A minute standing: food 99.58 to 99.04, water 99.37 to 98.57, rest unchanged. From food 30: no opener,
+    nothing; hatchet, 52; tin opener, 98.
+  - An arm wound that has taken hold: never washed, fully infected at 65 s, or at 233 s on antibiotics;
+    washed once and left open, fully infected at 91 s, or clear of it at 70 s on antibiotics.
+  - Standing water won't wash cloth; a clean bottle made two rags for two washes. Rags put down lay at the
+    player's feet and were picked up again. Dying in boots left them with the body.
+- Not built, and why: a bag or backpack and the grid (the loot screen is to be sketched and agreed first);
+  guns, magazines and rounds (to be designed together); containers and searching; items lying about by
+  place (the `found` tags are only data); moving a thing between slots; using a thing on a wound outside
+  the treatment screen; cooking, spoiling, more than one food; clothes beyond boots and a helmet, and any
+  of it showing on the character; a boarded window costing more planks for a bigger window; raiders using
+  any of it; warmth and light from a fire you lit; the weight you carry feeding the WT number.
 
 ## Small rules the owner has set (20 Nov 2026)
 
@@ -1242,7 +1319,8 @@ document; keep it in step when the rules change).
   - pop: Ready held. Near an open end you lean out round it, otherwise you stand up over low cover (high cover away
     from an end has no angle). Hit as normal.
 - Head hit on the player: 75% of full health (owner, 20 Nov 2026, after looking at how Project Zomboid and its
-  Bandits mod do it). On zombies a headshot is still a kill.
+  Bandits mod do it); 30% in a helmet (`helmet_share` 0.4, Claude's guess). On zombies a headshot is still a
+  kill.
 - Blind fire: attack without Ready in cover fires over low cover or round the near end of high cover, toward the
   crosshair, 14 degrees either way, slower, no aimed bonus.
 - Shots (`projectile.gd` `wall_hit`): low cover never stops a shot by itself, it goes over; someone hunkered behind
@@ -1456,8 +1534,8 @@ with crouching and going prone.
     (`Daylight.beam_*`, one carried beam for the whole level). What stands in the beam counts as lit, so you
     see it at night from as far as by day, and the screen isn't darkened there. Carrying it lit, you count as
     fully lit and, at night, are seen from 1.5 times the daytime distance (`torch_seen`: a raider from 27 m, a
-    zombie from 18 m); by day it makes no difference. A real `SpotLight3D` on the player gives the look. No
-    batteries, it doesn't need a free hand, and lying down the beam's drawn light follows the body rather than
+    zombie from 18 m); by day it makes no difference. A real `SpotLight3D` on the player gives the look. It
+    runs on batteries now (see The first working items); it doesn't need a free hand, and lying down the beam's drawn light follows the body rather than
     the aim.
   - The burning torch (owner, 21 Nov 2026: "both" kinds; not yet seen by the owner): `fire_torch`, also in
     the tool box. E now steps through what you carry: hand torch, burning torch, nothing (`torch_kind`). It
@@ -1584,7 +1662,8 @@ a list of "the human experience as stats" the owner brought; the picks below are
   (skills, crafting, people). `CharacterSheet.GOVERNS` / `LATER` say what each does and is meant to do.
   `player.recompute_stats()` turns them into numbers; at all 10s the game plays exactly as before.
 - Needs (the Sims side): food, water, rest, 100 = satisfied. They bring staged conditions (Hungry, Very hungry,
-  Starving...) but don't run down yet: `needs_rate` is 0 until there is a clock and things to eat and drink.
+  Starving...). Food and water run down since 21 Nov 2026 (see The first working items); rest waits for
+  somewhere to sleep.
 - Composure, 100 calm to 0 panic: zombies within 6 m and being held wear it down, damage knocks it, quiet brings
   it back (twice as fast hunkered in cover). Shaken under 50, Panicked under 20: worse aim, wilder blind fire.
 - Fight-or-flight (a trait every person has): grabbed or hurt, 8 s of Adrenaline (+10% speed, effort costs 40%

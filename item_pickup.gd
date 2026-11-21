@@ -7,6 +7,7 @@ extends Node3D
 var small := false           # one small thing lying on the ground (a rock, a bottle), not a box
 var tint := Color(0.85, 0.87, 0.82)
 var contents: Array[Dictionary] = []
+var thrown_id := ""          # a small pickup of one kind of thing: which (for the hint that it can be thrown)
 
 var _mesh: MeshInstance3D
 var _mat: StandardMaterial3D
@@ -51,6 +52,8 @@ func prompt_text(_p: Player) -> String:
 
 
 func interact(p: Player) -> void:
+	if small and not contents.is_empty():
+		thrown_id = contents[0]["id"]
 	var left: Array[Dictionary] = []
 	var took := 0
 	for item in contents:
@@ -62,7 +65,7 @@ func interact(p: Player) -> void:
 	contents = left
 	p.recompute_stats()
 	if left.is_empty() and small:
-		p.show_status("%s taken. Tab: Throw." % title, 1.5)
+		p.show_status("%s taken.%s" % [title, " Tab: Throw." if Player.THROWABLES.has(thrown_id) else ""], 1.5)
 		queue_free()
 	elif small:
 		p.show_status("No room for it: your pockets, belt and hands are full.", 1.8)

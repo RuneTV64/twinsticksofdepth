@@ -110,10 +110,16 @@ func _run() -> void:
 		p.global_position = Vector3(26.42, 0.05, -32.5)
 		await _wait(0.3)
 		var before := Water.look(slot)
+		var cold := fire.prompt_text(p)
+		p.inv.add(Items.make("wood_scrap", 2))
+		p.inv.add(Items.make("matches"))
+		p.inv.add(Items.make("cooking_pot"))
+		fire.interact(p)                       # lays the wood and lights it
 		var said := fire.prompt_text(p)
-		fire.interact(p)
+		fire.interact(p)                       # the pot goes on
 		await _wait(Water.BOIL_TIME + 1.0)
-		_say("at the kitchen stove with a bottle of water (%s): \"%s\"; %0.f s later it is: %s" % [before, said, Water.BOIL_TIME, Water.look(slot)])
+		_say("at the kitchen stove with a bottle of water (%s): cold, it says \"%s\"; with wood and a match it is %s and says \"%s\"; %0.f s later the water is: %s" % [
+			before, cold, fire.feel(), said, Water.BOIL_TIME, Water.look(slot)])
 	else:
 		_say("no fire found at the kitchen stove")
 	# ---- zombies: one outside the kitchen's east window with the player behind the table

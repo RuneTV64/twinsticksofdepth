@@ -30,6 +30,7 @@ func _run() -> void:
 	for n in get_nodes_in_group("interactables"):
 		if n is Campfire and n.global_position.distance_to(Vector3(-9, 0, 8)) < 1.0:
 			fire = n
+	p.inv.add(Items.make("cooking_pot"))        # (water boils in a pot)
 	for kind: String in ["rain", "pond"]:
 		for how: String in ["nothing", "boil", "tablet", "filter", "filter then tablet", "filter then boil"]:
 			item["uses"] = 0
