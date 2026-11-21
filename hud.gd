@@ -25,6 +25,7 @@ var _hint: Label               # the one line left when the help is hidden
 ## conditions), 2 nothing at all.
 var ui_level := 0
 var treat: TreatmentScreen     # seeing to wounds (H)
+var loot: LootScreen           # going through a drawer, a cupboard, or what you carry (interact, I)
 var _wheel: Control
 var _wheel_labels: Array[Label] = []
 
@@ -86,9 +87,13 @@ Breaking things: everything breaks. Ready, crosshair on it, close by, left-click
   sledgehammer (brick, pavement) if you carry one; a gun shoots it. Zombies beat on what is in their way, weakest
   first. What is left can be picked through, and rusts and rots away. Broken glass crunches underfoot.
   Water: fill a bottle at a barrel or trough. It may be dirty, and clear water can still be bad. Boil it on a
-  fire (interact with a cooking pot, stay by it), or Shift+I filters it and then treats it with tablets. I drinks.
+  fire (interact with a cooking pot, stay by it), or Shift+I filters it and then treats it with tablets. Right-click the bottle among your things to drink.
   Dirty water fouls a wound washed with it and can make you ill. A stove is a fire too: lay wood on it, light it
   with a match, feed it or it burns out.
+  Searching: interact with a dresser, a wardrobe, a kitchen counter, a fridge or a bookshelf. The drawer is dark
+  until you go through it: hold your hand over a column; Shift hurries and is heard. Drag things about,
+  double-click takes or puts back, right-click uses what is in a slot. 1 2 3 pick the drawer. You only see a
+  short way in front of you; ALT looks up. I opens just what you carry. A backpack on your back is a grid.
   Things you carry: C opens the character page; PgUp PgDn pick a thing, Enter uses it (eat a tin, put on boots,
   take a pill, fresh batteries in the torch, wash cloth into a rag), Delete puts it down. Food and water run down.
   Y lays the broken glass you carry: a trap for bare feet, an alarm under boots. It stays until picked up.
@@ -225,6 +230,9 @@ func _ready() -> void:
 	treat = TreatmentScreen.new()
 	treat.player = player
 	root.add_child(treat)
+	loot = LootScreen.new()
+	loot.player = player
+	root.add_child(loot)
 	_apply_ui.call_deferred()
 
 	# Quick weapon wheel: a ring of slots in the middle of the screen, shown while it's held open.
@@ -565,7 +573,12 @@ func _process(delta: float) -> void:
 			treat.open()
 		else:
 			treat.close()
-	_prompt.text = player.interact_prompt() if not player.treating else ""
+	if loot.visible != player.searching:
+		if player.searching:
+			loot.open()
+		else:
+			loot.close()
+	_prompt.text = player.interact_prompt() if not player.treating and not player.searching else ""
 	_prompt.modulate = Color(1, 1, 1, 0.5 if player.armed else 1.0)
 
 	var mask := Input.get_mouse_button_mask()

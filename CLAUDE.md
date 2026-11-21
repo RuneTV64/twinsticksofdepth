@@ -47,7 +47,8 @@ kit (see The street kit). The owner has pivoted back to making assets.
 
 Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
 owner: street lamps and signs (see The street kit, Lamps and signs), the furniture kit (see The
-furniture kit), and the first working items (see The first working items).
+furniture kit), the first working items (see The first working items), and searching furniture with
+the grid screen and a backpack (see Searching and the grid).
 
 Items by theme come next (owner, 21 Nov 2026: "Afterwards I will give you themes (boys room girls room
 bathroom electronics etc) and you will generate a set number of items per theme"). Wait for the themes and
@@ -169,7 +170,7 @@ The aim is something like Project Zomboid with its own, better flavour. Two plac
 - Order of work as the owner sees it: loot is more important than buildings; modular building assets come later;
   spawning and how the horde moves, and the turning-undead mechanic, are also still to come.
 
-## Loot (being designed with the owner, 20 Nov 2026; nothing built)
+## Loot (being designed with the owner, 20 Nov 2026; searching and the grid are built: see Searching and the grid)
 
 The owner's decisions so far. Sketch of the loot screen: `tools/sketches/loot_screen_sketch.png` (its HTML beside
 it). The owner said to sketch before building anything; wait for their critique of the sketch.
@@ -202,8 +203,8 @@ it). The owner said to sketch before building anything; wait for their critique 
   rest of loading (R tap to swap magazines, R hold to thumb rounds in, where magazines are kept).
 - Order (owner): enemy AI that follows sound came first, because items will make noise. That is built (see Sound,
   hordes and hunting). The items that exist are the medical ones, the tools and the rest listed under The
-  first working items (`items.gd`), with the slot inventory; the loot screen, containers, bags, guns and
-  loading are not built.
+  first working items (`items.gd`), with the slot inventory. Searching furniture, the grid screen and a
+  backpack are built (see Searching and the grid); loot on zombies, food rotting, guns and loading are not.
 - Claude's earlier layout, which the owner answered against: items are records (weight, condition, category);
   container contents are rolled when first opened; time is applied on opening (spoiling, picked over by others);
   nothing respawns in a cupboard; keepsakes unlock starting builds.
@@ -537,8 +538,8 @@ with heat, fire, chemicals or a water filter, all to be added. Every number is C
     returns) and passes in about 8 minutes. While Wretched it adds slowly to the same blood poisoning a bad
     wound causes, so it can kill and never turns you. Drinking adds 25 to the water need (which doesn't
     run down yet).
-- Keys (stand-ins until items can be used from the inventory): I drinks; Shift+I treats the water you carry
-  with what you carry, the filter first and then a tablet.
+- Keys: right-click the bottle among your things to drink (I opens them; it was the drink key until 21 Nov
+  2026); Shift+I treats the water you carry with what you carry, the filter first and then a tablet.
 - Cloud run (`tools/water_test.gd`), drinking made ill out of 400 and whether a wash leaves a wound clean:
 
   | Water | Nothing | Boiled | Tablet | Filtered | Filter + tablet or boil |
@@ -942,7 +943,8 @@ is Claude's first guess.
   from across it; the fridge stops sight, the table doesn't; a zombie with a chair or the kitchen table
   between it and the player climbed over in under 3 s; water put on the kitchen stove, once it had wood, a
   match and a pot, had boiled 20 s later. The stairs, floors and aiming tests still pass in the furnished house.
-- Not done: Forward+ unchecked; nothing can be searched, sat on, slept in or cooked on; nothing can be
+- Not done: Forward+ unchecked; nothing can be sat on, slept in or cooked on (five pieces can be searched
+  now: see Searching and the grid); nothing can be
   pushed, tipped or stood on (no blocking a door with a wardrobe); the stove gives no light or warmth; no bathroom, and no small things (lamps, rugs, low tables, a television); what
   you walk into is one box round the piece (no stepping between a chair's legs, no seeing under a table);
   one size of each; `furnish` only knows the 3 by 2 house and leaves the basement empty; worn all over,
@@ -960,7 +962,8 @@ that switch on what was already built or promised and was waiting for an item. O
   clothing, food, thrown, scrap), `stack` or `uses`, `keep` (still a thing when used up), `wear` ("feet",
   "head"), `found` (the kinds of place it turns up in, for the loot tables to come: kitchen, bathroom,
   bedroom, living room, garage, yard, shop, anywhere; `Items.found_in(place)`), and `for` (what it is for,
-  in a sentence the player reads on the character page). 34 items. An item with nothing in the game to use
+  in a sentence the player reads on the character page). 35 items with the backpack; `size` and `rare`
+  came with searching. An item with nothing in the game to use
   it doesn't go in (rule 2 holds for things you carry). The themed batches must fill in all of these.
 - What each new one switches on:
   - `hammer`, `nails` (a box of 20), `plank` (stack of 4): boarding a window. P at a window by the
@@ -993,7 +996,7 @@ that switch on what was already built or promised and was waiting for an item. O
   as a small pickup. A stand-in until the loot screen. Sheet: `tools/preview/items_page.png`
   (`tools/items_preview.gd`; the page only: the level behind it is black in the cloud).
 - Keys: P boards or prises (Shift+P the old free boarding); U boots on and off (Shift+U the old test
-  switch); I and Shift+I as before.
+  switch); I is now your things (see Searching and the grid), Shift+I treats water as before.
 - In the test level: a "Carpenter's box" (hammer, nails, 4 planks, crowbar) and "Boots and a helmet" by the
   spawn; batteries in the tool box; antibiotics in every first-aid box; "Kitchen things" (pot, matches, 3
   tins, tin opener) by the kit house's stove.
@@ -1012,12 +1015,91 @@ that switch on what was already built or promised and was waiting for an item. O
     washed once and left open, fully infected at 91 s, or clear of it at 70 s on antibiotics.
   - Standing water won't wash cloth; a clean bottle made two rags for two washes. Rags put down lay at the
     player's feet and were picked up again. Dying in boots left them with the body.
-- Not built, and why: a bag or backpack and the grid (the loot screen is to be sketched and agreed first);
-  guns, magazines and rounds (to be designed together); containers and searching; items lying about by
-  place (the `found` tags are only data); moving a thing between slots; using a thing on a wound outside
+- Not built, and why: guns, magazines and rounds (to be designed together); using a thing on a wound outside
   the treatment screen; cooking, spoiling, more than one food; clothes beyond boots and a helmet, and any
   of it showing on the character; a boarded window costing more planks for a bigger window; raiders using
   any of it; warmth and light from a fire you lit; the weight you carry feeding the WT number.
+
+## Searching and the grid (built 21 Nov 2026, in review; not seen by the owner)
+
+The owner, after the first items: "dont forget that cupboards and dressers need search functionality as well
+as drawer renders for the inventory grid view. Drawers. Etc." Built to the owner's sketch and their answers
+on it (see Loot). On the branch `claude/destructible-environment-6yu73c`, not on `main`. Every number is
+Claude's first guess.
+
+- What can be searched (`stash.gd`, `Stash`, a child of the piece: `FurnitureKit` puts one on each): a
+  dresser (three drawers, 6 by 3 squares each), a wardrobe (hanging rail 5 by 5, top shelf 5 by 2), a
+  kitchen counter (drawer 6 by 2, cupboard 6 by 4), a fridge (shelves 4 by 4, freezer box 4 by 2), a
+  bookshelf (shelves 6 by 4). `Stash.KINDS` has them; a new piece of furniture that holds things is one
+  line there. Interact with it, weapon away.
+- What is in a part is rolled the first time anyone looks in it, from `Items.found_in(place)` for that
+  piece's kind of place (dresser and wardrobe: bedroom; counter and fridge: kitchen, the fridge only food
+  and drink; bookshelf: living room), each thing part used or part of a stack (`Stash.found_item`). A new
+  item field `rare` (0 to 1) makes a thing turn up less (a backpack 0.25). A piece put down damaged or
+  worn out has been picked over: 0.6 and 0.3 as much. Nothing refills.
+- The grid (`item_grid.gd`, `ItemGrid`: plain data, `{"w", "h", "things": [{"item", "x", "y", "z"}]}`).
+  Every item has a `size` in squares (`Items.size_of`; small 1 by 1, a bottle 1 by 2, a hatchet 1 by 3, a
+  plank 1 by 4, boots 2 by 2, a sledgehammer 2 by 4). Things lie on each other as they were left (`z` 1,
+  the owner's layered clutter; 4 in 10 found things try to): what is under something can't be seen or
+  taken until the thing on it is moved (its edge is dashed gold). What a person puts down only goes where
+  there is clear room.
+- Searching (`Stash.search`, `found` 0 to 1 a column): a part nobody has been through is dark. The column
+  your hand is over is gone through, `search_time` 3 s a column, and the drawer's own picture is the meter:
+  it comes up out of the dark from the front. When a column is done, what lies wholly in searched columns
+  shows. Shift hurries (`hurry_mult` 3) and is heard `hurry_noise` 8 m, twice a second. Wisdom stands in
+  for the searching skill (3% a point). A part once searched opens at once from then on.
+- It costs your view (`Player.searching`, `search_sight` 7 m ahead, `search_near` 1.2 m round you, against
+  40 and 3); ALT looks up, your hands stop and the screen fades. A step, being grabbed, being hit, or the
+  piece being broken shuts it; so does Esc or I.
+- The screen (`loot_screen.gd`, `LootScreen`, `hud.loot`): the lower 60% of the screen, the world still
+  showing above. Left: your eight slots, what you wear, and the grid of the bag on your back. Right: the
+  piece, its parts as tabs (1 2 3), the open part drawn as itself with the grid over it. The hand is the
+  screen's own pointer (the mouse is captured). Drag a thing to a slot, a square, your feet, head or back,
+  or up out of the panel to put it on the ground; double-click sends it across; right-click uses what is in
+  a slot (`Player.use_item`) or says what a thing is for. The line at the bottom names what the hand is
+  over. I opens it with nothing on the right: just what you carry.
+- The drawer renders and the icons (`item_art.gd`, `ItemArt`): made by code, 16 texels a square, shown big
+  with no smoothing. `backdrop(look, stain, w, h)`: "drawer" (from above: sides, bottom boards, a handle),
+  "cupboard" and "shelf" (from the front, a shelf every two rows), "rail" (a wardrobe: a steel rail with
+  hangers), "fridge" (enamel, a wire shelf, the lamp), "freezer" (frost), "bag" (canvas, stitching, a zip),
+  dithered on 8-shade ramps; the wood is the piece's own stain. `icon(id)`: each item is a short recipe of
+  shapes in `ItemArt.ART` (box, round, bar, any shape, flat mark, cut), shaded and outlined by the code,
+  so a new item's picture is one line; one without a recipe shows as a parcel. The themed batches must
+  give every item a `size` and a recipe.
+- A backpack (`backpack`, worn on "back", `hold` 6 by 4; in the box by the spawn with the boots and
+  helmet): its grid is on the item itself (`Items.hold_of`), so it keeps what is in it when it is taken
+  off, dropped or left on your body. What no slot will take goes into it when you pick things up
+  (`Inventory.add`). What is in it can't be used until it is in a slot (`inv.has` only looks at slots): a
+  bag is storage. No bag goes in a bag. It weighs what is in it.
+- Breaking the piece (rule 1): what was in it, searched or not, lies on the floor as a pickup ("What was in
+  the dresser").
+- Review pictures (the screen is 2D, so these are as it will look; the level above it is black in the
+  cloud): `tools/preview/loot_search.png` (a dresser, four columns in), `loot_screen.png` (dresser, fridge,
+  wardrobe, cupboard), `loot_drawers.png` (every backdrop), `loot_icons.png` (every item). Made by
+  `tools/loot_preview.gd` (MODE icons, backs, screen).
+- Cloud run (`tools/search_test.gd`):
+  - In the level: 4 dressers, 2 bookshelves, a wardrobe, a counter, a fridge. Over 200 rolls a sound
+    dresser holds about 10 things in its three drawers, a wardrobe 7, a counter 7, a fridge 4, a
+    bookshelf 4; about a quarter lie on something. Worn out: 3, 2, 2, 1, 1, and some parts empty.
+  - A six-column drawer took 18 s carefully and was not heard at 6 m; 6 s in a hurry, heard at 6 m and
+    not at 11 m. Things showed as their columns were done.
+  - Searching, sight was 7 m ahead and 1.2 m round; ALT gave back 40 and 3.
+  - A double-click took a bottle; a drag put it back in a clear square; a drag up out of the panel left
+    painkillers on the ground. Boots lying on antibiotics hid them until the boots were dragged aside. A
+    column not yet looked in took nothing.
+  - A step shut it; back at it the prompt was "Look in the dresser" and nothing was left to go through. A
+    hit shut it.
+  - With a backpack on, eleven kinds of thing picked up: eight slots filled and the pot, tins and water
+    went in the bag. The bag came off into a free hand with its 3 things in it. Dying left it with the body.
+  - A bookshelf chopped up left its 2 things on the floor.
+- Stand-ins and not built: the pool is thin until the themed items exist (a bedroom's is eight things, so
+  dressers hold needles and painkillers); things are placed at random, not as a person would (clothes
+  hung, tins on a shelf); no junk items to be the clutter (any found thing may lie on another); your view
+  shrinks to a short cone, not a drawn "behind you: unseen" as in the sketch; the hand doesn't shake;
+  searching has no pose (you stand at it); zombies and raiders don't search or take; nothing is locked;
+  beds, couches, cars, bins and bodies can't be searched; a stack can't be split; things can't be turned
+  to fit; the slots on the left are a list, not laid out on a body; time does nothing to what is in a
+  stash; the fridge keeps nothing cold. In headless tests the screen needs `root.size` set.
 
 ## Small rules the owner has set (20 Nov 2026)
 

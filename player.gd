@@ -441,6 +441,17 @@ var inv := Inventory.new()
 ## Seeing to your wounds (the treatment screen is open). You don't move, and you see only a short way.
 var treating := false
 var treat_look := false          # looking up from it (ALT held): your view is back, your hands stop
+## Going through things (loot_screen.gd): a drawer, a cupboard, or only what you carry.
+var searching := false
+var search: Stash = null         # the piece of furniture being searched; null when it is only your own things
+var search_look := false         # ALT held: you look up and your hands stop
+@export_group("Searching")
+@export var search_sight := 7.0   # m: how far you see in front of you with your head in a drawer
+@export var search_near := 1.2    # ... and all round you
+@export var search_time := 3.0    # s to go through one column of a drawer, taking care
+@export var hurry_mult := 3.0     # how much faster in a hurry (Shift)
+@export var hurry_noise := 8.0    # m: a hurried rummage is heard this far
+@export_group("")
 @export var treat_sight := 3.0   # m: how far you see while your eyes are on the wound
 var invulnerable := false          # test switch (F7): nothing hurts you
 var _struggle := 0.0
@@ -763,7 +774,7 @@ func _input(event: InputEvent) -> void:
 		_lmb_event = l
 		_rmb_event = (mask & MOUSE_BUTTON_MASK_RIGHT) != 0
 	if event is InputEventMouseButton:
-		if event.pressed and camera_rig and not treating and not wheel_open \
+		if event.pressed and camera_rig and not treating and not searching and not wheel_open \
 				and (event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			camera_rig.zoom(-1 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1)
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -776,7 +787,7 @@ func _input(event: InputEvent) -> void:
 		if wheel_open:
 			# The mouse points at the wheel instead of moving the crosshair.
 			_wheel_vec = (_wheel_vec + event.relative).limit_length(WHEEL_MOUSE_RADIUS)
-		elif Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not dead and not treating:
+		elif Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not dead and not treating and not searching:
 			var rel: Vector2 = event.relative
 			# The same hand movement covers the same share of the screen however far out the camera is.
 			var far := camera_rig.distance / 18.0 if camera_rig else 1.0
@@ -790,6 +801,7 @@ func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
 	if dead:
 		treating = false
+		stop_search()
 		_respawn_t -= delta
 		velocity = Vector3.ZERO
 		wheel_open = false
@@ -813,6 +825,25 @@ func _physics_process(delta: float) -> void:
 			cover_crouch = 0.85
 			velocity = velocity.move_toward(Vector3.ZERO, decel * delta)
 			move_and_slide()
+			_update_sight(delta)
+			_update_visuals(delta)
+			return
+
+	if searching:
+		search_look = Input.is_action_pressed("look_up")
+		var gone := search != null and (not is_instance_valid(search) or _xz(search.global_position - global_position).length() > interact_range + 0.6)
+		if mv.length() > 0.3 or not held_by.is_empty() or _stagger > 0.0 or gone:
+			stop_search()
+		else:
+			# Head down in it: nothing else happens until you leave it.
+			if search != null:
+				var to := search.global_position - global_position
+				to.y = 0.0
+				if to.length() > 0.2:
+					facing = _turn_toward(facing, to.normalized(), turn_speed * delta)
+			velocity = velocity.move_toward(Vector3.ZERO, decel * delta)
+			move_and_slide()
+			_update_torch()
 			_update_sight(delta)
 			_update_visuals(delta)
 			return
@@ -1375,7 +1406,7 @@ func _update_stance() -> void:
 
 
 func _update_aim(delta: float) -> void:
-	free_look = Input.is_action_pressed("free_look") and not dead and not treating and not wheel_open
+	free_look = Input.is_action_pressed("free_look") and not dead and not treating and not searching and not wheel_open
 	if free_look:
 		_mouse_idle = 0.0       # it stays out there while you hold it
 	if armed:
@@ -2004,10 +2035,11 @@ func _update_sight(delta := 0.0) -> void:
 	# Peeking or popped out, your view is back (and you can be seen).
 	var hunkered := in_cover and cover_mode == "hunker"
 	var eyes_down := treating and not treat_look
+	var rummaging := searching and not search_look
 	var low_eyes := (in_cover and cover_face != null and cover_face.low and (hunkered or cover_side != 0)) or posture == 1
 	var k := 1.0 - exp(-10.0 * delta) if delta > 0.0 else 1.0
-	view_range = lerpf(view_range, treat_sight if eyes_down else (cover_hunker_sight if hunkered else sight_range), k)
-	view_near = lerpf(view_near, treat_sight if eyes_down else (cover_hunker_sight if hunkered else sight_near), k)
+	view_range = lerpf(view_range, treat_sight if eyes_down else (search_sight if rummaging else (cover_hunker_sight if hunkered else sight_range)), k)
+	view_near = lerpf(view_near, treat_sight if eyes_down else (search_near if rummaging else (cover_hunker_sight if hunkered else sight_near)), k)
 	_eye_h = lerpf(_eye_h, (0.3 if posture == 2 else (0.6 if low_eyes else sight_eye_height)) + perch, k)   # higher up, you see over more
 	if sight_rays.size() != SIGHT_RAYS:
 		sight_rays.resize(SIGHT_RAYS)
@@ -2903,6 +2935,7 @@ func take_damage(amount: float, dir: Vector3, knock: float, fright := true) -> v
 	if dead or invulnerable:
 		return
 	stop_treat()
+	stop_search()
 	health -= amount
 	if fright:
 		sheet.hurt(amount / max_health)
@@ -3254,6 +3287,50 @@ func toggle_treat() -> void:
 func stop_treat() -> void:
 	treating = false
 	treat_look = false
+
+
+# ---------------------------------------------------------------- searching: drawers, cupboards, your own bag
+## Start going through a piece of furniture (interact with it), or, with none, only what you carry (I).
+func start_search(st: Stash = null) -> void:
+	if dead or searching:
+		return
+	if not held_by.is_empty():
+		show_status("Not while something has hold of you.")
+		return
+	if armed or _roll_t > 0.0 or _roll_rec_t > 0.0 or _vault_t > 0.0 or _dash_t > 0.0:
+		show_status("Put your weapon away and stand still first.")
+		return
+	stop_treat()
+	searching = true
+	search = st
+	search_look = false
+	running = false
+
+
+func stop_search() -> void:
+	if not searching:
+		return
+	searching = false
+	search = null
+	search_look = false
+	_lmb_edge = false
+
+
+func toggle_things() -> void:
+	if searching:
+		stop_search()
+	else:
+		start_search(null)
+
+
+func is_searching() -> bool:
+	return searching
+
+
+## Seconds to go through one column of a drawer, taking care. (Skill is to make searching more efficient,
+## owner, 20 Nov 2026; until skills exist Wisdom stands in, 3% a point.)
+func search_pace() -> float:
+	return search_time * clampf(1.0 - 0.03 * sheet.bonus("wisdom"), 0.6, 1.4)
 
 
 func _wound(kind: String, amount: float, part: String) -> void:

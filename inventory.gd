@@ -3,7 +3,8 @@ extends RefCounted
 ## What a person carries when they have no bag: weighted slots. Each slot holds one thing (or one stack of the same
 ## thing), up to a weight. Hands take anything; the belt takes tools and holstered things; pockets take small
 ## things, and only some clothes have them (jeans pockets are assumed for now). Bags and containers, which are
-## full grids, come with the loot system.
+## full grids (item_grid.gd): a bag worn on your back takes what the slots won't, but what is in it can't be
+## used until it is in a slot.
 
 ## key, name, the most weight it takes (kg)
 const SLOTS := [
@@ -15,7 +16,7 @@ const SLOTS := [
 var slots := {}     # key -> item Dictionary, or absent when empty
 ## What is worn: place ("feet", "head") -> item. Worn things take no slot. (Clothes proper come later; these are
 ## the two that already matter: boots keep glass and dirt out of your feet, a helmet takes a blow to the head.)
-const WORN := [["feet", "On your feet"], ["head", "On your head"]]
+const WORN := [["feet", "On your feet"], ["head", "On your head"], ["back", "On your back"]]
 var worn := {}
 
 
@@ -39,6 +40,10 @@ func add(item: Dictionary) -> Dictionary:
 		if not slots.has(s[0]) and Items.weight(item) <= float(s[2]):
 			slots[s[0]] = item
 			return {}
+	# No slot will take it: into the bag on your back, if you wear one and it has room.
+	var bag = worn.get("back")
+	if bag != null and ItemGrid.add(Items.hold_of(bag), item):
+		return {}
 	return item
 
 
@@ -93,8 +98,9 @@ func wear(key: String) -> String:
 	var place := str(Items.DEFS[it["id"]].get("wear", ""))
 	if place == "":
 		return ""
-	var one := {"id": it["id"], "n": 1}
+	var one: Dictionary = it                      # the thing itself (a bag keeps what is in it)
 	if int(it.get("n", 1)) > 1:
+		one = {"id": it["id"], "n": 1}
 		it["n"] = int(it["n"]) - 1
 	else:
 		slots.erase(key)

@@ -187,11 +187,11 @@ func _unhandled_input(event: InputEvent) -> void:
 					player.work_window()
 			KEY_Y:   # lay the broken glass you carry, as an alarm or a trap
 				player.lay_glass()
-			KEY_I:   # drink from your bottle; Shift+I: filter or treat the water you carry
+			KEY_I:   # what you carry, as slots and a bag's grid (loot_screen.gd); Shift+I: filter or treat your water
 				if event.shift_pressed:
 					player.purify_water()
 				else:
-					player.drink_water()
+					player.toggle_things()
 			KEY_U:   # boots on and off, if you have a pair. Shift+U: the old test switch, boots or no boots
 				if event.shift_pressed:
 					player.barefoot = not player.barefoot
@@ -481,10 +481,10 @@ func _build_level() -> void:
 	joiner.contents = [Items.make("hammer"), Items.make("nails"), Items.make("plank", 4), Items.make("crowbar")]
 	add_child(joiner)
 	var kit_box := ItemPickup.new()
-	kit_box.title = "Boots and a helmet"
+	kit_box.title = "Boots, a helmet and a pack"
 	kit_box.tint = Color(0.4, 0.42, 0.36)
 	kit_box.position = Vector3(-7, 0, 6)
-	kit_box.contents = [Items.make("boots"), Items.make("helmet")]
+	kit_box.contents = [Items.make("boots"), Items.make("helmet"), Items.make("backpack")]
 	add_child(kit_box)
 	_place_grass.call_deferred()     # once the whole level is built, so it lands clear of everything
 	for p in [Vector3(-1.5, 0, 3), Vector3(1.5, 0, 3), Vector3(-9, 0, 9), Vector3(-14, 0, 13)]:
@@ -514,7 +514,7 @@ func _build_level() -> void:
 	kit.position = Vector3(-7, 0, 4)
 	kit.contents = [Items.make("purify_tabs"), Items.make("water_filter")]
 	add_child(kit)
-	_sign(Vector3(-9, 2.2, 6), "Water: fill a bottle here. Boil it on the fire (with a pot), or Shift+I treats it. I drinks")
+	_sign(Vector3(-9, 2.2, 6), "Water: fill a bottle here. Boil it on the fire (with a pot), or Shift+I treats it. I: your things; right-click the bottle to drink")
 	_sign(Vector3(0, 2.6, 5), "Break things: Ready, crosshair on it, left-click. P boards a window: hammer, nails, planks")
 
 	# Houses from the kit (assets/buildings/house): a sound two-storey one, and a small derelict one beside

@@ -88,7 +88,7 @@ FurnitureKit.furnish(level, house_origin, 2)             # the house's origin, h
 ## Not checked, not done
 
 - Forward+ on Godot 4.7: colours, the stepped light, cost.
-- Nothing can be searched, sat on, slept in or cooked on yet. Those wait for loot, rest and food.
+- The dresser, wardrobe, kitchen counter, fridge and bookshelf can be searched (`stash.gd`: the kit puts a `Stash` on each; what is in it spills on the floor if the piece is broken). Nothing can be sat on, slept in or cooked on yet.
 - Nothing can be pushed, dragged, tipped over or stood on, so furniture can't be used to block a door or a
   window.
 - The stove is cold until wood is laid on it and lit with a match, and burns the wood down (campfire.gd); its door glows while it burns. It gives no light or warmth.

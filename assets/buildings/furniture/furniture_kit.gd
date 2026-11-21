@@ -47,13 +47,13 @@ const LATER := {
 	"armchair": "sitting to rest",
 	"table": "a surface things are left on",
 	"chair": "sitting; something to wedge under a door handle",
-	"counter": "cupboards to search",
+	"counter": "(its drawer and cupboard are searched now: stash.gd)",
 	"stove": "cooking; warmth and light from it",
-	"fridge": "a container: food, and what the food has turned into",
+	"fridge": "what the food in it has turned into (it is searched now: stash.gd)",
 	"bed": "sleep; something under the mattress",
-	"wardrobe": "a container: clothes",
-	"dresser": "a container: small things, in drawers",
-	"bookshelf": "books: skills to read up on",
+	"wardrobe": "clothes to find in it (it is searched now: stash.gd)",
+	"dresser": "(its drawers are searched now: stash.gd)",
+	"bookshelf": "books: skills to read up on (its shelves are searched now: stash.gd)",
 }
 ## A piece put down worn starts with this share of its strength.
 const WEAR_HP := [1.0, 0.6, 0.3]
@@ -277,6 +277,15 @@ func _piece(kind: String, at: Vector3, facing: String, width: float, mesh: Array
 		fire.position = front * (d * 0.5 + 0.35)
 		body.add_child(fire)
 		fire.changed.connect(func(now: bool) -> void: look.material_override = FurnitureKit.mat(wood, cloth, br.stage, now, pin))
+	# Somewhere things are kept (stash.gd): searched by interacting with it; what is in it spills if it breaks.
+	var stash := Stash.for_piece(kind, str(k["what"]), wood, wear)
+	if stash != null:
+		var face := Vector3(0, 0, 1).rotated(Vector3.UP, turns * PI * 0.5)
+		stash.position = face * (d * 0.5 + 0.35)
+		body.add_child(stash)
+		br.broke.connect(func(_by: Node) -> void:
+			if is_instance_valid(stash):
+				stash.spill())
 	parts.append(br)
 	return br
 
