@@ -26,7 +26,9 @@ The owner's answers to what was open (21 Nov 2026):
 - Raiders seeing 18 m against the player's 40 m is fine for now. Raiders still beat the owner from across
   the screen, because you have to be zoomed in to see what you are doing close up. The owner's thought:
   "might need to add an outline to zombies and players to help them stand out". Proposed and built the same
-  day (see Outlines), not yet seen by the owner.
+  day (see Outlines), on `main` since the owner said to push it (after their own update of that day), not yet
+  seen by the owner. Checked on top of that update: the level runs clean, the outline sheet renders the same,
+  and `impale_test` and `items_test` pass. An impaled zombie keeps its outline while it hangs alive.
 
 Built after those answers and not yet seen by the owner: the burning torch, and lost limbs showing on the
 player (sheet: `tools/preview/missing_limbs.png`).
