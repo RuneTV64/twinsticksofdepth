@@ -436,8 +436,10 @@ func _leave_tracks() -> void:
 		_step_from = global_position
 		_step_side = -_step_side
 		_ground_slow = Ground.it.slow_at(global_position)
-		# Broken glass crunches under anyone; a raider (barefoot, like everyone) may take a shard in the foot.
-		if Wreck.step_on(global_position, self, 1.0, kind == "raider") == 2:
+		# Broken glass crunches under anyone, and goes into bare feet: a raider's (it hurts him), and a
+		# zombie's, which takes the shard off the ground and doesn't care (owner, 21 Nov 2026). One crawling
+		# over it picks up far more.
+		if Wreck.step_on(global_position, self, 1.0, true, Wreck.CRAWL_CUT if crawling else Wreck.BARE_CUT) == 2 and kind == "raider":
 			call("cut_foot")
 		if perch < 0.25:
 			Ground.it.stamp(global_position, moved, _step_side, crawling)

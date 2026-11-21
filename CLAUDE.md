@@ -394,8 +394,14 @@ always infects unless treated and cleaned at once. Every number here is Claude's
   glass `Wreck` like any other, with as many shards as you laid. It cuts you too. Raiders are barefoot like
   everyone: one treading on glass takes a shard half the time (`Raider.cut_foot()`): 5 health, a limp at
   0.55 speed for 25 s, and he cries out (you are told within 14 m). He doesn't learn where you are from it.
-  Cloud run: 3 shards laid, a raider took all 3 in 5 footfalls, health 62 to 47. Zombies only crunch on it
-  and never take shards, so they don't use a trap up (Claude's pick). Not built: raiders seeing and going
+  Cloud run: 3 shards laid, a raider took all 3 in 5 footfalls, health 62 to 47. Zombies take
+  shards in their feet too and it does nothing to them (owner, 21 Nov 2026), so a horde uses a trap up:
+  3 shards went into one zombie's feet in 6 footfalls, its health unchanged.
+- Crawling on glass (owner, 21 Nov 2026: "a horrible idea"): prone, each drag over glass has a 0.7 chance
+  (`Wreck.CRAWL_CUT`) of a shard, boots or not, in an arm, the chest (likeliest) or a leg: a cut there with
+  the glass in it. Crawling in boots over 6 shards put all 6 in the player within 1.4 m. Crawling zombies
+  pick it up the same way and don't care. Open wounds elsewhere than the feet don't yet take in dirt from
+  what you crawl through. Not built: raiders seeing and going
   round glass, picking it up or laying it; a bloody shard keeping its blood once laid; a proper control
   for laying (it waits for dropping and placing items).
 - Glass in a wound is drawn out with the tweezers like anything else and comes out as a `bloody_glass` item

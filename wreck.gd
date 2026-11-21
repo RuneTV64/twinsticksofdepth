@@ -12,6 +12,7 @@ extends Node3D
 
 const CRUNCH := 6.0            # how far glass underfoot is heard (m)
 const BARE_CUT := 0.5          # chance a bare foot landing on glass takes a shard
+const CRAWL_CUT := 0.7         # chance each drag of a body crawling over it does: boots are no help
 const MERGE := 0.8             # wreckage landing this close to more of the same pile joins it
 
 static var all: Array[Wreck] = []
@@ -96,14 +97,15 @@ func weather(dt: float, wet: float) -> void:
 ## A foot lands at `pos`. Returns 0 if there was no glass there. Shod (1): the glass crunches (heard `quiet`
 ## times as far when going carefully) and stays where it is. Barefoot (`bare`): it is quieter, and BARE_CUT
 ## of the time a shard goes into the foot (2) and is gone from the ground. Walking on glass never removes it
-## otherwise: it has to be picked up by hand (owner, 21 Nov 2026). The caller does the wounding.
-static func step_on(pos: Vector3, who: Node, quiet := 1.0, bare := false) -> int:
+## otherwise: it has to be picked up by hand (owner, 21 Nov 2026). The caller does the wounding. Someone
+## crawling over it passes `bare` true whatever is on their feet, and CRAWL_CUT as the chance.
+static func step_on(pos: Vector3, who: Node, quiet := 1.0, bare := false, chance := BARE_CUT) -> int:
 	if glass <= 0:
 		return 0
 	for w in all:
 		if w.lot.has("glass") and Vector2(w.global_position.x - pos.x, w.global_position.z - pos.z).length() <= w.spread + 0.25:
 			var e: Dictionary = w.lot["glass"]
-			var cut := bare and randf() < BARE_CUT
+			var cut := bare and randf() < chance
 			if cut:
 				var whole := maxf(float(e["area"]) * float(Materials.of("glass")["per_m2"]), 1.0)
 				e["gone"] = minf(float(e["gone"]) + 1.0 / whole, 1.0)

@@ -60,6 +60,33 @@ func _run() -> void:
 		n += 1
 	_say("  a raider walking on it: %d shards in his feet over %d footfalls, health %d -> %d, limping %s, trap %s" % [cuts, n, roundi(hp0), roundi(r.hp), r._glass_t > 0.0, "used up" if not (is_instance_valid(trap) and trap.lot.has("glass")) else "still there"])
 	r.queue_free()
+	# Crawling over a window's worth, in boots.
+	b.reset()
+	p.barefoot = false
+	p.posture = 2
+	w = Wreck.leave(main, Vector3(-8, 0, 12), 0.6, {"glass": 1.0}, 3.0, "window")
+	p.global_position = Vector3(-8, 0.05, 12)
+	n = 0
+	while is_instance_valid(w) and w.lot.has("glass") and n < 100:
+		p._step_in_it()
+		n += 1
+	_say("crawling over 6 shards in boots: all in you after %d drags (about %.1f m); wounds: %s; pain %.2f, bleeding %.2f a second" % [n, n * 0.2, b.wounds.map(func(x): return "%s sev %.2f glass %d" % [x["part"], x["sev"], x["glass"]]), b.pain, b.bleeding])
+	p.posture = 0
+	# A zombie walking over a trap.
+	w = Wreck.leave(main, Vector3(-8, 0, 16), 0.6, {"glass": 1.0}, 1.5, "window")
+	var z := Enemy.new()
+	z.kind = "shambler"
+	z.position = Vector3(-8, 0.05, 16)
+	main.add_child(z)
+	await physics_frame
+	var zhp := z.hp
+	n = 0
+	while is_instance_valid(w) and w.lot.has("glass") and n < 100:
+		z._step_from = z.global_position + Vector3(2, 0, 0)
+		z._leave_tracks()
+		n += 1
+	_say("a zombie walking on 3 shards: gone into its feet after %d footfalls; its health %d -> %d" % [n, roundi(zhp), roundi(z.hp)])
+	z.queue_free()
 	p.barefoot = true
 
 	# How long each kind of ground takes to turn an open cut foot bad, walking (one stride 0.7 m, 2 a second).

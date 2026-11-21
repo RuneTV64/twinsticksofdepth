@@ -907,9 +907,20 @@ func _step_in_it() -> void:
 	if body.missing.has(side):
 		side = "LegR" if side == "LegL" else "LegL"
 	var footed := not body.missing.has(side)
-	# Broken glass: shod it crunches, less going carefully. Barefoot it goes into your foot.
-	var glass := Wreck.step_on(global_position, self, 0.5 if posture > 0 else 1.0, barefoot and footed)
-	if glass == 2 and not invulnerable:
+	# Broken glass: shod it crunches, less going carefully. Barefoot it goes into your foot. Crawling over it
+	# is a horrible idea (owner, 21 Nov 2026): it goes into your arms, your chest, your legs, boots or no boots.
+	var crawl := posture == 2
+	var glass := Wreck.step_on(global_position, self, 0.5 if posture > 0 else 1.0, crawl or (barefoot and footed),
+		Wreck.CRAWL_CUT if crawl else Wreck.BARE_CUT)
+	if glass == 2 and not invulnerable and crawl:
+		var places: Array[String] = []
+		for part: String in ["ArmL", "ArmR", "Torso", "Torso", "LegL", "LegR"]:
+			if not body.missing.has(part):
+				places.append(part)
+		var part: String = places[randi() % places.size()]
+		body.glass_in(body.hurt("cut", part, glass_cut, ""))
+		show_status("Glass goes into your %s." % str(BodyHealth.NAMES[part]).to_lower(), 1.4)
+	elif glass == 2 and not invulnerable:
 		body.glass_in(body.hurt("cut", side, glass_cut, "foot"))
 		show_status("Glass goes into your foot.", 1.4)
 	elif glass == 1 and not barefoot:
