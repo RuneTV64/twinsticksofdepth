@@ -167,6 +167,44 @@ The aim is something like Project Zomboid with its own, better flavour. Two plac
   names, art, characters or levels. Which professions and what each one's game is are not designed: propose.
 - Order of work as the owner sees it: loot is more important than buildings; modular building assets come later;
   spawning and how the horde moves, and the turning-undead mechanic, are also still to come.
+- The view stays top-down (owner, 21 Nov 2026, after asking whether to go first-person: no). What makes the
+  game original is its systems, not the camera; first-person is already the crowded field, and the hordes,
+  cover, stealth, the cutaway, the art and the posing are all built for this view. Close-up moments (the
+  drawer, the treatment screen, a scope, peeking) can borrow first-person's closeness without a switch.
+
+## How fighting should feel (owner, 21 Nov 2026)
+
+The fights are one of the main places the game is to beat Zomboid, whose combat feels clunky. The owner: "I
+want my game to feel like you are playing a good twin-stick shooter that is also designed in a way to give
+you a very rich and detailed survival experience."
+
+- The rule: the depth goes in what happens around a fight, not in the controls during it. The character may
+  be limited (hurt legs slow you, shaking hands spoil your aim, a grab holds you, rummaging costs your view):
+  that is survival, and it is fair because you can see why. The controls must never fight you: no lag after a
+  click, no menus mid-fight, no lockouts you didn't choose. When something feels bad, ask whether it is the
+  character's limit (keep it) or the game's friction (cut it).
+- Ready is the bridge between the two halves of the game (owner): Ready held, you are in a twin-stick
+  shooter; let go, you are in the survival game (levers, traps, bridges, ladders, ropes, doors, loot). You
+  should be able to shoot a crowd, lower a bridge or set off a trap, and climb out an upstairs window on a
+  rope, switching without a seam. Keep Ready. So:
+  - Raising and lowering is instant both ways, with no lockout you can feel.
+  - Left-click is attack when Ready and use when lowered; the cursor and prompt always show which.
+  - Every interaction can be dropped by holding Ready (owner): working a bridge, climbing onto a rope,
+    rummaging. You are never stuck in an animation the game won't let you leave.
+  - Switching costs in the world, not the controls: while your hands are busy you are exposed and noisy.
+  - Some things want both modes (owner agreed: traps, and likely kicking or shoving a door shut with the gun
+    up). Decide per object rather than forcing everything through lowered.
+- What twin-stick feel needs, and where it is thin now (Claude's list; none of it built or tuned yet):
+  every input answers on the frame it is pressed, and a click made during a swing is remembered for the
+  next; a short freeze on contact, sounds by what was hit, and bodies reacting by the part struck; misses you
+  can see the reason for (reach, swing arcs, the spread ring idea held for the play test); zombie wind-ups you
+  can read before a lunge or grab (fast fresh, slow rotted); weapons that play differently (a hatchet that
+  sticks and needs yanking free, a bat that knocks down, a knife quick and quiet but close). Melee weapons are
+  where the game is thinnest and where it matters most; "punches using the part picking" is the natural place
+  to lay this plumbing for all melee. Reloading, when designed, should have a quick tap with a learnable
+  rhythm and leave the deeper handling for when there is time. Response, freeze on contact and hit reactions
+  are plumbing, cheaper early than bolted on later; numbers still wait for the bulk to be built.
+- Still to watch in the play test: the 0.45 s getting up after a roll, and hit rolls you can't see.
 
 ## Loot (being designed with the owner, 20 Nov 2026; searching and the grid are built: see Searching and the grid)
 
