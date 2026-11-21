@@ -31,7 +31,7 @@ The owner's answers to what was open (21 Nov 2026):
 Built after those answers and not yet seen by the owner: the burning torch, and lost limbs showing on the
 player (sheet: `tools/preview/missing_limbs.png`).
 
-Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
+Built 21 Nov 2026, on `main` since the owner said to push it, but not yet seen or played by the
 owner: everything can be broken (see Two rules for every object, and Breaking things), and bare feet, blood
 on the ground and ordinary infection. Tested headless only.
 
