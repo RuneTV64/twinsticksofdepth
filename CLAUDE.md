@@ -25,8 +25,8 @@ The owner's answers to what was open (21 Nov 2026):
   going); nothing is designed.
 - Raiders seeing 18 m against the player's 40 m is fine for now. Raiders still beat the owner from across
   the screen, because you have to be zoomed in to see what you are doing close up. The owner's thought:
-  "might need to add an outline to zombies and players to help them stand out". Not ordered yet; the
-  character shaders are approved assets, so propose how before building.
+  "might need to add an outline to zombies and players to help them stand out". Proposed and built the same
+  day (see Outlines), not yet seen by the owner.
 
 Built after those answers and not yet seen by the owner: the burning torch, and lost limbs showing on the
 player (sheet: `tools/preview/missing_limbs.png`).
@@ -167,6 +167,12 @@ The aim is something like Project Zomboid with its own, better flavour. Two plac
   names, art, characters or levels. Which professions and what each one's game is are not designed: propose.
 - Order of work as the owner sees it: loot is more important than buildings; modular building assets come later;
   spawning and how the horde moves, and the turning-undead mechanic, are also still to come.
+- Abilities are earned (owner, 21 Nov 2026): "a lot of this functionality and abilities will have to be
+  discovered, earned and or learned." That is a reason to chase the hats and badges that unlock new roles
+  (see character slates above): a role is often how you learn its abilities ("Cops learn stuff when they become
+  cops because they're cops"). So when building an ability, leave a switch for who has it (as
+  `Player.can_bash()` and `Player.reads_tells` do) rather than assuming everyone does. Which abilities belong
+  to which role is not designed.
 - The view stays top-down (owner, 21 Nov 2026, after asking whether to go first-person: no). What makes the
   game original is its systems, not the camera; first-person is already the crowded field, and the hordes,
   cover, stealth, the cutaway, the art and the posing are all built for this view. Close-up moments (the
@@ -205,6 +211,50 @@ you a very rich and detailed survival experience."
   rhythm and leave the deeper handling for when there is time. Response, freeze on contact and hit reactions
   are plumbing, cheaper early than bolted on later; numbers still wait for the bulk to be built.
 - Still to watch in the play test: the 0.45 s getting up after a roll, and hit rolls you can't see.
+- Parries and counters (owner, 21 Nov 2026): the outline's wind-up warning opens the way to them later. Not
+  designed; likely abilities to be learned (see Abilities are earned).
+
+## Outlines (built 21 Nov 2026, in review; not seen by the owner)
+
+The owner: zombies and raiders are hard to pick out, most of all zoomed out ("might need to add an outline to
+zombies and players"). Claude proposed, the owner answered, and it was built the same day.
+
+- How: `outline.gdshader`, put on each character's mesh as its `material_overlay` by the game's own scripts
+  (`outline.gd`, `Outline`): `zombie_body.gd` (on whatever `shown_meshes()` gives; re-applied in `refresh()`),
+  `player_body.gd` and `raider_body.gd`. The approved shaders and models are not touched. The mesh is drawn a
+  second time pushed out along its surface and inside out, so only a rim shows. One shared material per kind.
+- The same width on screen at every zoom: `width_px` 2 at 900 pixels high, scaled with the window.
+- Colours (owner): zombies dark (near black, a warm tint), raiders dark red, the player light; allied people
+  and, one day, other players share the player's. Flat colours, no soft edge.
+- Shown only on what is drawn: it goes with the body (a hunkered raider isn't drawn, nor is his outline), and
+  for zombies it reads the decay shader's own `dissolve` (pinned to the same per-object slot, 8) and fades a
+  step ahead of the body. Never through walls. The night layer (`fog.gd`) is drawn over it, so in the dark it is
+  as dark as the body. It isn't cut by the cutaway (the bodies aren't either).
+- Wound insides are left out (owner's ask): the inner surfaces under the holes in a zombie's skin (part codes
+  12 to 15 in the mesh's `COLOR.a`) are neither pushed out nor drawn.
+- The dead have none (owner: with this many zombies it is fine to know one is dead; a head shatter and brain
+  splatter are planned too). Downed ones keep it. Cut-off pieces and the corpse pile never have one (a live arm
+  in the pile must look like a dead one). A raider who respawns gets it back.
+- Flashes (owner: "Do it"), per-object values `outline_flash` and `outline_warn` (slots 14 and 15, which no
+  character shader uses), sent only when they change (`Enemy._update_outline()`):
+  - Seen: an enemy that had been fully out of view for `Outline.SEEN_AFTER` 3 s or more flashes its kind's
+    flash colour (zombie pale, raider bright red) for 0.35 s on coming into view.
+  - Warn: hot orange and a pixel wider while a zombie winds up a grab or a lunge at the player (`reach`,
+    `lunge_wind`) or a raider lines up a shot (popped, before his first shot: `Raider._winding_up()`). Only if
+    `Player.reads_tells` (true for everyone for now; it may become a learned ability, with parries and
+    counters after).
+- An arm across the body gets a line of its own (the inside-out drawing does that). The owner had pictured
+  only an outer outline; the sheet shows both. If the inner lines are unwanted, the way to an outer outline
+  only is a stencil pass (Godot 4.5 and up), without touching the approved shaders; not built.
+- Cost: one more draw per character (Godot skins once, so no second posing): a 226 horde about 860 to about
+  1,090 draw calls. Unmeasured: for the owner's PC.
+- Sheet: `tools/preview/outline.png` (`tools/outline_preview.gd`: the game's camera angle at 1600 x 900, the
+  default 18 m and zoomed out 45 m, with and without; a close-up of a torn chest; the flashes). What it shows:
+  at 18 m the crowd, the raider and the player stand clear of the ground; at 45 m the crowd goes from hard to
+  find to plain, though a 2 px rim on a figure 25 px tall makes zombies read as dark shapes (thinning it past
+  30 m is an option for the owner). What it can't show: Forward+ (the per-object slots, `material_overlay`
+  carrying per-object values, `VIEWPORT_SIZE` in the vertex stage are all unchecked there), the night layer,
+  the flashes in motion, the cost.
 
 ## Loot (being designed with the owner, 20 Nov 2026; searching and the grid are built: see Searching and the grid)
 

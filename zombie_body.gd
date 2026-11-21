@@ -137,6 +137,8 @@ var _detail_wait := randf() * 0.25   # time to the next detail check; offset so 
 var _pose_acc := randf() * 0.05   # time since last posed; starts offset so a crowd doesn't pose on the same frame
 var _first := true
 var _dissolve := -1.0           # the dissolve last sent to the parts; -1 = send next time
+var _outline := Outline.ZOMBIE  # the outline's kind (outline.gd); -1 = none (dead)
+var _flash := Vector2(-1.0, -1.0)   # the outline flash last sent (seen, warn); -1 = send next time
 var _low := false
 static var _swap_frame := -1
 static var _swaps := 0
@@ -258,6 +260,8 @@ func _make_shambler(path: String, from: Node3D, copy := true) -> bool:
 	shambler = sh
 	_skel = skels[0]
 	_dissolve = -1.0
+	_flash = Vector2(-1.0, -1.0)
+	_outline = Outline.ZOMBIE
 	sh.connect("rolled", func(_p: Dictionary, _c: bool) -> void: refresh())   # parts changed (or rolled anew)
 	sh.connect("skin_set", refresh)   # a new Freshness or look (set_skin, turn_from)
 	sh.connect("piece_spawned", _on_piece)
@@ -418,6 +422,28 @@ func refresh() -> void:
 	crawl_mult = lerpf(1.0, 0.6, rot_amt)
 	shed_chance = 0.6 * frail
 	_spring_tune()
+	# The parts shown may be different meshes now: the outline goes on whatever is shown.
+	Outline.apply(shambler.call("shown_meshes"), _outline)
+	if _flash.x >= 0.0:
+		Outline.flash(shambler.call("shown_meshes"), _flash.x, _flash.y)
+
+
+## The outline (outline.gd): on for a zombie that is up or down, off once it is dead.
+func set_outline(on: bool) -> void:
+	var k := Outline.ZOMBIE if on else -1
+	if k == _outline or shambler == null:
+		return
+	_outline = k
+	Outline.apply(shambler.call("shown_meshes"), k)
+
+
+## The outline's flash: seen (it has just come into view) and warn (winding up a grab or a lunge), 0 or 1 each.
+func set_outline_flash(seen: float, warn: float) -> void:
+	var f := Vector2(seen, warn)
+	if f == _flash or shambler == null:
+		return   # unchanged (nearly always)
+	_flash = f
+	Outline.flash(shambler.call("shown_meshes"), seen, warn)
 
 
 func part(slot: String) -> String:

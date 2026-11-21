@@ -448,6 +448,17 @@ func _update_fade(delta: float) -> void:
 	var shown := _alpha > 0.5 and (not dead or _corpse_t > 0.0)
 	if _visual.visible != shown:
 		_visual.visible = shown
+	_update_outline(delta, seen)
+
+
+## Lining up a shot at the player: popped out of cover (or standing in the open) and not yet firing.
+func _winding_up() -> bool:
+	return mode == "fight" and _phase == "pop" and _aim_t < aim_time
+
+
+func _outline_flash(seen: float, warn: float) -> void:
+	if rbody != null:
+		rbody.set_outline_flash(seen, warn)
 
 
 ## A shot of yours has reached it. What does its cover do? "" = nothing (hit as normal), "cover" = stopped,
@@ -636,6 +647,8 @@ func hear_noise(pos: Vector3, by_player := true) -> void:
 func _die() -> void:
 	dead = true
 	hp = 0.0
+	if rbody != null:
+		rbody.set_outline(false)
 	torch_on = false
 	Daylight.clear_beam(get_instance_id())
 	if _torch_light != null:
@@ -656,6 +669,8 @@ func _die() -> void:
 
 
 func _respawn() -> void:
+	if rbody != null:
+		rbody.set_outline(true)
 	dead = false
 	collision_layer = 4
 	global_position = home

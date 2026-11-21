@@ -30,6 +30,7 @@ func _make_material() -> ShaderMaterial:
 
 
 func _ready() -> void:
+	outline_kind = Outline.RAIDER
 	super._ready()
 	roll()
 

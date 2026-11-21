@@ -46,6 +46,10 @@ var material: ShaderMaterial
 
 var _skel: Skeleton3D
 var _mesh: MeshInstance3D
+## The outline's kind (outline.gd): the player and allies are ALLY; raider_body.gd sets RAIDER.
+var outline_kind := Outline.ALLY
+var _outline_on := true
+var _flash := Vector2(-1.0, -1.0)
 var _weapon: Node3D
 
 var _n := 0
@@ -112,6 +116,7 @@ func _ready() -> void:
 	material = _make_material()
 	_aim_light_at_sun.call_deferred()
 	_mesh.material_override = material
+	Outline.apply([_mesh], outline_kind)
 	# The shader reads per-vertex detail data, so never let the far-away simplified versions in.
 	_mesh.lod_bias = 64.0
 	_mesh.extra_cull_margin = 1.5
@@ -474,6 +479,23 @@ func show_missing(gone: int) -> void:
 	for k in 2:
 		_skel.set_bone_pose_scale(_arm[k][3], Vector3.ONE * (0.001 if gone & (1 << k) != 0 else 1.0))
 		_skel.set_bone_pose_scale(_leg[k][1], Vector3.ONE * (0.001 if gone & (4 << k) != 0 else 1.0))
+
+
+## The outline (outline.gd): off once dead, back on when alive again (a raider who respawns).
+func set_outline(on: bool) -> void:
+	if on == _outline_on or _mesh == null:
+		return
+	_outline_on = on
+	Outline.apply([_mesh], outline_kind if on else -1)
+
+
+## The outline's flash: seen (just come into view) and warn (lining up a shot at you), 0 or 1 each.
+func set_outline_flash(seen: float, warn: float) -> void:
+	var f := Vector2(seen, warn)
+	if f == _flash or _mesh == null:
+		return
+	_flash = f
+	Outline.flash([_mesh], seen, warn)
 
 
 # ====================================================================== helpers

@@ -27,6 +27,10 @@ var dexterity: float:                    # aimed-shot damage and headshot chance
 	get: return sheet.attr("dexterity")
 	set(v): sheet.set_attr("dexterity", v)
 @export var weight := 8.0                # the load you carry
+## Seeing an attack coming (outline.gd): a zombie winding up a grab or a lunge, or a raider lining up a shot at
+## you, warns in its outline. On for everyone for now; the owner means many abilities to be learned or earned
+## (with the roles the hats and badges unlock), and this may become one of them, with parries and counters after.
+@export var reads_tells := true
 
 # Derived in recompute_stats()
 var walk_speed := 2.1

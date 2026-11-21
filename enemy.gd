@@ -242,6 +242,8 @@ var _dead_t := 0.0
 var _corpse_t := 0.0
 var _sway := 0.0
 var _alpha := 1.0                # 1 = in the player's view, fades to 0 when it isn't
+var _unseen_for := 0.0           # s fully faded out of view (outline.gd: a long absence flashes on coming back)
+var _seen_flash_t := 0.0         # s left of the outline's "just come into view" flash
 var _out_t := 0.0                # s since it left the player's view
 var _noise_pos := Vector3.ZERO   # where the last noise it heard came from
 var _noise_t := 0.0              # > 0 while it is still drawn to that spot
@@ -426,6 +428,7 @@ func _update_fade(delta: float) -> void:
 		_out_t += delta
 		if _out_t > linger_time or _alpha < 0.99:
 			_alpha = move_toward(_alpha, 0.0, delta / maxf(fade_out_time, 0.01))
+	_update_outline(delta, seen)
 	if body != null:
 		var shown := _alpha > 0.02 or _corpse_t > 0.0
 		if _visual.visible != shown:
@@ -438,6 +441,33 @@ func _update_fade(delta: float) -> void:
 	var mode := BaseMaterial3D.TRANSPARENCY_DISABLED if _alpha > 0.99 else BaseMaterial3D.TRANSPARENCY_ALPHA
 	if _mat.transparency != mode:
 		_mat.transparency = mode
+
+
+## The outline's flashes (outline.gd). It flashes when it comes into view after a while out of it, and warns
+## while it winds up an attack on the player (`_winding_up()`), if the player can read it (`Player.reads_tells`).
+## Only what changes is sent to the body.
+func _update_outline(delta: float, seen: bool) -> void:
+	if dead:
+		return
+	if _alpha <= 0.02:
+		_unseen_for += delta
+	elif seen:
+		if _unseen_for >= Outline.SEEN_AFTER:
+			_seen_flash_t = Outline.SEEN_FLASH
+		_unseen_for = 0.0
+	_seen_flash_t -= delta
+	var warn := 1.0 if _winding_up() and player != null and player.reads_tells else 0.0
+	_outline_flash(1.0 if _seen_flash_t > 0.0 else 0.0, warn)
+
+
+## Winding up an attack on the player: reaching to grab, or crouched to lunge.
+func _winding_up() -> bool:
+	return (state == "reach" or state == "lunge_wind") and prey == player and player != null
+
+
+func _outline_flash(seen: float, warn: float) -> void:
+	if body != null:
+		body.set_outline_flash(seen, warn)
 
 
 ## Shoved back by the player: thrown along dir, no damage, and it needs a moment before it
@@ -496,6 +526,8 @@ func rise_from_death() -> void:
 func _die() -> void:
 	dead = true
 	hp = 0.0
+	if body != null:
+		body.set_outline(false)   # the dead have none (owner): a downed one keeps it
 	if not carried.is_empty():
 		var box := ItemPickup.new()
 		box.title = "Your old things" if was_player else "Its things"
