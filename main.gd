@@ -176,6 +176,11 @@ func _unhandled_input(event: InputEvent) -> void:
 					player.show_status("Boarded up." if Solid.board(win) else "It is boarded already.", 1.5)
 			KEY_Y:   # lay the broken glass you carry, as an alarm or a trap
 				player.lay_glass()
+			KEY_I:   # drink from your bottle; Shift+I: filter or treat the water you carry
+				if event.shift_pressed:
+					player.purify_water()
+				else:
+					player.drink_water()
 			KEY_U:   # shoes on and off, until footwear exists
 				player.barefoot = not player.barefoot
 				player.show_status("Barefoot." if player.barefoot else "Boots on (a stand-in until footwear exists).", 1.5)
@@ -465,6 +470,19 @@ func _build_level() -> void:
 	_box(Vector3(-4.5, 0.4, -12.5), Vector3(1.6, 0.8, 0.9), Color(0.5, 0.36, 0.22), "wood", "table")
 	_box(Vector3(-6.2, 0.9, -21.2), Vector3(0.8, 1.8, 0.8), Color(0.86, 0.87, 0.85), "metal", "fridge", {"metal": 0.6, "plastic": 0.4})
 	_box(Vector3(5.6, 1.2, -38.2), Vector3(0.12, 2.4, 0.12), Color(0.55, 0.57, 0.6), "metal", "street sign")
+	# Water (water.gd): a rain barrel and a trough of standing water to fill a bottle from, a fire to boil
+	# it on, and tablets and a filter. The barrel and the trough break like anything else, and the water
+	# goes with them.
+	_water(Vector3(-8, 0.5, 5), Vector3(0.7, 1.0, 0.7), Color(0.2, 0.35, 0.5), "plastic", "rain barrel", "rain")
+	_water(Vector3(-10.5, 0.3, 5), Vector3(1.6, 0.6, 0.7), Color(0.45, 0.47, 0.5), "metal", "water trough", "pond")
+	_lamp(Vector3(-9, 0, 8), 5.0, true)
+	var kit := ItemPickup.new()
+	kit.title = "Water kit"
+	kit.tint = Color(0.3, 0.55, 0.8)
+	kit.position = Vector3(-7, 0, 4)
+	kit.contents = [Items.make("purify_tabs"), Items.make("water_filter")]
+	add_child(kit)
+	_sign(Vector3(-9, 2.2, 6), "Water: fill a bottle here. Boil it on the fire, or Shift+I treats it. I drinks")
 	_sign(Vector3(0, 2.6, 5), "Break things: Ready, crosshair on it, left-click (P boards a window)")
 
 	_build_raider_camp()
@@ -625,6 +643,13 @@ func _flat_box(pos: Vector3, size: Vector3, col: Color, stuff := "wood", what :=
 	Solid.slab(self, pos, size, col, stuff, what)
 
 
+## Something that holds water, to fill a bottle from. `source` is a key of Water.SOURCES.
+func _water(pos: Vector3, size: Vector3, col: Color, stuff: String, what: String, source: String) -> void:
+	var ws := WaterSource.new()
+	ws.kind = source
+	_box(pos, size, col, stuff, what).add_child(ws)
+
+
 func _first_aid(pos: Vector3) -> void:
 	var b := ItemPickup.new()
 	b.position = pos
@@ -679,8 +704,12 @@ func _box(pos: Vector3, size: Vector3, col: Color, stuff := "brick", what := "wa
 ## Raiders' camp, in the south-west corner of the yard: three raiders on watch among things to hide behind.
 ## A fire or a lamp: it lights the ground round it at night (who stands in it can be seen), with a real light
 ## for the look of it.
-func _lamp(pos: Vector3, radius: float) -> void:
+func _lamp(pos: Vector3, radius: float, fire := false) -> void:
 	Daylight.add_lamp(pos, radius)
+	if fire:
+		var cf := Campfire.new()      # a fire you can boil water on
+		cf.position = pos
+		add_child(cf)
 	var l := OmniLight3D.new()
 	l.position = pos + Vector3(0.0, 1.2, 0.0)
 	l.omni_range = radius
@@ -702,7 +731,7 @@ func _lamp(pos: Vector3, radius: float) -> void:
 
 
 func _build_raider_camp() -> void:
-	_lamp(Vector3(-26, 0, 25), 9.0)      # the camp's fire: at night they stand in its light and you don't
+	_lamp(Vector3(-26, 0, 25), 9.0, true)      # the camp's fire: at night they stand in its light and you don't
 	_lamp(Vector3(2, 0, 9), 6.0)         # a lamp by the spawn
 	var crate := Color(0.45, 0.36, 0.25)
 	var wall_col := Color(0.5, 0.48, 0.44)

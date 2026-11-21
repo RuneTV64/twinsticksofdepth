@@ -430,9 +430,14 @@ func _hold(delta: float) -> void:
 			if tool == "vodka":
 				player.sheet.composure = maxf(player.sheet.composure - 1.5, 0.0)   # it stings
 			if not _washed.has(false):
-				b.wash(wound)
+				# Spirits clean. Water cleans as well as it is clean itself (water.gd).
+				var ok := b.wash(wound, Water.wash_germs(player.inv.slots[player.inv.find("water")]) if tool == "water" else 0.0)
 				_poured = false
-				_say("Washed." if int(wound["debris"]) == 0 else "Washed, but something is still in it.")
+				if not ok:
+					_washed.fill(false)
+					_say("Rinsed, but that water was not clean: the wound isn't either.")
+				else:
+					_say("Washed." if int(wound["debris"]) == 0 else "Washed, but something is still in it.")
 
 
 # ---------------------------------------------------------------- drawing

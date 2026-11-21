@@ -419,9 +419,9 @@ always infects unless treated and cleaned at once. Every number here is Claude's
   washing at 30 minutes and took hold at 43; with the dressing changed every 10 minutes, nothing.
   Anyone can see a wound is "dirty"; Medical 2 says whether it wants washing or the dressing changing.
 - Water washes wounds too (owner, 21 Nov 2026): `water`, "Bottle of water", 4 washes, in the first-aid
-  boxes. In the treatment screen it is used exactly as vodka is and cleans as well; it doesn't sting
-  (vodka costs composure). The tools are now ten: keys 1 to 9 and 0. Not built: refilling it, water from
-  taps, rain or puddles, dirty water making things worse, drinking it.
+  boxes. In the treatment screen it is used exactly as vodka is; it doesn't sting (vodka costs composure).
+  It cleans as well as it is clean itself (see How clean water is). The tools are now ten: keys 1 to 9
+  and 0.
 - A foot wound in boots or under a dressing still takes a quarter of the ordinary dirt of each stride
   (`covered_dirt`), and none of the blood or rot. Crawling, every open wound you have (not only feet) is
   dragged through what you crawl over: dirt, blood, rot, and the zombie-blood roll.
@@ -450,6 +450,46 @@ always infects unless treated and cleaned at once. Every number here is Claude's
   player's own blood on the ground; raiders and zombies being cut; anything to do with the bloody shard;
   antibiotics, or maggots cleaning an infected wound; "gross" things other than old blood and the corpse
   pile (rotting bodies, sewage, the toilet need).
+
+## How clean water is (built 21 Nov 2026, in review; not seen by the owner)
+
+The owner: water has a cleanliness or purity; dirty water can get you sick or infected; it can be purified
+with heat, fire, chemicals or a water filter, all to be added. Every number is Claude's first guess.
+
+- Two numbers on carried water (`water.gd`, `Water`), as in life: `dirt` (0 clear to 1 muddy: you can see
+  it) and `bugs` (0 safe to 1 teeming: you can't). Clear water can still be bad. The label says how it looks
+  and what has been done to it ("cloudy, boiled"), never the bugs. A bottle as found is clean.
+- Each way of making it safe does what it really does, so each has a use:
+  - Heat: a fire (`campfire.gd`, `Campfire`; `main.gd` `_lamp(pos, radius, true)`). Interact with water in
+    your bottle and stay within 2.5 m for `BOIL_TIME` 20 s. It kills the bugs; the mud stays.
+  - Chemicals: `purify_tabs` (6). They work after `TAB_WAIT` 60 s and kill everything in clear water, but
+    leave about a third of the bugs in water that is still cloudy.
+  - A filter: `water_filter` (20 uses). It takes out the dirt and most of the bugs (0.15 left), not all.
+  - So muddy water wants filtering and then boiling or tablets; clear water only heat or tablets.
+- Filling up (`water_source.gd`, `WaterSource`, a child of the thing that holds the water, so breaking the
+  thing ends it): a rain barrel (dirt 0.15, bugs 0.45) and a trough of standing water (0.7, 0.9) by the
+  spawn, with a fire and a "Water kit" (tablets, filter). An empty bottle is kept, not lost.
+- What dirty water does:
+  - Washing a wound with it leaves `Water.wash_germs` in the wound (0.8 of the bugs plus 0.3 of the dirt)
+    instead of none; over what the body shrugs off, the wound is not clean and can be worse than before.
+  - Drinking it (`Player.drink_water()`, `BodyHealth.drink()`): with a chance equal to the bugs, you get ill
+    in the gut. It comes on over about 90 s (Queasy, Sick to the stomach, Wretched: slower, stamina barely
+    returns) and passes in about 8 minutes. While Wretched it adds slowly to the same blood poisoning a bad
+    wound causes, so it can kill and never turns you. Drinking adds 25 to the water need (which doesn't
+    run down yet).
+- Keys (stand-ins until items can be used from the inventory): I drinks; Shift+I treats the water you carry
+  with what you carry, the filter first and then a tablet.
+- Cloud run (`tools/water_test.gd`), drinking made ill out of 400 and whether a wash leaves a wound clean:
+
+  | Water | Nothing | Boiled | Tablet | Filtered | Filter + tablet or boil |
+  |---|---|---|---|---|---|
+  | Rain barrel | 180, not clean | 0, clean | 0, clean | 33, clean | 0, clean |
+  | Standing water | 367, not clean | 0, not clean (mud) | 120, not clean | 49, not clean | 0, clean |
+
+- Not built: a pot or anything to boil in (the bottle goes on the fire), making and feeding a fire, a stove
+  or other heat, rain filling barrels, taps, puddles and rivers, more than one bottle being treated at a
+  time, water going bad again, chemicals other than tablets (bleach, iodine), filters wearing by how dirty
+  the water was, zombie blood or bodies fouling a water source, food.
 
 ## Small rules the owner has set (20 Nov 2026)
 

@@ -58,8 +58,11 @@ func use(id: String) -> bool:
 		return false
 	var it: Dictionary = slots[key]
 	if it.has("uses"):
+		var keep: bool = Items.DEFS[id].get("keep", false)       # a bottle is still a bottle when it is empty
+		if keep and int(it["uses"]) <= 0:
+			return false
 		it["uses"] = int(it["uses"]) - 1
-		if int(it["uses"]) <= 0:
+		if int(it["uses"]) <= 0 and not keep:
 			slots.erase(key)
 	elif it.has("n"):
 		it["n"] = int(it["n"]) - 1

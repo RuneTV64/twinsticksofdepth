@@ -109,6 +109,8 @@ func reset() -> void:
 	spread = 0.0
 	sickness = 0.0
 	septic = 0.0
+	gut = 0.0
+	gut_coming = 0.0
 	missing.clear()
 	wounds.clear()
 	_sum()
@@ -383,12 +385,50 @@ func pull_debris(w: Dictionary) -> String:
 
 
 ## Washing rinses the dirt out. In time, that is the end of it; once it has taken hold it only stops it
-## getting worse, and the wound must be kept covered while the body fights it.
-func wash(w: Dictionary) -> void:
-	w["clean"] = true
-	w["germs"] = 0.0
-	if float(w.get("inf", 0.0)) < hold:
+## getting worse, and the wound must be kept covered while the body fights it. `left` is the dirt the wash
+## itself leaves behind: 0 for spirits or clean water, more for dirty water (Water.wash_germs), which can
+## leave a wound worse than it found it. Returns true if the wound is clean after it.
+func wash(w: Dictionary, left := 0.0) -> bool:
+	w["germs"] = left
+	w["clean"] = left <= shrug
+	if w["clean"] and float(w.get("inf", 0.0)) < hold:
 		w["inf"] = 0.0
+	return w["clean"]
+
+
+# ---------------------------------------------------------------- the gut: bad water
+## Drinking water with things living in it may make you ill: not at once, and not always. It passes in time;
+## at its worst it can kill, by the same slow poisoning a wound gone bad does. It never turns you.
+var gut := 0.0               # 0 well .. 1 as ill as it gets
+var gut_coming := 0.0        # swallowed, not yet felt
+var gut_onset := 90.0        # s for what you drank to make itself felt
+var gut_over := 600.0        # s to get over it from the worst
+
+
+func drink(bugs: float) -> void:
+	if randf() < bugs:
+		gut_coming = minf(gut_coming + 0.3 + 0.6 * bugs, 1.0)
+
+
+func _tick_gut(dt: float) -> void:
+	if gut_coming > 0.0:
+		var d := minf(dt / gut_onset, gut_coming)
+		gut_coming -= d
+		gut = minf(gut + d, 1.0)
+	else:
+		gut = maxf(gut - dt / gut_over, 0.0)
+	if gut > 0.8:
+		septic = minf(septic + dt / (septic_time * 2.0), 1.0)
+
+
+func gut_feel() -> String:
+	if gut < 0.15:
+		return ""
+	if gut < 0.45:
+		return "Queasy"
+	if gut < 0.8:
+		return "Sick to the stomach"
+	return "Wretched"
 
 
 ## A stitch, `at` 0 to 1 along the wound.
@@ -483,6 +523,7 @@ func tick(dt: float) -> void:
 	painkiller_t = maxf(painkiller_t - dt, 0.0)
 	_tick_bite(dt)
 	_tick_infection(dt)
+	_tick_gut(dt)
 	_sum()
 	if bleeding > ooze:
 		blood = maxf(blood - bleeding * dt, 0.0)

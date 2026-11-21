@@ -246,6 +246,18 @@ func _rebuild() -> void:
 		if float(w.get("inf", 0.0)) >= 1.0:
 			_add("Infected wound", "it poisons the blood: wash it, cover it, and it may clear")
 			break
+	var belly := body.gut_feel()
+	if belly == "Queasy":
+		_add(belly, "something you drank: stamina comes back 15% slower")
+		stamina_regen_mult *= 0.85
+	elif belly == "Sick to the stomach":
+		_add(belly, "-15% speed, stamina comes back 40% slower")
+		speed_mult *= 0.85
+		stamina_regen_mult *= 0.6
+	elif belly == "Wretched":
+		_add(belly, "-35% speed, stamina barely comes back; this can kill")
+		speed_mult *= 0.65
+		stamina_regen_mult *= 0.3
 	var fever := body.fever_feel()
 	if fever == "Feverish":
 		_add(fever, "stamina comes back 20% slower")
@@ -256,7 +268,7 @@ func _rebuild() -> void:
 		aim_mult *= 0.8
 		stamina_regen_mult *= 0.6
 	elif fever == "Failing":
-		_add(fever, "-40% speed, -50% aim: you are turning")
+		_add(fever, "-40% speed, -50% aim: your body is giving out")
 		speed_mult *= 0.6
 		aim_mult *= 0.5
 		stamina_regen_mult *= 0.35

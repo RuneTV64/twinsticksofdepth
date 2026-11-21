@@ -84,6 +84,9 @@ Horde: noise warms an area and draws zombies in from round about. Z shows the re
 Breaking things: everything breaks. Ready, crosshair on it, close by, left-click: fists, or the hatchet (wood) or
   sledgehammer (brick, pavement) if you carry one; a gun shoots it. Zombies beat on what is in their way, weakest
   first. What is left can be picked through, and rusts and rots away. Broken glass crunches underfoot.
+  Water: fill a bottle at a barrel or trough. It may be dirty, and clear water can still be bad. Boil it on a
+  fire (interact, stay by it), or Shift+I filters it and then treats it with tablets. I drinks. Dirty water
+  fouls a wound washed with it and can make you ill.
   Y lays the broken glass you carry: a trap for bare feet, an alarm under boots. It stays until picked up.
   Barefoot (U toggles boots), glass goes into your feet. A cut foot takes in what you walk through: wash and dress it.
   P boards the window by the crosshair   O breaks what the crosshair is on   Shift+O ten minutes of rust and rot

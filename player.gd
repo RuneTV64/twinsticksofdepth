@@ -901,6 +901,41 @@ func lay_glass() -> void:
 	show_status("You scatter the glass on the ground.", 1.5)
 
 
+## Drink from the bottle you carry. What lives in the water goes down with it (water.gd).
+func drink_water() -> void:
+	var key := inv.find("water")
+	if key == "" or int(inv.slots[key]["uses"]) <= 0:
+		show_status("You have no water." if key == "" else "The bottle is empty.", 1.5)
+		return
+	var item: Dictionary = inv.slots[key]
+	inv.use("water")
+	sheet.set_need("water", float(sheet.needs["water"]) + 25.0)
+	if not invulnerable:
+		sheet.body.drink(Water.bugs(item))
+	show_status("You drink. It tastes of mud." if Water.dirt(item) > 0.45 else "You drink.", 1.5)
+
+
+## Make the water you carry safer with what else you carry: the filter if it looks dirty, then tablets.
+## (Heat is done at a fire: campfire.gd.)
+func purify_water() -> void:
+	var key := inv.find("water")
+	if key == "" or int(inv.slots[key]["uses"]) <= 0:
+		show_status("You have no water to treat.", 1.5)
+		return
+	var item: Dictionary = inv.slots[key]
+	var done: Array = item.get("done", [])
+	if inv.has("water_filter") and not done.has("filtered"):
+		inv.use("water_filter")
+		Water.filter(item)
+		show_status("Filtered. It looks %s." % Water.look(item), 2.0)
+	elif inv.has("purify_tabs") and not done.has("treated") and not item.has("tab_t"):
+		inv.use("purify_tabs")
+		Water.tablet(item)
+		show_status("A tablet goes in. Give it a minute.", 2.0)
+	else:
+		show_status("Nothing more you carry will help it. Fire would." if not done.has("boiled") else "You have done what you can for it.", 2.0)
+
+
 ## What your foot has just come down on (once a stride): glass, blood, filth.
 func _step_in_it() -> void:
 	var body := sheet.body
@@ -1013,6 +1048,9 @@ func _tick_timers(delta: float) -> void:
 			show_status("Mud: it drags at your feet.", 1.2)
 		_ground_slow = slow
 		if not dead:
+			for k in inv.slots:
+				if inv.slots[k]["id"] == "water" and Water.tick(inv.slots[k], _sheet_t):
+					show_status("The tablets have done their work.", 2.0)
 			sheet.tick(_sheet_t, _threat(), not held_by.is_empty(), in_cover and cover_mode == "hunker",
 				health / max_health, winded, weight / strength)
 		_sheet_t = 0.0

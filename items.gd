@@ -13,7 +13,9 @@ const DEFS := {
 	"needle_thread": {"name": "Needle and thread", "w": 0.02, "cat": "medical", "uses": 12, "for": "Stitches a wound shut, one stitch a use."},
 	"tweezers": {"name": "Tweezers", "w": 0.02, "cat": "medical", "for": "Picks glass, grit and bullets out of a wound."},
 	"vodka": {"name": "Vodka", "w": 0.7, "cat": "medical", "uses": 4, "for": "Washes a wound clean. It stings."},
-	"water": {"name": "Bottle of water", "w": 0.5, "cat": "medical", "uses": 4, "for": "Washes a wound clean, as well as spirits do and without the sting. To drink, too, once thirst runs."},
+	"water": {"name": "Bottle of water", "w": 0.5, "cat": "medical", "uses": 4, "keep": true, "for": "Washes a wound and quenches thirst, if it is clean. Dirty water does neither safely: filter it, boil it or treat it."},
+	"purify_tabs": {"name": "Purification tablets", "w": 0.02, "cat": "medical", "uses": 6, "for": "One in a bottle of water kills what lives in it, after a wait. Poor in cloudy water."},
+	"water_filter": {"name": "Water filter", "w": 0.3, "cat": "tool", "uses": 20, "for": "Takes the dirt out of a bottle of water, and most of what lives in it. Not all."},
 	"steroids": {"name": "Steroids", "w": 0.03, "cat": "medical", "uses": 4, "for": "Holds a bite's infection back for a few minutes. It cures nothing."},
 	"hatchet": {"name": "Hatchet", "w": 1.2, "cat": "tool", "for": "Chops. In the last resort, a limb."},
 	"torch": {"name": "Torch", "w": 0.3, "cat": "tool", "for": "A hand torch: a beam of light where you point. You see by it, and everyone sees you."},
@@ -50,6 +52,8 @@ static func weight(item: Dictionary) -> float:
 ## How it reads in a list: "Bandage x3", "Vodka (4 left)".
 static func label(item: Dictionary) -> String:
 	var nm := name_of(item["id"])
+	if item["id"] == "water":
+		return "%s (%s, %s)" % [nm, "empty" if int(item["uses"]) <= 0 else "%d left" % int(item["uses"]), Water.look(item)]
 	if item.has("uses"):
 		return "%s (%d left)" % [nm, int(item["uses"])]
 	return "%s x%d" % [nm, int(item["n"])] if int(item["n"]) > 1 else nm
