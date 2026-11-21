@@ -242,6 +242,10 @@ func _rebuild() -> void:
 			spread_mult *= 1.0 + 0.5 * body.arm_pain
 	if body.bitten:
 		_add("Bitten", "if it has taken, only taking the limb off in time can save you")
+	for w in body.wounds:
+		if float(w.get("inf", 0.0)) >= 1.0:
+			_add("Infected wound", "it poisons the blood: wash it, cover it, and it may clear")
+			break
 	var fever := body.fever_feel()
 	if fever == "Feverish":
 		_add(fever, "stamina comes back 20% slower")

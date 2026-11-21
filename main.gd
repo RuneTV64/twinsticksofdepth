@@ -49,6 +49,7 @@ func _ready() -> void:
 	Cover.clear()
 	Solid.reset()
 	add_child(Wear.new())
+	add_child(Spill.new())
 	TallGrass.clear()
 	Daylight.reset()
 	add_child(Daylight.new())
@@ -173,6 +174,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					player.show_status("No window by the crosshair.", 1.5)
 				else:
 					player.show_status("Boarded up." if Solid.board(win) else "It is boarded already.", 1.5)
+			KEY_U:   # shoes on and off, until footwear exists
+				player.barefoot = not player.barefoot
+				player.show_status("Barefoot." if player.barefoot else "Boots on (a stand-in until footwear exists).", 1.5)
 			KEY_O:   # break what the crosshair is on; Shift+O: ten minutes of rust and rot
 				if event.shift_pressed:
 					for w in get_tree().get_nodes_in_group("weathering"):

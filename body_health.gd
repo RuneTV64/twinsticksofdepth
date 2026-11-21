@@ -71,6 +71,17 @@ var infect_part := ""        # where it went in
 var spread := 0.0            # 0 just bitten .. 1 it is in the body
 var sickness := 0.0          # 0 .. 1 you turn
 var steroid_t := 0.0
+# ---- ordinary infection (owner, 21 Nov 2026). Not the zombie kind: it can kill you, it never turns you.
+## Dirt gets into an open wound (`germs`), most of all through a cut foot walked on (soil()). Left there it
+## takes hold (`inf` 0 to 1); washed in time, it doesn't. A wound it has taken hold of poisons the blood
+## (`septic` 0 to 1), and at 1 you die of it. Washed and dressed, the body slowly beats it. Stand-in times.
+var infect_time := 90.0      # s for a filthy wound (germs 1) to go bad; a little dirt takes much longer
+var hold := 0.5              # from here it has taken hold: washing no longer simply rinses it away
+var fight_time := 300.0      # s for a washed, dressed wound to clear an infection that had taken hold
+var septic_time := 720.0     # s from one wound gone fully bad to dying of it
+var septic_back := 900.0     # s to get over it once no wound is bad
+var blood_takes := 0.3       # chance fresh zombie blood in an open wound infects you as a bite would
+var septic := 0.0
 ## Limbs that are gone: "ArmL", "LegR"...
 var missing: Array[String] = []
 
@@ -90,21 +101,25 @@ func reset() -> void:
 	infect_part = ""
 	spread = 0.0
 	sickness = 0.0
+	septic = 0.0
 	missing.clear()
 	wounds.clear()
 	_sum()
 
 
 ## A new wound. `amount` is the damage that caused it (40 or more is as bad as that kind gets).
-func hurt(kind: String, part: String, amount: float) -> void:
+## `where` says more about the place: "foot" is the sole of that leg's foot (it gets walked on).
+## Returns the wound.
+func hurt(kind: String, part: String, amount: float, where := "") -> Dictionary:
 	if missing.has(part):
 		part = "Torso"       # there is nothing there to hit
+		where = ""
 	if kind == "bite":
 		_bitten(part)
 	var sev := clampf(amount / 40.0, 0.1, 1.0)
 	# A second hit on a part already hurt the same way makes that wound worse; it doesn't make a second one.
 	for w in wounds:
-		if w["part"] == part and w["kind"] == kind:
+		if w["part"] == part and w["kind"] == kind and str(w.get("where", "")) == where:
 			w["sev"] = minf(float(w["sev"]) + sev * 0.7, 1.0)
 			w["bleed"] = float(KINDS[kind][1]) * float(w["sev"])
 			w["closing"] = 0.0
@@ -113,7 +128,7 @@ func hurt(kind: String, part: String, amount: float) -> void:
 			w["dressed"] = ""
 			w["clean"] = false
 			_sum()
-			return
+			return w
 	# What is in it: a bullet, a tooth, grit and cloth. More likely the worse it is.
 	var debris := 0
 	if kind == "gunshot":
@@ -123,8 +138,65 @@ func hurt(kind: String, part: String, amount: float) -> void:
 	elif kind == "cut" or kind == "deep cut":
 		debris = (1 if randf() < sev else 0) + (1 if randf() < sev * 0.5 else 0)
 	wounds.append({"part": part, "kind": kind, "sev": sev, "bleed": float(KINDS[kind][1]) * sev, "closing": 0.0,
-		"debris": debris, "clean": false, "stitches": [], "dressed": "", "fester": false, "seed": randi() % 100000})
+		"debris": debris, "clean": false, "stitches": [], "dressed": "", "fester": false, "seed": randi() % 100000,
+		"where": where, "glass": 0, "germs": 0.0, "inf": 0.0})
 	_sum()
+	return wounds[wounds.size() - 1]
+
+
+# ---------------------------------------------------------------- dirt, and ordinary infection
+## A shard of glass goes into this wound and stays there until it is drawn out.
+func glass_in(w: Dictionary) -> void:
+	w["debris"] = int(w["debris"]) + 1
+	w["glass"] = int(w.get("glass", 0)) + 1
+
+
+## Is it open to the world: not dressed, not yet closed?
+static func open(w: Dictionary) -> bool:
+	return w["dressed"] == "" and float(w["closing"]) < 0.8 and w["kind"] != "bruise" and w["kind"] != "break"
+
+
+## The open wounds on the soles of your feet.
+func open_feet() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for w in wounds:
+		if str(w.get("where", "")) == "foot" and open(w):
+			out.append(w)
+	return out
+
+
+## You have put an open wound in something: `amount` 0 to 1 is how foul it was.
+func soil(w: Dictionary, amount: float) -> void:
+	w["germs"] = minf(float(w.get("germs", 0.0)) + amount, 1.0)
+	w["clean"] = false
+
+
+## Fresh zombie blood in an open wound: it may take, as a bite does.
+func blood_in(part: String) -> void:
+	if randf() < blood_takes / maxf(takes_chance, 0.01):
+		_bitten(part)
+
+
+func _tick_infection(dt: float) -> void:
+	var bad := 0
+	for w in wounds:
+		var germs := float(w.get("germs", 0.0))
+		var inf := float(w.get("inf", 0.0))
+		if germs > 0.0 or (inf >= hold and not (w["clean"] and w["dressed"] != "")):
+			inf = minf(inf + dt * maxf(germs, 0.3 if inf >= hold else 0.0) / infect_time, 1.0)
+		elif inf > 0.0:
+			inf = maxf(inf - dt / fight_time, 0.0)      # washed and covered: the body gets on top of it
+		w["inf"] = inf
+		if inf >= 1.0:
+			bad += 1
+	if bad > 0:
+		septic = minf(septic + dt * minf(bad, 2.0) / septic_time, 1.0)
+	else:
+		septic = maxf(septic - dt / septic_back, 0.0)
+
+
+func dead_from_sepsis() -> bool:
+	return septic >= 1.0
 
 
 # ---------------------------------------------------------------- the bite
@@ -184,17 +256,21 @@ func amputate(part: String, tied: bool) -> void:
 		else:
 			spread = 1.0
 	wounds.append({"part": part, "kind": "stump", "sev": 1.0, "bleed": 0.6 * (0.4 if tied else 1.0), "closing": 0.0,
-		"debris": 0, "clean": false, "stitches": [], "dressed": "", "fester": false, "seed": randi() % 100000, "tied": tied})
+		"debris": 0, "clean": false, "stitches": [], "dressed": "", "fester": false, "seed": randi() % 100000, "tied": tied,
+		"where": "", "glass": 0, "germs": 0.0, "inf": 0.0})
 	_sum()
 
 
 ## How you feel from the infection: never a number.
+## A fever feels the same whichever infection it is: the zombie's or an ordinary one. Only knowing medicine
+## tells them apart (describe(), bite_guess()).
 func fever_feel() -> String:
-	if not infected or sickness < 0.2:
+	var ill := maxf(sickness if infected else 0.0, septic)
+	if ill < 0.2:
 		return ""
-	if sickness < 0.45:
+	if ill < 0.45:
 		return "Feverish"
-	if sickness < 0.75:
+	if ill < 0.75:
 		return "Sick"
 	return "Failing"
 
@@ -271,12 +347,22 @@ func press(w: Dictionary, dt: float, good: float, rag: bool) -> void:
 	_sum()
 
 
-func pull_debris(w: Dictionary) -> void:
+## Draw one thing out of it. Returns what it was: "glass", or "" for anything else.
+func pull_debris(w: Dictionary) -> String:
 	w["debris"] = maxi(int(w["debris"]) - 1, 0)
+	if int(w.get("glass", 0)) > 0:
+		w["glass"] = int(w["glass"]) - 1
+		return "glass"
+	return ""
 
 
+## Washing rinses the dirt out. In time, that is the end of it; once it has taken hold it only stops it
+## getting worse, and the wound must be kept covered while the body fights it.
 func wash(w: Dictionary) -> void:
 	w["clean"] = true
+	w["germs"] = 0.0
+	if float(w.get("inf", 0.0)) < hold:
+		w["inf"] = 0.0
 
 
 ## A stitch, `at` 0 to 1 along the wound.
@@ -315,6 +401,7 @@ func take_painkiller() -> void:
 func _shut_in(w: Dictionary) -> void:
 	if int(w["debris"]) > 0 or not w["clean"]:
 		w["fester"] = true
+		w["germs"] = maxf(float(w.get("germs", 0.0)), 0.6)     # and what is shut in goes bad
 
 
 ## What has been done and what is left, for the treatment screen: [[name, state, done]].
@@ -360,13 +447,16 @@ func tick(dt: float) -> void:
 				rate *= 0.25
 			if w["fester"]:
 				rate *= 0.4
-			w["closing"] = float(w["closing"]) + dt * rate / close_time
-			if float(w["closing"]) >= 1.0:
+			if float(w.get("inf", 0.0)) >= hold:
+				rate *= 0.2
+			w["closing"] = minf(float(w["closing"]) + dt * rate / close_time, 1.0)
+			if float(w["closing"]) >= 1.0 and float(w.get("inf", 0.0)) < hold and int(w["debris"]) == 0:
 				wounds.remove_at(i)
 				continue
 		i += 1
 	painkiller_t = maxf(painkiller_t - dt, 0.0)
 	_tick_bite(dt)
+	_tick_infection(dt)
 	_sum()
 	if bleeding > ooze:
 		blood = maxf(blood - bleeding * dt, 0.0)
@@ -382,6 +472,7 @@ func _sum() -> void:
 	bitten = false
 	for w in wounds:
 		var p: float = float(KINDS[w["kind"]][2]) * float(w["sev"]) * (1.0 - 0.6 * float(w["closing"]) * (0.0 if w["fester"] else 1.0))
+		p += 0.25 * float(w.get("inf", 0.0))        # a wound going bad throbs, however small it was
 		if painkiller_t > 0.0:
 			p *= 0.5
 		pain += p
@@ -429,6 +520,10 @@ func describe(part: String) -> Array[String]:
 				s += ", bleeding"
 			if w["dressed"] != "":
 				s += ", dressed"
+			if float(w.get("inf", 0.0)) >= 1.0:
+				s += ", hot and swollen"
+			if str(w.get("where", "")) == "foot":
+				s = "Foot: " + s.to_lower()
 			out.append(s)
 		else:
 			var how := "slight" if sev < 0.3 else ("nasty" if sev < 0.65 else "severe")
@@ -447,6 +542,17 @@ func describe(part: String) -> Array[String]:
 				s2 += " (won't stop on its own)"
 			if medical >= 3 and w["fester"]:
 				s2 += " (festering: shut in dirty)"
+			if str(w.get("where", "")) == "foot":
+				s2 += ", on the sole of the foot"
+			var inf := float(w.get("inf", 0.0))
+			if inf >= 1.0:
+				s2 += " (infected: wash it, cover it, keep off it)"
+			elif inf >= hold or (medical >= 3 and inf > 0.15):
+				s2 += " (going bad)"
+			elif medical >= 3 and float(w.get("germs", 0.0)) > 0.3:
+				s2 += " (filthy: wash it now)"
+			if medical >= 2 and int(w.get("glass", 0)) > 0:
+				s2 += " (glass in it)"
 			out.append(s2)
 	return out
 

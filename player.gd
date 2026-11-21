@@ -177,6 +177,12 @@ var reload_time := 1.1
 @export var punch_still_speed := 0.6    # m/s; slower than this counts as holding still
 @export var punch_miss_chance := 0.2    # chance a punch in range just doesn't connect
 @export var punch_range := 1.75         # meters
+## Bare feet (first guesses). Nobody has shoes until footwear exists, so `barefoot` is true; U toggles it.
+@export var barefoot := true
+@export var glass_cut := 7.0            # the damage of a shard in the foot
+@export var step_dirt := 0.004          # how much one stride on ordinary ground fouls an open cut foot (0 to 1)
+@export var step_blood := 0.3           # ... in fresh blood
+@export var step_gross := 0.9           # ... in old blood, or anything rotten
 ## Breaking things (first guesses): the force of a blow with each thing, times Strength (melee_mult).
 @export var break_fist := 6.0
 @export var break_butt := 14.0
@@ -874,12 +880,57 @@ func _update_ground() -> void:
 		_step_from = global_position
 		_step_side = -_step_side
 		Ground.it.stamp(global_position, moved, _step_side, crawl, true)
-		# Broken glass underfoot: it crunches, less going carefully.
-		if Wreck.step_on(global_position, self, 0.5 if posture > 0 else 1.0):
-			show_status("Glass crunches under you.", 0.9)
+		_step_in_it()
+
+
+## What your foot has just come down on (once a stride): glass, blood, filth.
+func _step_in_it() -> void:
+	var body := sheet.body
+	var side := "LegL" if _step_side < 0 else "LegR"
+	if body.missing.has(side):
+		side = "LegR" if side == "LegL" else "LegL"
+	var footed := not body.missing.has(side)
+	# Broken glass: shod it crunches, less going carefully. Barefoot it goes into your foot.
+	var glass := Wreck.step_on(global_position, self, 0.5 if posture > 0 else 1.0, barefoot and footed)
+	if glass == 2 and not invulnerable:
+		body.glass_in(body.hurt("cut", side, glass_cut, "foot"))
+		show_status("Glass goes into your foot.", 1.4)
+	elif glass == 1 and not barefoot:
+		show_status("Glass crunches under you.", 0.9)
+	# An open cut on the sole takes in whatever you walk through.
+	if not barefoot or invulnerable:
+		return
+	var feet := body.open_feet()
+	if feet.is_empty():
+		return
+	var stain := Spill.at(global_position)
+	var foul := step_dirt * (1.0 + 4.0 * (Ground.it.softness(global_position) if Ground.it != null else 0.0))
+	var said := ""
+	if CorpsePile.height_at(global_position) > 0.05 or perch > 0.25:
+		foul = step_gross
+		said = "Your cut foot is in the rot."
+	elif not stain.is_empty() and Spill.fresh(stain) and stain["zombie"]:
+		foul = step_blood
+		said = "Your cut foot is in their blood."
+		for w in feet:
+			body.blood_in(w["part"])
+	elif not stain.is_empty() and not Spill.fresh(stain):
+		foul = step_gross
+		said = "Your cut foot is in old blood."
+	elif not stain.is_empty():
+		foul = step_blood
+	for w in feet:
+		body.soil(w, foul)
+	if said != "" and _foul_said_t <= 0.0:
+		_foul_said_t = 4.0
+		show_status(said, 1.6)
+
+
+var _foul_said_t := 0.0
 
 
 func _tick_timers(delta: float) -> void:
+	_foul_said_t -= delta
 	_lit_t -= delta
 	_draw_t -= delta
 	_fire_cd -= delta
@@ -916,6 +967,8 @@ func _tick_timers(delta: float) -> void:
 				show_status("You lose your footing!", 0.9)
 		if not dead and sheet.body.turned() and not invulnerable:
 			_die("You turned.")
+		if not dead and sheet.body.dead_from_sepsis() and not invulnerable:
+			_die("You died of infection.")
 		if not dead and sheet.body.dead_from_blood() and not invulnerable:
 			_die("You bled out.")
 		var slow := Ground.it.slow_at(global_position) if Ground.it != null else 1.0

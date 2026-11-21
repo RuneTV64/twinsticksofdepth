@@ -32,7 +32,8 @@ Built after those answers and not yet seen by the owner: the burning torch, and 
 player (sheet: `tools/preview/missing_limbs.png`).
 
 Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
-owner: everything can be broken (see Two rules for every object, and Breaking things). Tested headless only.
+owner: everything can be broken (see Two rules for every object, and Breaking things), and bare feet, blood
+on the ground and ordinary infection. Tested headless only.
 
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
@@ -271,7 +272,8 @@ stand-ins until the game has a clock (`body_health.gd`, "the bite").
   old things". Not infected, your things lie there as "Your body". The new character starts with nothing. The
   risen zombie's skin is rolled, not yours: the player has no look of its own yet.
 - Not built: sickness other than the bite, a turned raider, more than one cutting tool, cauterising, prosthetics.
-- Next, in order: sickness; the new needs (hygiene, morale, toilet, warmth).
+- Next, in order: the rest of sickness (wound infection is built: see Bare feet, blood and ordinary
+  infection); the new needs (hygiene, morale, toilet, warmth).
 
 ## Two rules for every object (owner, 20 Nov 2026)
 
@@ -338,8 +340,8 @@ This is the foundation; every number in it is Claude's first guess.
 - Wreckage (`wreck.gd`, `Wreck`): what is left where the thing stood, by material and area. Interact picks
   through it for the scrap items (`glass_shard`, `wood_scrap`, `scrap_metal`, `plastic_scrap`; brick,
   concrete and pavement give the existing `rock`). Wreckage landing within 0.8 m of more joins it.
-  - Broken glass crunches underfoot (`Wreck.step_on`, from the player's and enemies' footfalls): heard 6 m,
-    half that crouched or crawling, and each footfall grinds 4% of it away. So glass round a window is an
+  - Broken glass crunches under a shod foot (`Wreck.step_on`, from the player's and enemies' footfalls): heard 6 m,
+    half that crouched or crawling, and each footfall grinds 4% of it away. (Barefoot: see Bare feet.) So glass round a window is an
     alarm for whoever walks on it, you included.
   - Rust and rot (`wear.gd`, `Wear`, one node, a 5 s clock): wood and plaster rot (gone in 15 minutes dry),
     metal rusts (30 minutes dry), both up to 3 to 4 times quicker in the wet (`Seasons` wetness); glass
@@ -371,6 +373,52 @@ This is the foundation; every number in it is Claude's first guess.
     and gone by 20; brick, pavement and glass stayed.
   - Seen in the same run and not looked into: zombies wandering the level broke several windows and an
     inside wall on their own, because one with a drive in its head beats on whatever stops it.
+
+## Bare feet, blood and ordinary infection (built 21 Nov 2026, in review; not seen by the owner)
+
+The owner: glass cuts your feet when you walk over it barefoot, and that is how the glass goes: it sticks in
+your feet. Blood stays on the shards when they are pulled out. Stepping in fresh zombie blood with foot
+wounds can infect you. Stepping on anything with untreated, uncovered foot wounds can make you sick: an
+ordinary infection, which can kill you but won't turn you. Old blood or anything particularly gross almost
+always infects unless treated and cleaned at once. Every number here is Claude's first guess.
+
+- Barefoot (`Player.barefoot`, true: nobody has shoes until footwear exists; U toggles it for testing). A
+  bare foot landing on broken glass takes a shard half the time (`Wreck.BARE_CUT`): a cut "on the sole of the
+  foot" on that leg (a leg wound with `where` "foot"), with the glass in it, and that shard is gone from the
+  ground. A broken window was gone in about 5 footfalls barefoot, against 25 in boots. More shards in the
+  same foot make the one wound worse. It is quieter than in boots (3 m).
+- Glass in a wound is drawn out with the tweezers like anything else and comes out as a `bloody_glass` item
+  ("Bloody glass"). A wound with anything still in it never closes. The item does nothing yet.
+- Blood on the ground (`spill.gd`, `Spill`, one node in the level): a zombie that is hit leaves its blood
+  where it stood, a raider theirs (not infectious). A stain is fresh for 180 s, then old; rain washes it
+  away in about a minute and it dries to nothing in 30 minutes (Wear's clock). Drawn as flat patches, red
+  fresh and brown-black old: a stand-in look.
+- Walking on an open cut foot (`Player._step_in_it()`, once a stride; open = not dressed and not nearly
+  closed): each stride puts dirt in it (`germs`, 0 to 1): ordinary ground a little (`step_dirt` 0.004, up
+  to five times that in mud), fresh blood 0.3, old blood or the corpse pile 0.9. Fresh zombie blood also
+  rolls for the zombie infection (`blood_takes` 0.3: 110 to 128 in 400 in the cloud), which goes in by
+  that leg exactly as a bite there does (so the leg can still come off in time). A dressed foot takes in
+  nothing.
+- Ordinary infection (`body_health.gd`, `_tick_infection`): dirt left in a wound takes hold (`inf`), faster
+  the fouler it is (`infect_time` 90 s at its worst). Washed before it takes hold (`hold` 0.5), that is the
+  end of it. After that, washing only stops it getting worse, and the wound has to be kept washed and
+  dressed while the body beats it (`fight_time` 300 s). A wound gone fully bad poisons the blood (`septic`);
+  720 s later you die: "You died of infection." You don't turn. It clears slowly once no wound is bad.
+  - Any wound can go this way, not only feet: one stitched or dressed dirty now does (festering leads
+    here).
+  - A fever feels the same whichever infection it is (Feverish, Sick, Failing): only Medical tells them
+    apart. Medical 0 to 1 sees "hot and swollen"; 2 "infected"; 3 "filthy: wash it now" and "going bad".
+    The condition "Infected wound" shows once one has gone fully bad.
+- Cloud run (`tools/foot_test.gd`): one step in old blood and then nothing done: took hold at 50 s, fully
+  infected at 100 s, dead at 820 s. Washed and bandaged 20 s after the step: nothing came of it. Washed
+  and bandaged at 70 s (after it took hold): it never went fully bad and the cut closed. Walking without
+  stopping on ordinary ground with an open cut foot: took hold at 106 s.
+- The owner's "almost always gets you infected" for old blood and gross things is built as the ordinary
+  infection, since it can be cleaned away at once and the zombie kind can't. Ask if that was wrong.
+- Not built: footwear; glass hurting more as you walk on it; cuts from crawling or falling on glass; the
+  player's own blood on the ground; raiders and zombies being cut; anything to do with the bloody shard;
+  antibiotics, or maggots cleaning an infected wound; "gross" things other than old blood and the corpse
+  pile (rotting bodies, sewage, the toilet need).
 
 ## Small rules the owner has set (20 Nov 2026)
 

@@ -312,6 +312,8 @@ func _new_zombie(reroll := true) -> void:
 func take_hit(dmg: float, dir: Vector3, knock: float) -> void:
 	if dead:
 		return
+	if kind == "shambler":
+		Spill.leave(global_position, true)       # its blood on the ground where it was hit
 	hp -= dmg
 	_flash = 0.1
 	hurt_t = 0.18

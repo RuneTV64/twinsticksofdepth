@@ -24,6 +24,8 @@ func _process(delta: float) -> void:
 
 func pass_time(seconds: float) -> void:
 	var wet := Seasons.it.now.y if Seasons.it != null else 0.0
+	if Spill.it != null:
+		Spill.it.age(seconds, wet)
 	for w in Wreck.all.duplicate():
 		if is_instance_valid(w):
 			w.weather(seconds, wet)

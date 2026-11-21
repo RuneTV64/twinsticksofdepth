@@ -84,6 +84,7 @@ Horde: noise warms an area and draws zombies in from round about. Z shows the re
 Breaking things: everything breaks. Ready, crosshair on it, close by, left-click: fists, or the hatchet (wood) or
   sledgehammer (brick, pavement) if you carry one; a gun shoots it. Zombies beat on what is in their way, weakest
   first. What is left can be picked through, and rusts and rots away. Broken glass crunches underfoot.
+  Barefoot (U toggles boots), glass goes into your feet. A cut foot takes in what you walk through: wash and dress it.
   P boards the window by the crosshair   O breaks what the crosshair is on   Shift+O ten minutes of rust and rot
 Cutaway: walls between the camera and you open up. V switches it off and on, to compare.
 Cover test: G test gunner at the crosshair   Shift+G remove them

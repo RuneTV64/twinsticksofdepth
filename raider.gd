@@ -469,6 +469,7 @@ func take_hit(dmg: float, dir: Vector3, knock: float) -> void:
 func _damage(dmg: float, dir: Vector3, knock: float, by_player: bool) -> void:
 	if dead:
 		return
+	Spill.leave(global_position, false)      # a living person's blood: no zombie infection in it
 	hp -= dmg
 	_hurt_t = 0.15
 	hurt_t = 0.18

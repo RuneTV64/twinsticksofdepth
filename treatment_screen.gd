@@ -249,8 +249,12 @@ func _release() -> void:
 	var b := player.sheet.body
 	if float(_near(_at)[1]) > 45.0:
 		_bits().erase(_grip)
-		b.pull_debris(wound)
-		_say("It is out." if int(wound["debris"]) == 0 else "It is out. There is more in there.")
+		var what := b.pull_debris(wound)
+		if what == "glass":
+			player.inv.add(Items.make("bloody_glass"))      # the blood stays on it (owner)
+			player.recompute_stats()
+		var it := "A shard of glass, red with your blood." if what == "glass" else "It is out."
+		_say(it if int(wound["debris"]) == 0 else it + " There is more in there.")
 	else:
 		_say("You let go of it too soon.")
 	_grip = -1

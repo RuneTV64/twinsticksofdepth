@@ -11,6 +11,7 @@ extends Node3D
 
 const CRUNCH := 6.0            # how far glass underfoot is heard (m)
 const TREAD := 0.04            # share of the glass one footfall grinds away
+const BARE_CUT := 0.5          # chance a bare foot landing on glass takes a shard
 const MERGE := 0.8             # wreckage landing this close to more of the same pile joins it
 
 static var all: Array[Wreck] = []
@@ -92,19 +93,26 @@ func weather(dt: float, wet: float) -> void:
 	_settle()
 
 
-## A foot lands at `pos`. Glass there crunches (heard `quiet` times as far when going carefully) and is ground
-## a little further in. Returns true if it crunched.
-static func step_on(pos: Vector3, who: Node, quiet := 1.0) -> bool:
+## A foot lands at `pos`. Returns 0 if there was no glass there. Shod (1): the glass crunches (heard `quiet`
+## times as far when going carefully) and is ground a little further in. Barefoot (`bare`): it is quieter, and
+## BARE_CUT of the time a shard goes into the foot (2): that shard is gone from the ground, which is how
+## glass goes away under bare feet (owner, 21 Nov 2026). The caller does the wounding.
+static func step_on(pos: Vector3, who: Node, quiet := 1.0, bare := false) -> int:
 	if glass <= 0:
-		return false
+		return 0
 	for w in all:
 		if w.lot.has("glass") and Vector2(w.global_position.x - pos.x, w.global_position.z - pos.z).length() <= w.spread + 0.25:
 			var e: Dictionary = w.lot["glass"]
-			e["gone"] = minf(float(e["gone"]) + TREAD, 1.0)
-			Earshot.make(pos, CRUNCH * quiet, w.get_tree(), who, who is Player)
+			var cut := bare and randf() < BARE_CUT
+			if cut:
+				var whole := maxf(float(e["area"]) * float(Materials.of("glass")["per_m2"]), 1.0)
+				e["gone"] = minf(float(e["gone"]) + 1.0 / whole, 1.0)
+			elif not bare:
+				e["gone"] = minf(float(e["gone"]) + TREAD, 1.0)
+			Earshot.make(pos, CRUNCH * quiet * (0.5 if bare else 1.0), w.get_tree(), who, who is Player)
 			w._settle()
-			return true
-	return false
+			return 2 if cut else 1
+	return 0
 
 
 ## Drop what has gone entirely; go when nothing is left.
