@@ -1169,6 +1169,16 @@ back), `clothes_living_room.png` (the game's own items), `raiders_dressed.png`, 
   took four things the slots wouldn't. Muddy water through the net curtain: dirt 0.7 to 0.24, bugs 0.9 to
   0.81. Curtains torn up in 10 s. Died dressed: the body held the clothes, the jeans with 3 things in them;
   the next character started dressed.
+- More bodies are coming (owner, 21 Nov 2026): a female body at least, and male skinny, husky and obese with
+  female ones to match, "as good as the existing one turned out". Clothes are to be made in one batch for now
+  and fitted to the new bodies after they exist. What will need fitting: `Clothes.MARK` (the heights cuts are
+  named by) is this body's, and a few sizes are written into `clothes.gdshader` (the lenses' spacing, how wide
+  the face is, the pack's width, where a strap runs, where laces are). Make those a per-body table so a new body
+  is its own numbers plus a review sheet, not every outfit again. What fits by itself: the clothes are drawn on
+  each body's own mesh and pushed out along its own surface, so a belly, a bust or thin arms are followed; the
+  body areas come from bone names, so a new body needs the same 72-bone skeleton and names. A new body built
+  from the same recipe (`male_body_muscular.js`, same skeleton, same detail data, the rest position in CUSTOM0)
+  works with every pose, the skin shaders and the clothes; each will want a shambler of its own as well.
 - Not built: clothes on zombies (and loot by what they wore); clothes that show in the world when dropped (a
   pickup is a box); getting wet, washing, mending; warmth doing anything; noise (a parka rustles); clothes
   slowing you; the outline is drawn round the body, so zoomed right in a coat can stand a little past it;
