@@ -54,9 +54,14 @@ the grid screen and a backpack (see Searching and the grid).
 
 Items by theme: the owner named the first theme on 21 Nov 2026, a middle-class living room. Built first, as
 planned, what all four batches share: held things as weapons that wear out, and taking things apart (see Held
-weapons and taking apart; on the session branch, not on `main`, not seen by the owner). Waiting on the owner
-for: how many items the theme gets, and their answer to the clothes proposal (see Themed item batches) before
-any clothes are built.
+weapons and taking apart). Then the owner's answers (21 Nov 2026): the living room's "clothes" are its cloth
+(drapes, table cloths, "stuff like that"; people's clothes in every fashion come with the themed bedrooms);
+slots come from clothes and everyone starts dressed ("every player will start in a place they can loot");
+"Make clothes good... dress my character to the nines"; and push the weapons work to `main`. Built the same day
+(see Clothes): every place to wear things, clothes drawn on the body, pockets from clothes, protection, and the
+living room's cloth. Not seen by the owner. The push to `main` was refused by the session's permission check:
+everything is on the session branch, waiting for the owner to merge it or allow the push.
+Next in the theme: furniture (session 2), then appliances, then everything else.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -1090,8 +1095,8 @@ what it can be torn or tied into. Furniture and appliances in a batch are made w
 principles (rule 1 and rule 2, `Solid`, a `Stash` if things are kept in it). What the batches share is built
 (see Held weapons and taking apart): every item now also gets `hit`, `apart` and, if it is a tool, `does`.
 
-First theme (owner, 21 Nov 2026): a middle-class living room. No number of items given yet. Claude's proposal
-for how clothes are worn, sent to the owner the same day and waiting for an answer (build no clothes before):
+First theme (owner, 21 Nov 2026): a middle-class living room; its first session (clothes) is its cloth. The
+proposal for how clothes are worn that the owner answered (built: see Clothes):
 
 - Layers by body area: head; neck; torso under (t-shirt), mid (sweater, hoodie, cardigan), outer (jacket,
   coat); legs under and outer; feet socks and shoes; hands; the back (bags, as now); a belt at the waist.
@@ -1106,10 +1111,76 @@ for how clothes are worn, sent to the owner the same day and waiting for an answ
 - Draft list for the living room (12): slippers, wool socks, sneakers, sweatpants, jeans, t-shirt, hoodie,
   cardigan, dressing gown, winter parka (hall closet), knit beanie, wool scarf.
 
+## Clothes (built 21 Nov 2026, in review; not seen by the owner)
+
+The owner: "Make clothes good. I don't care how you do it just make it so I can dress my character to the
+nines. I want wrists, neck, socks, eyes, face, head, overshirt, undershirt, belt, weapon straps, you name it."
+And: slots come from clothes; everyone starts dressed. Every number is Claude's first guess. Test
+`tools/clothes_test.gd`; sheets `tools/preview/clothes_range.png` (what the system can draw: front, side,
+back), `clothes_living_room.png` (the game's own items), `raiders_dressed.png`, `loot_clothes.png`.
+
+- Places (`Clothes.PLACES`, outermost first, which is also the order things are drawn and a bite meets them):
+  back, strap (weapon straps), cloak, eyes, head, face, neck, left wrist, right wrist, hands, fingers, outer
+  (jacket or coat), waist (belt), feet, shirt (overshirt), undershirt, legs, socks, underwear. One thing a place.
+- Drawn on the body (`clothes.gd`, `clothes.gdshader`): a second skinned copy of the body's own mesh
+  (`Clothes.shell()`, built once per mesh: rest position and body area per vertex in CUSTOM0, the area from
+  each vertex's main bone), a sibling of the body mesh on the same skeleton (`PlayerBody.dress(layers)`). The
+  approved model and its skin shader are not touched. Each worn thing is a layer: what it covers is a height
+  range per area (torso, arm, hand, leg, foot, neck, head, face) on the body at rest, from cuts in
+  `Clothes.CUTS` named by landmarks (`MARK`: knee, wrist, eyes...); a side (a watch on one wrist); a shape (a
+  strap across the chest, a pack on the back, lenses, a balaclava's eye slot); an open front; flare (a skirt, a
+  cloak). At each spot the outermost layer drawn wins; where nothing covers, the body shows. The copy is pushed
+  out by what covers it (a coat is bulkier, a pack stands out on the back). Up to 14 layers. Patterns texel by
+  texel in the 8-shade way: plain, knit, denim, check, stripes, leather, lace (open), print, metal, glass;
+  hems, buttons, zips, laces, jeans seams; holes (`tatter`: what is under shows), grime, blood. One extra
+  draw per dressed character; the hit flash and the sun's direction reach it.
+- An item's clothing fields (`items.gd`, at the top): `wear` (a place), `look` (cut, inks, pattern, thickness,
+  shape, side, open, flare, detail), `guard` (bite, cut, blow, warm), `pockets` ([name, kg] or [name, kg,
+  "long"]). A new garment is one line; a new kind of cut is one line in `CUTS`.
+- Slots (`inventory.gd`): your hands always; every other slot is a pocket of something worn ("legs:0" is the
+  first pocket of what is on your legs): jeans four, a belt two, a sling one that takes only something long.
+  Take a thing off and what is in its pockets stays in it ("pocketed"), and weighs with it; put it on and it is
+  back. `Inventory.don()`, `doff()`, `slot_list()`, `fits()`, `strip()` (for a body left behind).
+- What it keeps out (`Clothes.meet`): a bite or a cut lands on a random spot of the part it hit; what is worn
+  over that spot meets it, outermost first; each may stop it (its guard, less as it is torn). A stopped bite is
+  a bruise and no bite (so no infection); everything it went through gets torn a little and bloody. Glass
+  crawled over is met the same way. A blow to the head: `Player.head_share()` from what is on the head (the
+  helmet's blow 0.6 is the old 30% of a head hit).
+- Warmth is summed (`Clothes.warmth`) and shown on the character page; nothing uses it until the warmth need.
+- Everyone starts dressed (`Player.START_OUTFIT`, a stand-in until who you were picks it): t-shirt, jeans,
+  leather belt, socks, sneakers. So nobody starts barefoot any more (glass crunches; U takes shoes off).
+- Raiders are dressed (`RaiderBody.outfit()`): rolled drab tops, an open check overshirt or a jacket, jeans,
+  boots, sometimes a bandana, a cap, a sling, gloves. Looks only: what they wear keeps nothing out.
+- The screens: the loot screen's left side is a grid of the places, head to foot (drag something onto its
+  place to put it on; the place lights up while you hold something that goes there), and a column of the
+  slots your clothes give you, each named. The character page lists what you wear (torn, filthy, bloody in
+  words) and your warmth.
+- The living room's cloth (owner: "drapes and table cloths. Stuff like that"), each with a use (rule 2):
+  curtains (a cloak: warm, a bite has to get through; tear into 5 cloth and 4 strips), net curtain (strains
+  muddy water: dirt to a third, the bugs stay; Shift+I uses it first), tablecloth (knotted into a bundle on
+  your back: a 4 by 3 bag), throw blanket (a shawl, warm), cushion cover (a 3 by 3 sack on your back), lace
+  table runner (a thin scarf; strips), curtain tie-back (a weapon strap: carries one long thing across your
+  back). New: strip of cloth (ties a limb off before an amputation, in place of a rag). They turn up in living
+  rooms (the bookshelf's pool for now). The five you start in turn up in bedrooms.
+- Cloud run (`tools/clothes_test.gd`): bites that broke the skin out of 200, naked: all; in the start clothes:
+  arm 197, torso 187, legs 140, head 200; with curtains, boots and a helmet: arm 179, torso 134, legs 95,
+  head 177. Jeans were in tatters after 23 bites on the legs. Jeans off with things in the pockets: the
+  pockets went from the list and the weight stayed; back on, everything was where it was. A tablecloth bundle
+  took four things the slots wouldn't. Muddy water through the net curtain: dirt 0.7 to 0.24, bugs 0.9 to
+  0.81. Curtains torn up in 10 s. Died dressed: the body held the clothes, the jeans with 3 things in them;
+  the next character started dressed.
+- Not built: clothes on zombies (and loot by what they wore); clothes that show in the world when dropped (a
+  pickup is a box); getting wet, washing, mending; warmth doing anything; noise (a parka rustles); clothes
+  slowing you; the outline is drawn round the body, so zoomed right in a coat can stand a little past it;
+  curtains, tablecloths and the rest in the world on windows and tables (the furniture session); things
+  hiding the face from raiders; a tie (nothing hangs down the front yet); hair (the body is bald); one body
+  type only, so the cuts' heights are this body's; checked only in the software renderer, never on Forward+.
+
 ## Held weapons and taking apart (built 21 Nov 2026, in review; not seen by the owner)
 
 The plumbing every themed batch needs (owner: anything held in one or two hands is a weapon, most things don't
-last long against a head; nothing is junk, everything comes apart into something). On the session branch only.
+last long against a head; nothing is junk, everything comes apart into something). The owner said to put it on
+`main` (21 Nov 2026); the push was refused by the session's permission check, so it is on the session branch.
 Every number is Claude's first guess. Test `tools/melee_test.gd`; sheet `tools/preview/held_weapons.png`.
 
 - Item fields (`items.gd`, documented at the top): `hit` (hands, kind blunt/chop/pierce, force, smash and

@@ -103,7 +103,7 @@ var aim_range_bonus := 0.0              # Ready: e.g. a scoped gun
 # (Zombies notice someone hidden behind cover at Enemy.HIDDEN_NOTICE of their usual range.)
 @export var cover_peek_hit_chance := 0.15   # chance a shot crossing your cover hits while you peek
 @export var head_hit_fraction := 0.75   # a head hit on you takes this much of full health
-@export var helmet_share := 0.4         # ... and through a helmet, this share of that
+@export var helmet_share := 0.4         # (no longer read: what is on your head says how much it keeps out: head_share(), the helmet's guard)
 @export var board_time := 6.0           # s to board a window up
 @export var board_planks := 2
 @export var board_nails := 4
@@ -612,6 +612,7 @@ func _ready() -> void:
 
 	recompute_stats()
 	_reset_vitals()
+	dress_start()
 
 
 ## Defaults (STR 10 / END 10 / WT 8) give walk 3.2, Ready 2.6, run 6.7, 100 stamina.
@@ -1017,6 +1018,8 @@ func use_item(key: String) -> void:
 	if def.has("wear"):
 		var name_was := Items.name_of(id).to_lower()
 		if inv.wear(key) != "":
+			if not inv.left.is_empty():
+				_drop(inv.left)        # what came off had nowhere to go: it is at your feet
 			_worn_changed()
 			show_status("You put on the %s." % name_was, 1.6)
 		return
@@ -1079,10 +1082,29 @@ func _drop(it: Dictionary) -> void:
 	get_parent().add_child(box)
 
 
-## What you wear has changed: bare feet or not.
+## What you wear has changed: bare feet or not, and the clothes drawn on you.
 func _worn_changed() -> void:
 	barefoot = not inv.worn.has("feet")
+	_redress()
 	recompute_stats()
+
+
+## Draw what you wear as it is now (holes, blood and all).
+func _redress() -> void:
+	if _body != null:
+		_body.dress(Clothes.layers_of(inv.worn))
+
+
+## Everyone starts dressed (owner, 21 Nov 2026), and somewhere there is something to loot. A stand-in until who
+## you were picks it.
+const START_OUTFIT := ["t_shirt", "jeans", "belt", "socks", "sneakers"]
+
+
+func dress_start() -> void:
+	for id: String in START_OUTFIT:
+		if Items.DEFS.has(id):
+			inv.don(Items.make(id))
+	_worn_changed()
 
 
 ## Eat a tin. With a tin opener, all of it; hacked open with a hatchet, half is lost; with neither, nothing.
@@ -1287,7 +1309,7 @@ func _finish_apart() -> void:
 		var rest := inv.add(bit)
 		if not rest.is_empty():
 			_drop(rest)
-	show_status("The %s comes apart: %s." % [nm, ", ".join(got)], 2.2)
+	show_status("You take the %s apart: %s." % [nm, ", ".join(got)], 2.2)
 	recompute_stats()
 
 
@@ -1331,7 +1353,10 @@ func purify_water() -> void:
 		return
 	var item: Dictionary = inv.slots[key]
 	var done: Array = item.get("done", [])
-	if inv.has("water_filter") and not done.has("filtered"):
+	if inv.tool_for("strain") != "" and not done.has("strained") and not done.has("filtered") and Water.dirt(item) > 0.1:
+		Water.strain(item)
+		show_status("Strained through the cloth. It looks %s. Whatever lives in it went through." % Water.look(item), 2.4)
+	elif inv.has("water_filter") and not done.has("filtered"):
 		inv.use("water_filter")
 		Water.filter(item)
 		show_status("Filtered. It looks %s." % Water.look(item), 2.0)
@@ -1384,8 +1409,13 @@ func _step_in_it() -> void:
 			if not body.missing.has(part):
 				places.append(part)
 		var part: String = places[randi() % places.size()]
-		body.glass_in(body.hurt("cut", part, glass_cut, ""))
-		show_status("Glass goes into your %s." % str(BodyHealth.NAMES[part]).to_lower(), 1.4)
+		var met := Clothes.meet(inv.worn, part, "cut")
+		_redress()
+		if not (met["stopped"] as Dictionary).is_empty():
+			show_status("Glass catches in your %s." % Items.name_of(met["stopped"]["id"]).to_lower(), 1.2)
+		else:
+			body.glass_in(body.hurt("cut", part, glass_cut, ""))
+			show_status("Glass goes into your %s." % str(BodyHealth.NAMES[part]).to_lower(), 1.4)
 	elif glass == 2 and not invulnerable:
 		body.glass_in(body.hurt("cut", side, glass_cut, "foot"))
 		show_status("Glass goes into your foot.", 1.4)
@@ -3204,7 +3234,7 @@ func take_shot(amount: float, dir: Vector3, knock: float, from: Vector3) -> Stri
 	if in_cover and cover_mode != "pop" and hidden_from(from, true):
 		if cover_mode == "hunker" or randf() >= cover_peek_hit_chance:
 			return "cover"
-		var dmg := max_health * head_hit_fraction * (helmet_share if inv.worn.has("head") else 1.0)
+		var dmg := max_health * head_hit_fraction * head_share()
 		take_damage(dmg, dir, knock)
 		_wound("gunshot", dmg, "Head")
 		if not dead and not invulnerable:
@@ -3229,10 +3259,8 @@ func _die(text: String) -> void:
 	held_by.clear()
 	_respawn_t = 3.0
 	var things: Array[Dictionary] = []
-	for k in inv.slots:
-		things.append(inv.slots[k])
-	for k in inv.worn:
-		things.append(inv.worn[k])
+	for it in inv.strip():        # what was worn keeps what was in its pockets
+		things.append(it)
 	inv = Inventory.new()
 	barefoot = true
 	if sheet.body.infected:
@@ -3580,7 +3608,27 @@ func search_pace() -> float:
 func _wound(kind: String, amount: float, part: String) -> void:
 	if dead or invulnerable:
 		return
+	if kind == "bite" or kind == "cut":
+		# What you wear there may stop it: a bite stopped is a bruise and a tear in the cloth.
+		var met := Clothes.meet(inv.worn, part, kind)
+		_redress()
+		if not (met["stopped"] as Dictionary).is_empty():
+			var nm := Items.name_of(met["stopped"]["id"]).to_lower()
+			if kind == "bite":
+				sheet.body.hurt("bruise", part, amount * 0.4)
+				show_status("The teeth don't get through your %s." % nm, 1.4)
+			else:
+				show_status("Your %s takes it." % nm, 1.2)
+			return
 	sheet.body.hurt(kind, part, amount)
+
+
+## How much of a blow to the head gets through what is on it (a helmet: little). 1 = all of it.
+func head_share() -> float:
+	var share := 1.0
+	for it in Clothes.over(inv.worn, "Head", ["head", 1.76]):
+		share *= 1.0 - float(Items.DEFS[it["id"]].get("guard", {}).get("blow", 0.0))
+	return share
 
 
 func _pick(parts: Array) -> String:
@@ -3609,6 +3657,7 @@ func _respawn() -> void:
 	_cam_carry = Vector3.ZERO
 	sheet.reset()
 	_reset_vitals()
+	dress_start()
 	if camera_rig:
 		camera_rig.snap()
 

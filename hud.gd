@@ -333,10 +333,12 @@ func _sheet_rows() -> Array:
 	rows.append_array(CharacterSheet.NEEDS)
 	rows.append("medical")
 	# What you carry and wear: Enter uses the picked thing, Delete puts it down.
-	for sl in Inventory.SLOTS:
+	# The slots are the ones your clothes give you now; only the places with something on are listed.
+	for sl in player.inv.slot_list():
 		rows.append("slot:" + str(sl[0]))
 	for wr in Inventory.WORN:
-		rows.append("worn:" + str(wr[0]))
+		if player.inv.worn.has(wr[0]):
+			rows.append("worn:" + str(wr[0]))
 	return rows
 
 
@@ -344,7 +346,7 @@ func _sheet_rows() -> Array:
 func sheet_use() -> void:
 	if not _sheet_panel.visible:
 		return
-	var row: String = _sheet_rows()[_sheet_row]
+	var row: String = _row_now()
 	if row.begins_with("slot:"):
 		player.use_item(row.substr(5))
 	elif row.begins_with("worn:"):
@@ -352,11 +354,35 @@ func sheet_use() -> void:
 	_sheet_t = 0.0
 
 
+## The picked row (the list changes as you dress and undress, so it is kept in range).
+func _row_now() -> String:
+	var rows := _sheet_rows()
+	_sheet_row = clampi(_sheet_row, 0, rows.size() - 1)
+	return rows[_sheet_row]
+
+
+func _warm_word(w: float) -> String:
+	return "next to nothing" if w < 0.3 else ("light" if w < 0.7 else ("warm" if w < 1.2 else "very warm"))
+
+
+## How a worn thing is holding up, in words: torn, filthy, bloody.
+func _cloth_state(it: Dictionary) -> String:
+	var bits: Array[String] = []
+	var t := float(it.get("tatter", 0.0))
+	if t > 0.05:
+		bits.append("torn" if t < 0.4 else ("badly torn" if t < 0.75 else "in tatters"))
+	if float(it.get("grime", 0.0)) > 0.3:
+		bits.append("filthy")
+	if float(it.get("blood", 0.0)) > 0.15:
+		bits.append("bloody")
+	return "" if bits.is_empty() else "  [color=#c9a070](%s)[/color]" % ", ".join(bits)
+
+
 ## Take apart the carried thing that is picked (Shift+Enter on the character page).
 func sheet_apart() -> void:
 	if not _sheet_panel.visible:
 		return
-	var row: String = _sheet_rows()[_sheet_row]
+	var row: String = _row_now()
 	if row.begins_with("slot:"):
 		player.take_apart(row.substr(5))
 	_sheet_t = 0.0
@@ -366,7 +392,7 @@ func sheet_apart() -> void:
 func sheet_drop() -> void:
 	if not _sheet_panel.visible:
 		return
-	var row: String = _sheet_rows()[_sheet_row]
+	var row: String = _row_now()
 	if row.begins_with("slot:"):
 		player.drop_item(row.substr(5))
 	elif row.begins_with("worn:"):
@@ -389,7 +415,7 @@ func sheet_select(d: int) -> void:
 func sheet_adjust(d: int) -> void:
 	if not _sheet_panel.visible:
 		return
-	var row: String = _sheet_rows()[_sheet_row]
+	var row: String = _row_now()
 	var s := player.sheet
 	if row.begins_with("slot:") or row.begins_with("worn:"):
 		return
@@ -411,7 +437,7 @@ func _meter(v: float, width := 20) -> String:
 
 
 func _mark(row: String) -> String:
-	return "[color=#ffc04d]>[/color] " if _sheet_rows()[_sheet_row] == row else "   "
+	return "[color=#ffc04d]>[/color] " if _row_now() == row else "   "
 
 
 func _cell(text: String) -> String:
@@ -481,16 +507,19 @@ func _sheet_text2() -> String:
 	if guess != "":
 		t += "   [color=#d6a04a]%s[/color]\n" % guess
 	t += "\n[b]CARRYING[/b]   [color=#999]no bag: slots, each up to a weight.  %.1f kg in all.[/color]\n" % player.inv.weight()
-	var picked: String = _sheet_rows()[_sheet_row]
+	var picked: String = _row_now()
 	var about := ""
-	for sl in Inventory.SLOTS:
+	for sl in player.inv.slot_list():
 		var it = player.inv.slots.get(sl[0])
 		t += "%s%s: %s\n" % [_mark("slot:" + str(sl[0])), sl[1], Items.label(it) if it != null else "[color=#777]empty[/color]"]
 		if it != null and picked == "slot:" + str(sl[0]):
 			about = Items.about(it["id"])
+	t += "[b]WEARING[/b]   [color=#999]warmth %s[/color]\n" % _warm_word(Clothes.warmth(player.inv.worn))
 	for wr in Inventory.WORN:
 		var on = player.inv.worn.get(wr[0])
-		t += "%s%s: %s\n" % [_mark("worn:" + str(wr[0])), wr[1], Items.label(on) if on != null else "[color=#777]nothing[/color]"]
+		if on == null:
+			continue
+		t += "%s%s: %s%s\n" % [_mark("worn:" + str(wr[0])), wr[1], Items.label(on), _cloth_state(on)]
 		if on != null and picked == "worn:" + str(wr[0]):
 			about = Items.about(on["id"])
 	if about != "":

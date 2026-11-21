@@ -185,12 +185,12 @@ func _run() -> void:
 	if crate != null:
 		p.inv.slots.erase("hand_l")
 		_hold("plank")
-		p.inv.slots.erase("belt1")
-		p.inv.slots.erase("belt2")
+		p.inv.slots.erase("waist:0")
+		p.inv.slots.erase("waist:1")
 		_say("crate with a plank in hand: %s; with a hatchet on the belt too: %s" % [p.break_tool(crate)[2], ""])
-		p.inv.slots["belt1"] = Items.make("hatchet")
+		p.inv.slots["waist:0"] = Items.make("hatchet")
 		_say("  ... with a hatchet on the belt too: %s (%s)" % [p.break_tool(crate)[2], crate.feel(p.break_tool(crate)[0], p.break_tool(crate)[1])])
-		p.inv.slots.erase("belt1")
+		p.inv.slots.erase("waist:0")
 
 	# ---- taking apart
 	p.set_physics_process(true)
@@ -218,13 +218,13 @@ func _run() -> void:
 	var ear_far := _zombie(p.global_position + Vector3(-12, 0, 0), 1.0)
 	ear_near._noise_t = 0.0
 	ear_far._noise_t = 0.0
-	p.inv.slots["belt1"] = Items.make("bottle")
-	p.take_apart("belt1")
+	p.inv.slots["waist:0"] = Items.make("bottle")
+	p.take_apart("waist:0")
 	await _wait(1.4)
 	_say("bottle smashed: '%s'; heard 8 m %s, 12 m %s" % [p.status_text, ear_near._noise_t > 0.0, ear_far._noise_t > 0.0])
-	p.inv.slots["pocket1"] = Items.make("backpack")
-	Items.hold_of(p.inv.slots["pocket1"])["things"].append({"item": Items.make("rock"), "x": 0, "y": 0, "z": 0})
-	p.take_apart("pocket1")
+	p.inv.slots["legs:0"] = Items.make("backpack")
+	Items.hold_of(p.inv.slots["legs:0"])["things"].append({"item": Items.make("rock"), "x": 0, "y": 0, "z": 0})
+	p.take_apart("legs:0")
 	_say("a backpack with a rock in it: '%s'" % p.status_text)
 	var carried: Array[String] = []
 	for k in p.inv.slots:

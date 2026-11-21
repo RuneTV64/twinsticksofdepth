@@ -196,16 +196,23 @@ func _unhandled_input(event: InputEvent) -> void:
 					player.purify_water()
 				else:
 					player.toggle_things()
-			KEY_U:   # boots on and off, if you have a pair. Shift+U: the old test switch, boots or no boots
+			KEY_U:   # shoes on and off, if you have any. Shift+U: the old test switch, shod or not
 				if event.shift_pressed:
 					player.barefoot = not player.barefoot
-					player.show_status("Barefoot." if player.barefoot else "Shod (a test key: no boots needed).", 1.5)
+					player.show_status("Barefoot." if player.barefoot else "Shod (a test key: no shoes needed).", 1.5)
 				elif player.inv.worn.has("feet"):
 					player.use_item("worn:feet")
-				elif player.inv.has("boots"):
-					player.use_item(player.inv.find("boots"))
 				else:
-					player.show_status("You have no boots.", 1.5)
+					var shoe := ""
+					for sl in player.inv.slot_list():
+						var it = player.inv.slots.get(sl[0])
+						if it != null and str(Items.DEFS[it["id"]].get("wear", "")) == "feet":
+							shoe = sl[0]
+							break
+					if shoe != "":
+						player.use_item(shoe)
+					else:
+						player.show_status("You have nothing to put on your feet.", 1.5)
 			KEY_O:   # break what the crosshair is on; Shift+O: ten minutes of rust and rot
 				if event.shift_pressed:
 					for w in get_tree().get_nodes_in_group("weathering"):

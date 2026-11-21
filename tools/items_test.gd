@@ -37,7 +37,7 @@ func _ear(at: Vector3) -> Enemy:
 
 func _carry() -> String:
 	var out: Array[String] = []
-	for sl in Inventory.SLOTS:
+	for sl in p.inv.slot_list():
 		var it = p.inv.slots.get(sl[0])
 		if it != null:
 			out.append(Items.label(it))

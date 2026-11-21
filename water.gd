@@ -59,6 +59,13 @@ static func filter(item: Dictionary) -> void:
 	_done(item, "filtered")
 
 
+## Strained through cloth (a net curtain): most of the mud stays in the cloth; what lives in it doesn't.
+static func strain(item: Dictionary) -> void:
+	item["dirt"] = dirt(item) * 0.35
+	item["bugs"] = bugs(item) * 0.9
+	_done(item, "strained")
+
+
 static func _done(item: Dictionary, what: String) -> void:
 	var d: Array = item.get("done", [])
 	if not d.has(what):

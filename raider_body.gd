@@ -46,6 +46,35 @@ func roll() -> void:
 	_mesh.set_instance_shader_parameter("variant", look.variant)
 	_mesh.set_instance_shader_parameter("hair_color", look.hair)
 	_mesh.set_instance_shader_parameter("look_seed", look.seed)
+	dress(Clothes.layers_from(outfit(rng)))
+
+
+## What a raider has on (owner, 21 Nov 2026: clothes, so they read as raiders and not as copies of you). Rolled,
+## in drab and hard-wearing things, with a bandana, a cap or a sling now and then. Looks only: raiders have no
+## inventory yet, so what they wear keeps nothing out.
+static func outfit(rng: RandomNumberGenerator) -> Array:
+	var pick := func(a: Array): return a[rng.randi() % a.size()]
+	var out := [
+		{"wear": "undershirt", "look": {"cut": pick.call(["tee", "tee", "tank", "longsleeve"]), "ink": pick.call(["dark", "olive", "canvas", "#5a4a3a", "crimson"]), "pat": "plain"}},
+		{"wear": "legs", "look": {"cut": "jeans", "ink": pick.call(["blue", "dark", "olive", "#4a4438"]), "pat": pick.call(["denim", "plain"]), "ink2": "water", "detail": "jeans", "thick": 0.01}},
+		{"wear": "feet", "look": {"cut": "boots", "ink": pick.call(["leather", "dark"]), "pat": "leather", "thick": 0.022, "detail": "laces"}},
+		{"wear": "waist", "look": {"cut": "belt", "ink": "leather", "pat": "leather", "thick": 0.014}},
+	]
+	if rng.randf() < 0.6:
+		out.append({"wear": "outer", "look": pick.call([
+			{"cut": "longsleeve", "ink": "red", "ink2": "dark", "pat": "check", "open": 0.16, "thick": 0.014},
+			{"cut": "longsleeve", "ink": "#3a5a4a", "ink2": "dark", "pat": "check", "open": 0.16, "thick": 0.014},
+			{"cut": "jacket", "ink": "leather", "pat": "leather", "open": 0.1, "thick": 0.018},
+			{"cut": "jacket", "ink": "olive", "pat": "plain", "open": 0.08, "thick": 0.018, "detail": "zip"}])})
+	if rng.randf() < 0.4:
+		out.append({"wear": "face", "look": {"cut": "bandana", "ink": pick.call(["red", "dark", "#3a4a6a"]), "ink2": "white", "pat": "print"}})
+	if rng.randf() < 0.35:
+		out.append({"wear": "head", "look": {"cut": pick.call(["beanie", "cap"]), "ink": pick.call(["dark", "olive", "red"]), "pat": "knit", "thick": 0.014}})
+	if rng.randf() < 0.5:
+		out.append({"wear": "strap", "look": {"cut": "strap", "shape": "strap", "ink": "leather", "pat": "leather", "thick": 0.016}})
+	if rng.randf() < 0.3:
+		out.append({"wear": "hands", "look": {"cut": "gloves", "ink": pick.call(["dark", "leather"]), "pat": "leather"}})
+	return out
 
 
 ## The living skin shader lights in view space: point it at the level sun as the camera sees it (the camera

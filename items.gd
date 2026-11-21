@@ -7,7 +7,14 @@ extends RefCounted
 ##   stack   how many go in one slot (left out: 1), or
 ##   uses    how many uses one has (a box of nails, a bottle's washes, a torch's seconds of light)
 ##   keep    it is still a thing when its uses are gone (an empty bottle, a flat torch)
-##   wear    where it is worn, if it is: "feet", "head" or "back" (inventory.gd)
+##   wear    where it is worn, if it is: one of Clothes.PLACES ("undershirt", "legs", "feet", "head", "back", "strap"...)
+##   look    how it is drawn worn (clothes.gd): a cut from Clothes.CUTS (or its own "cover"), "ink" and "ink2"
+##           (ItemArt.INK names or "#rrggbb"), "pat" (plain, knit, denim, check, stripes, leather, lace, print,
+##           metal, glass), "thick" (m), "shape" (strap, pack, lens, slot), "side" (L or R), "open" (m down the
+##           front), "flare", "detail" (buttons, zip, laces, jeans)
+##   guard   what it keeps out where it covers, each 0 to 1: "bite", "cut", "blow" (a stop chance; a blow's share
+##           kept out), "warm" (for the warmth need to come). Torn, it keeps out less (Clothes.meet)
+##   pockets the slots it gives worn: [[name, kg], ...], or [name, kg, takes] ("long": a sling takes something long)
 ##   size    how many squares it takes in a drawer or a bag, [wide, high] (left out: one square). Squares are
 ##           not a measure: small, long, bulky. The picture of it (item_art.gd) is drawn to this size.
 ##   hold    it is a bag: the grid it holds, [wide, high]. What is in it is on the item itself ("grid")
@@ -65,9 +72,24 @@ const DEFS := {
 	"plank": {"name": "Plank", "w": 1.5, "size": [1, 4], "cat": "material", "stack": 4, "found": ["garage", "yard"], "for": "A sound board. Two of them, nails and a hammer board up a window. It burns, too.", "hit": {"hands": 2, "kind": "blunt", "force": 15.0, "reach": 1.9, "time": 0.85, "lasts": 6, "into": [["wood_scrap", 2]], "noise": 6.0, "look": [1.1, 0.05, "pale"]}, "apart": {"into": [["wood_scrap", 3]], "tool": "blade", "time": 6.0, "noise": 6.0}},
 	"nails": {"name": "Box of nails", "w": 0.3, "cat": "material", "uses": 20, "found": ["garage"], "for": "Four to board a window."},
 	# ---- clothing
-	"boots": {"name": "Boots", "w": 1.2, "size": [2, 2], "cat": "clothing", "wear": "feet", "rare": 0.5, "found": ["bedroom", "garage"], "for": "On your feet, broken glass only crunches, and a cut foot is out of the dirt."},
-	"helmet": {"name": "Helmet", "w": 1.2, "size": [2, 2], "cat": "clothing", "wear": "head", "rare": 0.3, "found": ["garage", "bedroom"], "for": "On your head, a blow or a bullet there takes far less out of you.", "apart": {"into": [["plastic_scrap", 2], ["cloth_scrap", 1]], "tool": "blade", "time": 5.0}},
-	"backpack": {"name": "Backpack", "w": 0.8, "size": [3, 3], "cat": "clothing", "wear": "back", "hold": [6, 4], "rare": 0.25, "found": ["bedroom", "garage"], "for": "On your back it holds a grid of things. What is in it has to come out into a hand, your belt or a pocket before you can use it.", "apart": {"into": [["cloth_scrap", 4]], "tool": "blade", "time": 8.0}},
+	"boots": {"name": "Boots", "w": 1.2, "size": [2, 2], "cat": "clothing", "wear": "feet", "rare": 0.5, "found": ["bedroom", "garage"], "for": "On your feet, broken glass only crunches, and a cut foot is out of the dirt.", "look": {"cut": "boots", "ink": "leather", "pat": "leather", "thick": 0.022, "detail": "laces"}, "guard": {"bite": 0.6, "cut": 0.9, "warm": 0.15}, "apart": {"into": [["cloth_scrap", 1], ["plastic_scrap", 1]], "tool": "blade", "time": 6.0}},
+	"helmet": {"name": "Helmet", "w": 1.2, "size": [2, 2], "cat": "clothing", "wear": "head", "rare": 0.3, "found": ["garage", "bedroom"], "for": "On your head, a blow or a bullet there takes far less out of you.", "apart": {"into": [["plastic_scrap", 2], ["cloth_scrap", 1]], "tool": "blade", "time": 5.0}, "look": {"cut": "helmet", "ink": "olive", "pat": "plain", "thick": 0.03}, "guard": {"bite": 0.9, "cut": 0.9, "blow": 0.6}},
+	"backpack": {"name": "Backpack", "w": 0.8, "size": [3, 3], "cat": "clothing", "wear": "back", "hold": [6, 4], "rare": 0.25, "found": ["bedroom", "garage"], "for": "On your back it holds a grid of things. What is in it has to come out into a hand, your belt or a pocket before you can use it.", "apart": {"into": [["cloth_scrap", 4]], "tool": "blade", "time": 8.0}, "look": {"cut": "pack", "shape": "pack", "ink": "canvas", "pat": "plain", "thick": 0.1}},
+	# ---- clothing: what everyone starts in (owner, 21 Nov 2026: all have clothes from the beginning). The themed
+	# bedrooms bring the rest, in every fashion.
+	"t_shirt": {"name": "T-shirt", "w": 0.15, "size": [2, 2], "cat": "clothing", "wear": "undershirt", "found": ["bedroom"], "for": "Worn under everything. Thin: it keeps nothing much out. Torn up it is rags and strips.", "look": {"cut": "tee", "ink": "white", "pat": "plain", "thick": 0.006}, "guard": {"bite": 0.05, "cut": 0.05, "warm": 0.1}, "apart": {"into": [["cloth_scrap", 2], ["cloth_strip", 2]], "time": 5.0}},
+	"jeans": {"name": "Jeans", "w": 0.7, "size": [2, 3], "cat": "clothing", "wear": "legs", "found": ["bedroom"], "for": "Tough cloth: a bite or a cut on the legs has to get through it. Four pockets.", "look": {"cut": "jeans", "ink": "blue", "pat": "denim", "ink2": "water", "detail": "jeans", "thick": 0.01}, "guard": {"bite": 0.3, "cut": 0.4, "warm": 0.25}, "pockets": [["Front pocket", 0.5], ["Front pocket", 0.5], ["Back pocket", 0.4], ["Back pocket", 0.4]], "apart": {"into": [["cloth_scrap", 3], ["cloth_strip", 2]], "tool": "blade", "time": 8.0}},
+	"belt": {"name": "Leather belt", "w": 0.3, "size": [1, 3], "cat": "clothing", "wear": "waist", "found": ["bedroom"], "for": "Two things hang on it: a hatchet, a torch, a hammer.", "look": {"cut": "belt", "ink": "leather", "pat": "leather", "thick": 0.014}, "pockets": [["On your belt", 1.5], ["On your belt", 1.5]], "hit": {"hands": 1, "kind": "blunt", "force": 5.0, "reach": 1.5, "time": 0.55, "lasts": 40, "into": [["cloth_strip", 1]], "look": [0.5, 0.02, "leather"]}},
+	"socks": {"name": "Socks", "w": 0.08, "cat": "clothing", "wear": "socks", "found": ["bedroom"], "for": "Warm feet. Nothing against glass.", "look": {"cut": "socks", "ink": "white", "pat": "knit", "thick": 0.006}, "guard": {"cut": 0.05, "warm": 0.08}, "apart": {"into": [["cloth_scrap", 1]], "time": 2.0}},
+	"sneakers": {"name": "Sneakers", "w": 0.7, "size": [2, 2], "cat": "clothing", "wear": "feet", "found": ["bedroom", "living room"], "for": "Light and quiet. Glass mostly only crunches under them; they are no boots.", "look": {"cut": "shoes", "ink": "white", "ink2": "dark", "detail": "laces", "thick": 0.02}, "guard": {"bite": 0.15, "cut": 0.75, "warm": 0.1}, "apart": {"into": [["plastic_scrap", 1], ["cloth_scrap", 1]], "tool": "blade", "time": 5.0}},
+	# ---- the living room's cloth (owner, 21 Nov 2026: "Do clothes like drapes and table cloths. Stuff like that.")
+	"curtains": {"name": "Curtains", "w": 2.4, "size": [3, 3], "cat": "clothing", "wear": "cloak", "rare": 0.6, "found": ["living room"], "for": "Heavy drapes from the front room. Round your shoulders they are a warm cloak a bite has to get through. Torn up, a lot of cloth.", "look": {"cut": "cloak", "ink": "#6e2a36", "ink2": "#8c4450", "pat": "print", "thick": 0.025, "flare": 0.12, "open": 0.16}, "guard": {"bite": 0.25, "cut": 0.2, "warm": 0.45}, "apart": {"into": [["cloth_scrap", 5], ["cloth_strip", 4]], "time": 10.0}},
+	"net_curtain": {"name": "Net curtain", "w": 0.3, "size": [2, 2], "cat": "tool", "found": ["living room"], "for": "Fine white netting. Muddy water poured through it comes out far clearer; what lives in it goes straight through.", "does": ["strain"], "apart": {"into": [["cloth_strip", 3]], "time": 3.0}},
+	"tablecloth": {"name": "Tablecloth", "w": 0.6, "size": [2, 2], "cat": "clothing", "wear": "back", "hold": [4, 3], "found": ["living room", "kitchen"], "for": "Its corners knotted, it is a bundle on your back: a small bag. Torn up, cloth and strips.", "look": {"cut": "pack", "shape": "pack", "ink": "white", "ink2": "red", "pat": "check", "thick": 0.07}, "apart": {"into": [["cloth_scrap", 2], ["cloth_strip", 3]], "time": 5.0}},
+	"throw_blanket": {"name": "Throw blanket", "w": 1.0, "size": [3, 2], "cat": "clothing", "wear": "cloak", "found": ["living room", "bedroom"], "for": "Knitted, off the back of the couch. Round your shoulders it is warm, if not much else.", "look": {"cut": "shawl", "ink": "#b8893a", "ink2": "#6c7848", "pat": "stripes", "thick": 0.02, "open": 0.12}, "guard": {"bite": 0.12, "cut": 0.1, "warm": 0.4}, "apart": {"into": [["cloth_scrap", 4]], "time": 6.0}},
+	"cushion_cover": {"name": "Cushion cover", "w": 0.15, "size": [2, 2], "cat": "clothing", "wear": "back", "hold": [3, 3], "found": ["living room"], "for": "Zipped off a couch cushion, it is a sack: slung on your back it carries a few things.", "look": {"cut": "pack", "shape": "pack", "ink": "#4f6a8a", "ink2": "#c9b98a", "pat": "print", "thick": 0.05}, "apart": {"into": [["cloth_scrap", 1], ["cloth_strip", 1]], "time": 3.0}},
+	"table_runner": {"name": "Lace table runner", "w": 0.1, "size": [1, 3], "cat": "clothing", "wear": "neck", "found": ["living room"], "for": "A long strip of lace off the sideboard. Round your neck it is a thin scarf; torn, it is strips to tie with.", "look": {"cut": "scarf", "ink": "lace", "pat": "lace", "thick": 0.008}, "guard": {"warm": 0.05}, "apart": {"into": [["cloth_strip", 2]], "time": 2.0}},
+	"curtain_tieback": {"name": "Curtain tie-back", "w": 0.1, "size": [1, 2], "cat": "clothing", "wear": "strap", "found": ["living room"], "for": "A braided cord with a tassel. Knotted round something long (a plank, a sledgehammer) it carries it across your back, out of your hands.", "look": {"cut": "strap", "shape": "strap", "ink": "yellow", "ink2": "amber", "pat": "stripes", "thick": 0.014}, "pockets": [["Slung across your back", 6.0, "long"]]},
 	# ---- food
 	"canned_food": {"name": "Tin of beans", "w": 0.45, "cat": "food", "stack": 3, "found": ["kitchen", "shop"], "for": "A meal that keeps for years. It wants a tin opener."},
 	# ---- thrown
@@ -77,6 +99,7 @@ const DEFS := {
 	"glass_shard": {"name": "Broken glass", "w": 0.1, "cat": "scrap", "stack": 5, "found": [], "for": "Shards from something glass that broke. Sharp: laid on the ground it is an alarm, and a trap for bare feet.", "does": ["blade"]},
 	"broken_bottle": {"name": "Broken bottle", "w": 0.3, "size": [1, 2], "cat": "thrown", "found": [], "for": "The neck of a bottle with a jagged end. It stabs, and it cuts what needs cutting. Thrown, it is just broken glass.", "does": ["blade"], "hit": {"hands": 1, "kind": "pierce", "force": 9.0, "reach": 1.0, "time": 0.4, "lasts": 5, "into": [["glass_shard", 1]], "look": [0.2, 0.06, "green"]}, "apart": {"into": [["glass_shard", 2]], "time": 1.0, "noise": 4.0}},
 	"bloody_glass": {"name": "Bloody glass", "w": 0.1, "cat": "scrap", "stack": 5, "found": [], "for": "A shard drawn out of a wound. The blood stays on it."},
+	"cloth_strip": {"name": "Strip of cloth", "w": 0.03, "cat": "scrap", "stack": 6, "found": [], "for": "Torn from cloth. It ties: a limb off above a wound before it comes off, and more to come."},
 	"cloth_scrap": {"name": "Torn cloth", "w": 0.1, "cat": "scrap", "stack": 5, "found": [], "for": "Ripped from a couch or a mattress. Filthy as it is; washed in clean water, it is a rag."},
 	"wood_scrap": {"name": "Splintered wood", "w": 0.4, "cat": "scrap", "stack": 3, "found": [], "for": "Broken wood: no use as a plank any more, but it burns."},
 	"scrap_metal": {"name": "Scrap metal", "w": 0.6, "cat": "scrap", "stack": 2, "found": [], "for": "Bent and torn metal from something that broke."},
@@ -148,6 +171,8 @@ static func weight(item: Dictionary) -> float:
 	var w := float(d["w"]) * (int(item["n"]) if item.has("n") else 1)
 	if item.has("grid"):
 		w += ItemGrid.weight(item["grid"])       # a bag weighs what is in it
+	for k in item.get("pocketed", {}):
+		w += weight(item["pocketed"][k])        # and clothes what is in their pockets
 	return w
 
 

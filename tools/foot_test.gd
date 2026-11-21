@@ -19,6 +19,8 @@ func _run() -> void:
 	var p: Player = main.player
 	var b := p.sheet.body
 	b.medical = 4
+	p.inv.doff("feet")                 # everyone starts in shoes now (clothes.gd): take them off
+	p._worn_changed()
 	# A window's worth of broken glass.
 	var w := Wreck.leave(main, Vector3(3, 0, 12), 0.6, {"glass": 1.0}, 1.54, "window")
 	var shards := w.left("glass")

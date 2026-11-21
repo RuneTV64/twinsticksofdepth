@@ -88,10 +88,10 @@ func _run() -> void:
 		e.queue_free()
 	var p: Player = main.player
 	p.invulnerable = true
-	for it in [Items.make("boots"), Items.make("helmet"), Items.make("backpack")]:
+	for it in [Items.make("boots"), Items.make("helmet"), Items.make("backpack"), Items.make("curtain_tieback"), Items.make("table_runner"), Items.make("throw_blanket")]:
 		p.inv.add(it)
 		p.use_item(p.inv.find(it["id"]))
-	for it in [Items.make("bandage", 3), Items.make("matches"), Items.make("hammer"), Items.make("torch"), Items.make("hatchet")]:
+	for it in [Items.make("bandage", 3), Items.make("matches"), Items.make("hammer"), Items.make("torch"), Items.make("hatchet"), Items.make("plank")]:
 		p.inv.add(it)
 	var bag := Items.hold_of(p.inv.worn["back"])
 	for it in [Items.make("water"), Items.make("canned_food", 2), Items.make("cooking_pot"), Items.make("antibiotics"), Items.make("plank", 2)]:

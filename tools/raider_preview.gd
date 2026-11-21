@@ -12,6 +12,7 @@ const DT := 1.0 / 60.0
 const GAP := 2.3
 
 var _frames := 0
+var _cloth: Shader
 
 # label, tone, look, hair, then Raider fields
 const CELLS := [
@@ -48,6 +49,8 @@ func _build() -> void:
 	code = code.replace("ALBEDO=pow(c,vec3(2.2));", "ALBEDO=c;").replace("instance uniform", "uniform")
 	var shader := Shader.new()
 	shader.code = code
+	_cloth = Shader.new()
+	_cloth.code = FileAccess.get_file_as_string("res://clothes.gdshader").replace("ALBEDO = pow(col, vec3(2.2));", "ALBEDO = col;")
 	for i in CELLS.size():
 		var c: Array = CELLS[i]
 		var f: Dictionary = c[4]
@@ -77,6 +80,8 @@ func _build() -> void:
 		mat.set_shader_parameter("look_seed", 7.0 * i)
 		mat.set_shader_parameter("key_dir", (cam.global_transform.basis.inverse() * Vector3(0.33, 0.82, 0.47)).normalized())
 		r.rbody._mesh.material_override = mat
+		if r.rbody._clothes != null:      # their clothes, with the same software-renderer patch
+			(r.rbody._clothes.material_override as ShaderMaterial).shader = _cloth
 		r.facing = Vector3(0, 0, 1) if (not f.has("wall") or f.get("back", false)) else Vector3(0, 0, -1)
 		for k in f:
 			if k != "wall" and k != "back":

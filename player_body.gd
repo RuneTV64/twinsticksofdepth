@@ -51,6 +51,8 @@ var outline_kind := Outline.ALLY
 var _outline_on := true
 var _flash := Vector2(-1.0, -1.0)
 var _weapon: Node3D
+var _clothes: MeshInstance3D        # what is worn, drawn over the body (clothes.gd); made the first time it is dressed
+var _clothes_tint := -1.0
 
 var _n := 0
 var _parent := PackedInt32Array()
@@ -517,6 +519,27 @@ func animate(p, delta: float) -> void:
 		amount = 0.4
 	material.set_shader_parameter("tint_color", tint)
 	material.set_shader_parameter("tint_amount", amount)
+	if _clothes != null and amount != _clothes_tint:
+		_clothes_tint = amount
+		var cm := _clothes.material_override as ShaderMaterial
+		cm.set_shader_parameter("tint_color", tint)
+		cm.set_shader_parameter("tint_amount", amount)
+
+
+## Dress the body in these layers (Clothes.layers_of(): outermost first). Nothing worn, nothing drawn.
+func dress(layers: Array) -> void:
+	if _mesh == null:
+		return
+	if _clothes == null:
+		if layers.is_empty():
+			return
+		_clothes = Clothes.put_on(_mesh, pixel_size)
+		if is_inside_tree():
+			var suns := get_tree().root.find_children("*", "DirectionalLight3D", true, false)
+			if not suns.is_empty():
+				(_clothes.material_override as ShaderMaterial).set_shader_parameter("key_dir", (suns[0] as Node3D).global_transform.basis.z.normalized())
+	_clothes.visible = not layers.is_empty()
+	Clothes.set_layers(_clothes.material_override as ShaderMaterial, layers)
 
 
 ## Show these limbs as cut off (bits as in MISSING_BIT): the forearm or the lower leg, and all below it, is
@@ -552,6 +575,8 @@ func _aim_light_at_sun() -> void:
 	var suns := get_tree().root.find_children("*", "DirectionalLight3D", true, false)
 	if not suns.is_empty():
 		material.set_shader_parameter("key_dir", (suns[0] as Node3D).global_transform.basis.z.normalized())
+		if _clothes != null:
+			(_clothes.material_override as ShaderMaterial).set_shader_parameter("key_dir", (suns[0] as Node3D).global_transform.basis.z.normalized())
 
 
 func _ease(cur: float, to: float, sharpness: float, delta: float) -> float:

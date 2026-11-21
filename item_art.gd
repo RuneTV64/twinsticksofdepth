@@ -29,7 +29,8 @@ const INK := {
 	"blue": Color("4f76a8"), "water": Color("86b4d2"), "glass": Color("b4d0cc"), "green": Color("5f8a56"),
 	"amber": Color("c98a3a"), "yellow": Color("d6b648"), "tin": Color("b2b6b2"), "card": Color("b89a6a"),
 	"stone": Color("8a867e"), "leather": Color("6a4a34"), "olive": Color("6c7848"), "canvas": Color("7c7658"),
-	"blood": Color("7c1c1c"), "plastic": Color("c6beb0"), "dark": Color("3a3c44"), "crimson": Color("7e2a2c"),
+	"blood": Color("7c1c1c"), "wine": Color("6e2a36"), "mustard": Color("b8893a"), "slate": Color("4f6a8a"),
+	"lace": Color("efeadc"), "denim": Color("4a6a9a"), "plastic": Color("c6beb0"), "dark": Color("3a3c44"), "crimson": Color("7e2a2c"),
 }
 
 const ART := {
@@ -65,6 +66,20 @@ const ART := {
 	"helmet": [["E", 16, 18, 12, 11, "olive"], ["X", 0, 21, 31, 31], ["R", 3, 20, 28, 23, "olive"], ["F", 9, 24, 10, 26, "leather"], ["F", 21, 24, 22, 26, "leather"]],
 	"backpack": [["R", 10, 12, 37, 43, "canvas"], ["E", 24, 13, 13, 6, "canvas"], ["R", 12, 8, 14, 13, "leather"], ["R", 33, 8, 35, 13, "leather"], ["R", 15, 28, 32, 40, "olive"],
 		["F", 15, 28, 32, 29, "dark"], ["F", 11, 21, 36, 21, "dark"], ["F", 23, 22, 24, 25, "steel"], ["R", 20, 4, 27, 6, "leather"]],
+	# ---- clothing
+	"t_shirt": [["P", [3, 6, 10, 3, 22, 3, 29, 6, 31, 13, 25, 13, 25, 29, 7, 29, 7, 13, 1, 13], "white"], ["F", 12, 3, 20, 5, "rag"]],
+	"jeans": [["P", [6, 2, 26, 2, 28, 45, 19, 45, 16, 14, 13, 45, 4, 45], "denim"], ["F", 6, 2, 26, 4, "leather"], ["F", 16, 5, 16, 13, "dark"], ["F", 8, 6, 12, 9, "water"], ["F", 20, 6, 24, 9, "water"]],
+	"belt": [["R", 6, 2, 10, 45, "leather"], ["R", 4, 4, 12, 10, "yellow"], ["X", 6, 6, 10, 8], ["F", 8, 14, 8, 15, "dark"], ["F", 8, 20, 8, 21, "dark"]],
+	"socks": [["P", [3, 2, 8, 2, 8, 9, 13, 11, 13, 14, 3, 14], "white"], ["F", 3, 2, 8, 4, "red"]],
+	"sneakers": [["P", [2, 12, 9, 6, 14, 8, 28, 16, 29, 22, 2, 22], "white"], ["F", 2, 20, 29, 22, "dark"], ["F", 9, 9, 13, 10, "dark"], ["F", 11, 12, 15, 13, "dark"], ["F", 20, 16, 24, 18, "red"], ["P", [2, 27, 9, 24, 14, 25, 28, 28, 29, 31, 2, 31], "white"]],
+	"curtains": [["R", 3, 2, 22, 45, "wine"], ["R", 25, 2, 44, 45, "wine"], ["F", 3, 2, 44, 4, "yellow"], ["F", 8, 6, 8, 44, "crimson"], ["F", 15, 6, 15, 44, "crimson"], ["F", 31, 6, 31, 44, "crimson"], ["F", 38, 6, 38, 44, "crimson"]],
+	"net_curtain": [["R", 3, 3, 28, 28, "lace"], ["F", 3, 3, 28, 4, "steel"], ["F", 7, 7, 7, 27, "white"], ["F", 13, 7, 13, 27, "white"], ["F", 19, 7, 19, 27, "white"], ["F", 25, 7, 25, 27, "white"]],
+	"tablecloth": [["R", 3, 3, 28, 28, "white"], ["F", 3, 6, 28, 8, "red"], ["F", 3, 14, 28, 16, "red"], ["F", 3, 22, 28, 24, "red"], ["F", 6, 3, 8, 28, "red"], ["F", 14, 3, 16, 28, "red"], ["F", 22, 3, 24, 28, "red"]],
+	"throw_blanket": [["R", 3, 4, 44, 27, "mustard"], ["F", 3, 9, 44, 11, "olive"], ["F", 3, 17, 44, 19, "olive"], ["F", 3, 27, 44, 29, "mustard"], ["F", 5, 29, 5, 31, "mustard"], ["F", 15, 29, 15, 31, "mustard"], ["F", 25, 29, 25, 31, "mustard"], ["F", 35, 29, 35, 31, "mustard"]],
+	"cushion_cover": [["R", 4, 4, 27, 27, "slate"], ["F", 4, 4, 27, 5, "dark"], ["F", 9, 10, 10, 11, "card"], ["F", 19, 10, 20, 11, "card"], ["F", 14, 17, 15, 18, "card"], ["F", 9, 22, 10, 23, "card"], ["F", 19, 22, 20, 23, "card"]],
+	"table_runner": [["R", 4, 2, 11, 45, "lace"], ["F", 6, 6, 9, 7, "white"], ["F", 6, 14, 9, 15, "white"], ["F", 6, 22, 9, 23, "white"], ["F", 6, 30, 9, 31, "white"], ["F", 6, 38, 9, 39, "white"]],
+	"curtain_tieback": [["L", 8, 2, 8, 20, 2, "yellow"], ["E", 8, 4, 4, 3, "amber"], ["P", [5, 20, 11, 20, 13, 30, 3, 30], "amber"]],
+	"cloth_strip": [["L", 3, 12, 13, 4, 2, "rag"], ["F", 4, 11, 5, 11, "dark"]],
 	# ---- food
 	"canned_food": [["R", 4, 3, 11, 13, "tin"], ["F", 4, 6, 11, 10, "red"], ["F", 6, 7, 9, 9, "amber"]],
 	# ---- thrown

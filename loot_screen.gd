@@ -27,10 +27,18 @@ const C_WARN := Color(0.91, 0.51, 0.42)
 const C_GOOD := Color(0.56, 0.82, 0.56)
 const C_MARK := Color(1.0, 0.75, 0.3)
 const BAG_CELL := 40.0
-const SLOT_ROWS := [
-	["Hands", ["hand_l", "hand_r"]], ["Belt", ["belt1", "belt2"]],
-	["Pockets", ["pocket1", "pocket2"]], ["", ["pocket3", "pocket4"]],
+## What you wear, as a small grid laid out head to foot (Clothes.PLACES), four to a row.
+const WORN_GRID := [
+	["head", "eyes", "face", "neck"],
+	["cloak", "outer", "shirt", "undershirt"],
+	["wrist_l", "hands", "fingers", "wrist_r"],
+	["strap", "waist", "legs", "underwear"],
+	["back", "socks", "feet", ""],
 ]
+const WORN_TAG := {"head": "Head", "eyes": "Eyes", "face": "Face", "neck": "Neck", "cloak": "Cloak", "outer": "Coat",
+	"shirt": "Shirt", "undershirt": "Under", "wrist_l": "L wrist", "hands": "Hands", "fingers": "Rings", "wrist_r": "R wrist",
+	"strap": "Strap", "waist": "Belt", "legs": "Legs", "underwear": "Under", "back": "Back", "socks": "Socks", "feet": "Feet"}
+const WORN_BOX := 46.0
 
 var player: Player
 
@@ -110,27 +118,29 @@ func _right() -> Rect2:
 	return Rect2(p.position + Vector2(p.size.x * 0.5 + 3.0, 0.0), Vector2(p.size.x * 0.5 - 3.0, p.size.y))
 
 
-## Your slots and what you wear, as boxes: [{"where", "key", "rect", "name", "limit"}].
+## Your slots and what you wear, as boxes: [{"where", "key", "rect", "name", "limit", "info"}]. The slots are the
+## ones your clothes give you now (Inventory.slot_list()), in a column; what you wear is a grid head to foot.
 func _slot_boxes() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var l := _left()
-	var x0 := l.position.x + 104.0
-	var y := l.position.y + 78.0
-	for row: Array in SLOT_ROWS:
-		var x := x0
-		for key: String in row[1]:
-			var limit := 0.0
-			for sl in Inventory.SLOTS:
-				if sl[0] == key:
-					limit = float(sl[2])
-			out.append({"where": "slot", "key": key, "rect": Rect2(x, y, 168.0, 36.0), "name": str(row[0]), "limit": limit})
-			x += 174.0
-		y += 42.0
-	y += 6.0
-	var x2 := x0
-	for wr in Inventory.WORN:
-		out.append({"where": "worn", "key": str(wr[0]), "rect": Rect2(x2, y, 110.0, 36.0), "name": "Worn", "limit": 0.0})
-		x2 += 116.0
+	var y0 := l.position.y + 80.0
+	for r in WORN_GRID.size():
+		for c in 4:
+			var key: String = WORN_GRID[r][c]
+			if key == "":
+				continue
+			var nm := ""
+			for wr in Inventory.WORN:
+				if wr[0] == key:
+					nm = wr[1]
+			out.append({"where": "worn", "key": key, "rect": Rect2(l.position.x + 24.0 + c * (WORN_BOX + 4.0), y0 + r * (WORN_BOX + 4.0), WORN_BOX, WORN_BOX),
+				"name": nm, "limit": 0.0})
+	var list := player.inv.slot_list()
+	var h := clampf((l.size.y - 110.0) / maxf(list.size(), 1.0) - 4.0, 22.0, 34.0)
+	for i in list.size():
+		var sl: Array = list[i]
+		out.append({"where": "slot", "key": str(sl[0]), "rect": Rect2(l.position.x + 230.0, y0 + i * (h + 4.0), 240.0, h),
+			"name": str(sl[1]), "limit": float(sl[2]), "info": sl})
 	return out
 
 
@@ -251,9 +261,8 @@ func _pick_up(h: Dictionary) -> void:
 				inv.slots.erase(h["key"])
 				_held = {"item": it, "from": "slot", "key": h["key"], "grab": Vector2(BAG_CELL, BAG_CELL) * 0.5}
 		"worn":
-			var on = inv.worn.get(h["key"])
-			if on != null:
-				inv.worn.erase(h["key"])
+			if inv.worn.has(h["key"]):
+				var on := inv.doff(h["key"])            # what is in its pockets goes with it
 				_held = {"item": on, "from": "worn", "key": h["key"], "grab": Vector2(BAG_CELL, BAG_CELL) * 0.5}
 				player._worn_changed()
 		"bag", "box":
@@ -284,18 +293,23 @@ func _release() -> void:
 		"slot":
 			var have = inv.slots.get(h["key"])
 			if have == null:
-				if Items.weight(item) <= float(h["limit"]):
+				if Inventory.fits(h["info"], item):
 					inv.slots[h["key"]] = item
 					done = true
-				else:
+				elif Items.weight(item) > float(h["limit"]):
 					_say("Too heavy for that: it takes up to %.1f kg." % float(h["limit"]))
+				else:
+					_say("That only takes something long.")
 			else:
 				done = _merge(have, item, float(h["limit"]))
 		"worn":
 			if str(Items.DEFS[id].get("wear", "")) == str(h["key"]) and not inv.worn.has(h["key"]):
-				inv.worn[h["key"]] = item
+				inv.don(item)
 				player._worn_changed()
 				done = true
+			elif str(Items.DEFS[id].get("wear", "")) != str(h["key"]):
+				var place := str(Items.DEFS[id].get("wear", ""))
+				_say("That isn't worn there." if place == "" else "That goes: %s." % _place_name(place).to_lower())
 		"bag", "box":
 			var box: bool = h["where"] == "box"
 			var st := _stash()
@@ -346,7 +360,7 @@ func _put_back() -> void:
 		"slot":
 			player.inv.slots[_held["key"]] = item
 		"worn":
-			player.inv.worn[_held["key"]] = item
+			player.inv.don(item)
 			player._worn_changed()
 		"bag":
 			var bag := _bag()
@@ -401,8 +415,8 @@ func _across(h: Dictionary) -> void:
 					bag["things"].append(bt)
 			else:
 				var ok := false
-				for sl in Inventory.SLOTS:
-					if not inv.slots.has(sl[0]) and Items.weight(bt["item"]) <= float(sl[2]):
+				for sl in inv.slot_list():
+					if not inv.slots.has(sl[0]) and Inventory.fits(sl, bt["item"]):
 						inv.slots[sl[0]] = bt["item"]
 						ok = true
 						break
@@ -522,8 +536,11 @@ func _draw() -> void:
 		col = C_MARK
 	else:
 		var it := _item_under(hover)
+		var where := (_place_name(hover["key"]) + ": ") if hover["where"] == "worn" else ""
 		if not it.is_empty():
-			line = "%s  (%.2f kg)   %s" % [Items.label(it), Items.weight(it), Items.about(it["id"])]
+			line = "%s%s  (%.2f kg)   %s" % [where, Items.label(it), Items.weight(it), Items.about(it["id"])]
+		elif hover["where"] == "worn":
+			line = where + "nothing. Drag something here to put it on."
 	_text(p.position + Vector2(24.0, p.size.y - 40.0), _fit(line, 15, p.size.x - 48.0), col, 15)
 	_text(p.position + Vector2(24.0, p.size.y - 14.0),
 		"Drag: move    Double-click: take / put back    Right-click: use    Shift+right-click: take apart    Drag up out of here: put on the ground    Shift: hurry (loud)    ALT: look up    Esc, I or walk away: stop",
@@ -539,6 +556,13 @@ func _draw() -> void:
 	draw_arc(_ptr, 8.0, 0.0, TAU, 20, hc, 2.0)
 	draw_line(_ptr - Vector2(13, 0), _ptr + Vector2(13, 0), hc, 1.5)
 	draw_line(_ptr - Vector2(0, 13), _ptr + Vector2(0, 13), hc, 1.5)
+
+
+func _place_name(place: String) -> String:
+	for wr in Inventory.WORN:
+		if wr[0] == place:
+			return wr[1]
+	return place
 
 
 func _item_under(h: Dictionary) -> Dictionary:
@@ -560,26 +584,34 @@ func _draw_you(hover: Dictionary) -> void:
 	var inv := player.inv
 	_text(l.position + Vector2(24, 36), "YOU", C_TEXT, 24)
 	_text(l.position + Vector2(92, 34), "%.1f kg carried.  Each slot takes one thing, up to a weight." % inv.weight(), C_DIM, 14)
-	var row_named := ""
+	_text(l.position + Vector2(24, 70), "Wearing", C_DIM, 15)
+	_text(l.position + Vector2(230, 70), "Carrying", C_DIM, 15)
 	for b in _slot_boxes():
 		var r: Rect2 = b["rect"]
-		if b["where"] == "slot" and str(b["name"]) != "" and str(b["name"]) != row_named and r.position.x < l.position.x + 110.0:
-			row_named = str(b["name"])
-			_text(Vector2(l.position.x + 24.0, r.position.y + 24.0), row_named, C_DIM, 15)
-		elif b["where"] == "worn" and r.position.x < l.position.x + 110.0:
-			_text(Vector2(l.position.x + 24.0, r.position.y + 24.0), "Wearing", C_DIM, 15)
 		var it = inv.slots.get(b["key"]) if b["where"] == "slot" else inv.worn.get(b["key"])
 		var over: bool = hover["where"] == b["where"] and hover.get("key", "") == b["key"]
-		draw_rect(r, Color(0.16, 0.16, 0.19) if it != null else Color(0.08, 0.08, 0.1))
-		draw_rect(r, C_MARK if over else C_LINE, false, 1.0)
+		# A worn place lights up while the hand holds something that goes there.
+		var goes: bool = not _held.is_empty() and b["where"] == "worn" and str(Items.DEFS[_held["item"]["id"]].get("wear", "")) == str(b["key"])
+		draw_rect(r, Color(0.16, 0.16, 0.19) if it != null else (Color(0.14, 0.13, 0.08) if goes else Color(0.08, 0.08, 0.1)))
+		draw_rect(r, C_MARK if over or goes else C_LINE, false, 1.0)
+		if b["where"] == "worn":
+			if it == null:
+				_text(r.position + Vector2(4, r.size.y * 0.5 + 4.0), _fit(str(WORN_TAG.get(b["key"], b["key"])), 11, r.size.x - 6.0), Color(C_DIM, 0.55), 11)
+			else:
+				var szw := Vector2(Items.size_of(it["id"]))
+				var kw := (r.size.x - 8.0) / maxf(szw.x, szw.y)
+				draw_texture_rect(ItemArt.icon(it["id"]), Rect2(r.position + (r.size - szw * kw) * 0.5, szw * kw), false)
+			continue
+		var side := r.size.y - 4.0
 		if it == null:
-			var hint: String = ("up to %.1f kg" % float(b["limit"])) if b["where"] == "slot" else str(b["key"])
-			_text(r.position + Vector2(10, 23), hint, Color(C_DIM, 0.6), 13)
+			_text(r.position + Vector2(8, r.size.y * 0.5 + 5.0), "%s  (%.1f kg)" % [str(b["name"]), float(b["limit"])], Color(C_DIM, 0.6), 12)
 		else:
 			var sz := Vector2(Items.size_of(it["id"]))
-			var k := 30.0 / maxf(sz.x, sz.y)
-			draw_texture_rect(ItemArt.icon(it["id"]), Rect2(r.position + Vector2(3.0 + (30.0 - sz.x * k) * 0.5, 3.0 + (30.0 - sz.y * k) * 0.5), sz * k), false)
-			_text(r.position + Vector2(38, 23), _fit(Items.label(it), 13, r.size.x - 44.0), C_TEXT, 13)
+			var k := side / maxf(sz.x, sz.y)
+			draw_texture_rect(ItemArt.icon(it["id"]), Rect2(r.position + Vector2(2.0 + (side - sz.x * k) * 0.5, 2.0 + (side - sz.y * k) * 0.5), sz * k), false)
+			var tag := _fit(str(b["name"]), 10, 78.0)
+			_text(r.position + Vector2(side + 8.0, r.size.y * 0.5 + 5.0), _fit(Items.label(it), 13, r.size.x - side - 92.0), C_TEXT, 13)
+			_text(Vector2(r.end.x - 4.0 - _font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x, r.position.y + r.size.y * 0.5 + 4.0), tag, Color(C_DIM, 0.7), 10)
 	# The bag.
 	var bag := _bag()
 	var o := _bag_origin()
