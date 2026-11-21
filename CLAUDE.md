@@ -765,12 +765,26 @@ account) and in the **Building Assets** artifact (`files/Fence/`). On the branch
     the weight. Raiders vaulting one are caught a quarter as often as a zombie (`Raider.spiked()`: hurt, a
     limp, a cry).
   - Cloud run: 14 zombies over a sound picket fence one at a time, 5 stuck; 4 pulled themselves off after
-    6 s on average and 1 was still hanging after half a minute. 30 zombies with their backs to the fence
-    knocked down backward: 9 on the points. The player vaulting 60 times, calm: caught 7 times in one run
-    and 3 in another. Dropped 3.4 m onto the fence: a deep leg wound, health 100 to 85, the section broke.
-  - Not built: an impaled one biting whoever comes close; a pose of its own (it uses the crawl pose, hung
-    at the fence's height) and blood on the points; the player or a raider actually stuck and having to
-    pull free; a dead body dropping when its fence goes; pushing or throwing a body onto spikes on purpose
+    6 s on average and 1 was still hanging after half a minute (another run: 3 stuck). 30 zombies with
+    their backs to the fence knocked down backward: 9 on the points in one run, 15 in another. The player
+    vaulting 60 times: caught 3, 7 and 9 times in three runs. Dropped 3.4 m onto the fence: a deep leg wound, health 100 to 85, the section broke.
+  - Its pose and animation (owner, 21 Nov 2026: "Remember that being impaled as a zombie doesn't mean you
+    are dead"; built the same day, not seen by the owner). `zombie_body.gd` `_pose_impaled()`, `_hang()`,
+    `_hung_w`; `Enemy.heave` (0 to 1 over the 0.9 s before each try to pull free). On its front it is
+    folded over the fence at the belly: legs hanging down the near side and scrabbling, chest pushed up on
+    the far side, head lifted and snapping at its prey, one arm clawing toward it and the other shoving at
+    the fence. On its back it is arched over the fence face up: head lifted, arms clawing the air, legs
+    kicking. The whole body writhes and see-saws on the points. As a try builds, both hands go to the
+    fence, the body heaves up and the legs drive; then it drops back. A fresh one thrashes fast, a rotted
+    one slowly and weakly, one in rigor in jerks. Killed there it hangs limp: head and arms down, legs
+    dangling. One that pulls free drags itself over and off (the last half of a climb) instead of
+    jumping to the ground. Its belly sits on the points (`perch` = the top less 0.12 m).
+    Sheet: `tools/preview/zombie_impaled.png`; motion: `tools/preview/zombie_impaled.gif` (made by
+    `tools/zombie_fall_preview.gd` SHEET=impaled, CLIP=n for the moving picture, and
+    `tools/impaled_gif.py`). Seen from the side on the software renderer; never at the game's camera
+    angle or on Forward+.
+  - Not built: an impaled one biting whoever comes close; blood on the points; the points showing through
+    it; the player or a raider actually stuck and having to pull free; a dead body dropping when its fence goes; pushing or throwing a body onto spikes on purpose
     with a move of its own; fences made for it (sharpened stakes, iron railings).
 - Not done: Forward+ unchecked (and the shadows the cut-out throws); posts are drawn, not modelled; fences
   only run along X or Z on level ground; a bullet stops at a board fence as at a house wall; a gate is a

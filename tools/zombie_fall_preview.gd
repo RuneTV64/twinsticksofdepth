@@ -8,7 +8,9 @@ extends SceneTree
 ##       --resolution 1500x260 -s res://zombie_anim_preview.gd
 ## One row per run (the software renderer only has room for the per-object shader values of about 20 shamblers);
 ## a ROW past the last one exits without writing. zombie_anim_sheet.py stacks the rows into a sheet.
-## Sheets: walk, approach, limbs, abilities, stages_crawl, falls.
+## Sheets: walk, approach, limbs, abilities, stages_crawl, falls, impaled (hung on a picket fence).
+## CLIP=<frames> (with SHEET=impaled) writes that many pictures, 1/15 s apart, to OUT with the frame number put
+## before ".png", for a moving picture (tools/impaled_gif.py puts them together).
 ## (A copy of ShamblerMale_Muscular/source/zombie_anim_preview.gd with the falls sheet added; that asset is
 ## approved, so its own harness was left as it is.)
 ## Test-only patches for the software renderer: it skips the linear->sRGB step and ignores instance uniforms, so the
@@ -22,6 +24,8 @@ var _shader: Shader
 var _frames := 0
 var _root: Node3D
 var _empty := false
+var _clip := 0                  # CLIP: how many pictures of a moving picture to write
+var _live: Array = []           # [enemy, driver, its time] for a moving picture
 
 
 func _init() -> void:
@@ -31,6 +35,7 @@ func _init() -> void:
 	code = code.replace("ALBEDO=pow(c,vec3(2.2));", "ALBEDO=c;").replace("instance uniform", "uniform")
 	_shader = Shader.new()
 	_shader.code = code
+	_clip = int(OS.get_environment("CLIP")) if OS.get_environment("CLIP") != "" else 0
 	_build.call_deferred(OS.get_environment("SHEET"), int(OS.get_environment("ROW")))
 
 
@@ -41,8 +46,23 @@ func _process(_d: float) -> bool:
 			quit()
 			return false
 		var img := root.get_viewport().get_texture().get_image()
-		img.save_png(OS.get_environment("OUT"))
-		quit()
+		if _clip <= 0:
+			img.save_png(OS.get_environment("OUT"))
+			quit()
+	elif _frames > 8 and _clip > 0:
+		# A moving picture: this frame shows the step taken last frame; save it, then step again.
+		var n := _frames - 9
+		root.get_viewport().get_texture().get_image().save_png(OS.get_environment("OUT").replace(".png", "_%03d.png" % n))
+		if n + 1 >= _clip:
+			quit()
+			return false
+		for l: Array in _live:
+			var e: Enemy = l[0]
+			for i in 4:
+				(l[1] as Callable).call(e, l[2])
+				e._visual.rotation.y = atan2(-e.facing.x, -e.facing.z)
+				e.body.animate(e, DT)
+				l[2] += DT
 	return false
 
 
@@ -90,6 +110,18 @@ func _rows(sheet: String) -> Array:
 			rows.append(["On its back, rolls over to crawl", INTACT, 0.9, [0.7, 1.2, 1.45, 1.7, 2.0, 2.8], _fall_back_roll])
 			rows.append(["Knocked onto its front, gets up", INTACT, 0.9, [0.08, 0.16, 0.35, 2.1, 2.35, 2.7], _knockdown])
 			rows.append(["Killed from the front: on its back", INTACT, 0.9, [0.05, 0.2, 0.45, 0.7, 1.0, 1.6], _die_back])
+		"impaled":
+			var it := [0.7, 1.3, 1.9, 2.6, 2.95, 3.4]
+			rows.append(["Impaled on its front: thrashing, then a heave to pull free", INTACT, 0.95, it, _impaled.bind(false, -1.0, 2.1)])
+			rows.append(["The same, long rotted: slower and weaker", INTACT, 0.3, it, _impaled.bind(false, -1.0, 2.1)])
+			rows.append(["In rigor: the same in jerks", INTACT, 0.78, it, _impaled.bind(false, -1.0, 2.1)])
+			rows.append(["Knocked backward onto the points", INTACT, 0.95, it, _impaled.bind(true, -1.0, 2.1)])
+			rows.append(["Killed on the fence: it hangs limp", INTACT, 0.95, [0.7, 1.0, 1.25, 1.6, 2.2, 3.4], _impaled.bind(false, 1.1, 9.0)])
+			rows.append(["Killed on its back", INTACT, 0.95, [0.7, 1.0, 1.25, 1.6, 2.2, 3.4], _impaled.bind(true, 1.1, 9.0)])
+			var p := INTACT.duplicate()
+			p["ArmL"] = "Destroyed"
+			p["LegR"] = "Destroyed"
+			rows.append(["With an arm and a leg gone", p, 0.56, it, _impaled.bind(false, -1.0, 2.1)])
 		"stages_crawl":
 			var p := INTACT.duplicate()
 			p["LegR"] = "Destroyed"
@@ -111,6 +143,9 @@ func _build(sheet: String, only: int) -> void:
 		_empty = true
 		return
 	var rows := [all[only]]
+	if _clip > 0:
+		rows = [(all[only] as Array).duplicate()]
+		rows[0][3] = [0.6]              # a moving picture: one zombie, stepped on from here
 	var cw := 1.7
 	var rh := 2.25
 	var floor_mat := StandardMaterial3D.new()
@@ -135,6 +170,7 @@ func _build(sheet: String, only: int) -> void:
 		lab.modulate = Color(0.91, 0.85, 0.78)
 		lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		lab.position = Vector3(-0.75, y + 2.05, 0.5)
+		lab.visible = _clip <= 0
 		_root.add_child(lab)
 		for c in times.size():
 			var e := Enemy.new()
@@ -155,8 +191,13 @@ func _build(sheet: String, only: int) -> void:
 			e.body._rng.seed = 7
 			e.crawling = e.body.legs() < 2
 			_material(e)
+			if sheet == "impaled":
+				_fence(Vector3(c * cw, y, 0.0))
 			var t := 0.0
 			var tt: float = times[c]
+			if _clip > 0:
+				tt = 0.6
+				_live.append([e, row[4], tt])
 			while t < tt - 0.0001:
 				(row[4] as Callable).call(e, t)
 				e._visual.rotation.y = atan2(-e.facing.x, -e.facing.z)   # as Enemy does each tick
@@ -168,13 +209,14 @@ func _build(sheet: String, only: int) -> void:
 			tl.pixel_size = 0.004
 			tl.modulate = Color(0.66, 0.58, 0.56)
 			tl.position = Vector3(c * cw, y - 0.12, 0.6)
+			tl.visible = _clip <= 0
 			_root.add_child(tl)
 	var cam := Camera3D.new()
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
 	var n := rows.size()
 	var cols: int = (rows[0][3] as Array).size()
 	cam.keep_aspect = Camera3D.KEEP_WIDTH
-	cam.size = cols * cw + 0.2
+	cam.size = cols * cw + (1.1 if _clip > 0 else 0.2)
 	cam.position = Vector3((cols - 1) * cw * 0.5, 0.97, 8.0)
 	_root.add_child(cam)
 	cam.current = true
@@ -333,6 +375,55 @@ func _die_back(e: Enemy, t: float) -> void:
 		e.on_back = true
 		e.dead = true
 		e.velocity = Vector3.ZERO
+
+
+## Hung on a fence: on its front (or, `back`, knocked backward onto it); `die_at` kills it there (< 0: never);
+## from `heave_at` a try to pull itself off builds for 0.9 s and lets go, again every 3.2 s.
+func _impaled(e: Enemy, t: float, back: bool, die_at: float, heave_at: float) -> void:
+	e.facing = FACE.normalized()
+	e.chasing = true
+	e.velocity = Vector3.ZERO
+	e.target = e.global_position + e.facing * 2.5 + Vector3.UP * 1.0
+	if back and t < DT:
+		_state(e, "walk", t)        # on its feet when the blow lands, so it goes over backward
+		return
+	e.crawling = true
+	e.on_back = back
+	e.hung = true
+	e.perch = 0.88
+	e._visual.position.y = e.perch
+	_state(e, "impaled", t)
+	var ht := fposmod(t - heave_at, 3.2) if t >= heave_at else -1.0
+	e.heave = clampf(ht / 0.9, 0.0, 1.0) if ht >= 0.0 and ht < 0.9 else 0.0
+	if die_at >= 0.0 and t >= die_at:
+		e.dead = true
+		e.crawling = false
+		e.heave = 0.0
+
+
+## A bit of picket fence, seen end on, for the impaled sheet.
+func _fence(at: Vector3) -> void:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.86, 0.85, 0.8)
+	var across := Vector3(-FACE.z, 0.0, FACE.x).normalized()
+	for i in range(-1, 2):
+		var pk := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.04, 1.0, 0.11)
+		pk.mesh = bm
+		pk.material_override = m
+		pk.position = at + across * (i * 0.19) + Vector3(0.0, 0.5, 0.0)
+		pk.rotation.y = atan2(-FACE.z, FACE.x)       # its thin side along the way the zombie faces
+		_root.add_child(pk)
+	for h: float in [0.3, 0.75]:
+		var rl := MeshInstance3D.new()
+		var rb := BoxMesh.new()
+		rb.size = Vector3(0.05, 0.09, 0.56)
+		rl.mesh = rb
+		rl.material_override = m
+		rl.position = at + Vector3(0.0, h, 0.0) - FACE.normalized() * 0.04
+		rl.rotation.y = atan2(-FACE.z, FACE.x)
+		_root.add_child(rl)
 
 
 func _hit_die(e: Enemy, t: float) -> void:

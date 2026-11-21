@@ -103,6 +103,7 @@ var _crawl_phase := 0.0
 var _move_w := 0.0
 var _prone_w := 0.0
 var _back_w := 0.0              # lying on its back (Enemy.on_back): it falls straight over backward, face up
+var _hung_w := 0.0              # impaled on a fence (Enemy.hung): draped over it at the belly, or on its back
 var _reach_w := [0.0, 0.0]
 var _grip_w := 0.0
 var _bite_w := 0.0
@@ -276,7 +277,7 @@ func _pose_interval(e: Enemy) -> float:
 	if e.player == null:
 		return 0.0
 	var full := 1.0 / 60.0 - 0.0005   # (a hair under, so a 60 FPS frame never skips one)
-	if e.state != "walk" and e.state != "down" and e.state != "heap" and not e.dead:
+	if e.state != "walk" and e.state != "down" and e.state != "heap" and e.state != "impaled" and not e.dead:
 		return full                     # it's got its hands on you, or its teeth in: always smooth
 	var now := Time.get_ticks_msec()
 	if now - _ranked_at > 250:
@@ -510,7 +511,7 @@ func animate(e: Enemy, delta: float) -> void:
 		vel = Vector3.ZERO
 	var speed := vel.length()
 	# On the ground: a crawler, or one scrambling on all fours over a heap of bodies.
-	var prone := (e.crawling or e.perch > 0.3) and not e.dead
+	var prone := ((e.crawling or e.perch > 0.3) and not e.dead) or e.hung     # (one that dies on a fence stays lying over it)
 
 	_move_w = _ease(_move_w, smoothstep(0.05, 0.6, speed), 8.0, delta)
 	_prone_w = _ease(_prone_w, 1.0 if prone else 0.0, 7.0 if prone else 3.0, delta)
@@ -520,6 +521,9 @@ func animate(e: Enemy, delta: float) -> void:
 	elif not e.on_back and (_prone_w < 0.05 or e.state == "walk" and prone):
 		_back_w = 0.0
 	_dead_w = _ease(_dead_w, 1.0 if e.dead else 0.0, 6.0, delta)
+	_hung_w = _ease(_hung_w, 1.0 if e.hung else 0.0, 10.0 if e.hung else 5.0, delta)
+	if not e.hung and _hung_w < 0.02:
+		_hung_w = 0.0
 	if not e.dead and _dead_w < 0.02:
 		_dead_w = 0.0
 	var reaching := e.state == "reach" or e.state == "hold" or e.state == "bite"
@@ -589,6 +593,9 @@ func animate(e: Enemy, delta: float) -> void:
 			var reach_down := smoothstep(0.3, 1.0, v + 0.5 * u)     # hands go out to break the fall
 			_tq[_arm[k][1]] = _tq[_arm[k][1]].slerp(_rx(-1.1) * _rz(ks * 0.25), reach_down * (1.0 - _dead_w))
 		_tq[_chest] = _tq[_chest].slerp(_rx(0.35), kneel)
+	# ---- impaled: hung over a fence, alive and fighting it (or dead and limp)
+	if _hung_w > 0.001:
+		_pose_impaled(e)
 	# ---- rigor: the pose only moves on in jerks
 	_hold_t -= delta
 	var kk := 1.0 - exp(-pose_sharpness * delta)
@@ -610,7 +617,7 @@ func animate(e: Enemy, delta: float) -> void:
 		_kick_springs(e, delta, vel)
 	for i in _n:
 		if springy and _sf[i] > 0.0:
-			_cq[i] = _spring(i, _hold_q[i], delta, _prone_w)
+			_cq[i] = _spring(i, _hold_q[i], delta, _prone_w * (1.0 - 0.75 * _hung_w))     # (hung, the arms are free to swing)
 		else:
 			_cq[i] = _cq[i].slerp(_hold_q[i], kk)
 		_skel.set_bone_pose_rotation(i, _cq[i])
@@ -623,6 +630,8 @@ func animate(e: Enemy, delta: float) -> void:
 		var bf := smoothstep(0.0, 1.0, fall)
 		basis = Basis(Vector3.UP, PI) * Basis(Vector3.RIGHT, -PI * 0.5 * bf) * Basis(Vector3.UP, PI * smoothstep(0.0, 1.0, e.roll_u))
 		position = Vector3.ZERO.lerp(Vector3(0.0, CRAWL_HEIGHT, -CRAWL_FORWARD), bf)
+		if _hung_w > 0.001:
+			_hang(e)
 		return
 	var pitch := PI * 0.5 * smoothstep(0.0, 1.0, v)
 	rotation = Vector3(pitch, PI, 0.0)
@@ -641,6 +650,106 @@ func animate(e: Enemy, delta: float) -> void:
 		knee.x = 0.0
 		pos += flip * knee - flip * Basis(Vector3.RIGHT, pitch) * knee
 	position = pos.lerp(Vector3(0.0, CRAWL_HEIGHT, CRAWL_FORWARD), smoothstep(0.55, 1.0, v))
+	if _hung_w > 0.001:
+		_hang(e)
+
+
+# ---------------------------------------------------------------------- impaled
+## Hung on a fence's points (Enemy.hung, state "impaled"). Being impaled doesn't kill a zombie (owner, 21 Nov
+## 2026): it is alive and fighting to get at whoever it was after.
+##
+## On its front it is folded over the fence at the belly: the legs hang down the near side and scrabble at
+## the ground, the chest hangs down the far side and keeps pushing itself up, the head is lifted and snaps
+## at its prey, one arm claws toward it while the other shoves at the fence. On its back it is arched over
+## the fence face up: head lifted to look, arms clawing the air, legs kicking. Either way the whole body
+## writhes from side to side and see-saws on the points.
+##
+## Every few seconds it tries to pull itself off (Enemy.heave, 0 to 1 as the try builds): both hands go to
+## the fence, the body heaves up off the points and the legs drive hard; then it drops back.
+##
+## How hard it fights goes with its state: a fresh one thrashes fast, a rotted one slowly and weakly, one in
+## rigor in jerks (the rigor hold below sees to that). Dead on the fence it hangs limp: head and arms down,
+## legs dangling, swinging a little on the springs.
+func _pose_impaled(e: Enemy) -> void:
+	var w := _hung_w
+	var live := 1.0 - _dead_w
+	var vig := live * (1.0 - 0.5 * drag) * (1.0 - 0.3 * stiff)        # how hard it can thrash
+	var hv: float = clampf(e.heave, 0.0, 1.0) * live
+	hv = hv * hv * (3.0 - 2.0 * hv)
+	var t := _t * lerpf(4.4, 2.3, drag) + _noise_o * 7.0
+	var writhe := sin(t * 0.63) * vig
+	var snap := pow(maxf(0.0, sin(_t * 2.1 + _noise_o * 5.0)), 8.0) * vig * (1.0 - hv)      # the head snapping at its prey
+	var back := _back_w > 0.5
+	if back:
+		# Arched over the fence, face up.
+		_to(_hips, _rz(0.14 * writhe) * _ry(0.1 * sin(t * 0.9) * vig), w)
+		_to(_chest, _rx(lerpf(-0.6, -0.32, live) + 0.42 * hv + 0.08 * vig * sin(t * 1.3)) * _rz(-0.22 * writhe) * _ry(0.16 * vig * sin(t * 0.8 + 1.0)), w)
+		_to(_neck, _rx(lerpf(-0.55, 0.5 + 0.25 * hv - 0.3 * snap, live)) * _rz(lerpf(0.3, _tilt + 0.25 * _noise(0.5), live)), w)
+		_to(_head, _rx(lerpf(-0.3, 0.3 - 0.35 * snap, live)) * _ry(0.35 * vig * sin(t * 0.47 + 2.0)), w)
+	else:
+		# Folded over the fence at the belly.
+		_to(_hips, _rz(0.14 * writhe) * _ry(0.1 * sin(t * 0.9) * vig), w)
+		_to(_chest, _rx(lerpf(0.8, 0.45, live) - 0.55 * hv - 0.1 * vig * sin(t * 1.3)) * _rz(-0.22 * writhe) * _ry(0.16 * vig * sin(t * 0.8 + 1.0)), w)
+		_to(_neck, _rx(lerpf(0.45, -0.8 + 0.3 * snap + 0.15 * hv, live)) * _rz(lerpf(0.25, _tilt + 0.25 * _noise(0.5), live)), w)
+		_to(_head, _rx(lerpf(0.25, -0.45 + 0.4 * snap, live)) * _ry(0.35 * vig * sin(t * 0.47 + 2.0)), w)
+	_hips_off *= 1.0 - w
+	# Legs: hanging, and kicking (driving hard as it heaves).
+	for k in 2:
+		var sgn := 1.0 if k == 0 else -1.0
+		var ph := t * 1.9 + k * PI
+		var kick := sin(ph) * vig * (0.3 + 0.45 * hv)
+		var bend := maxf(0.0, sin(ph + 0.9)) * vig * (0.45 + 0.4 * hv)
+		if back:
+			_to(_leg[k][0], _rx(lerpf(0.5, 0.32 + kick, live)) * _rz(sgn * (0.14 + 0.1 * vig * sin(t * 0.7 + k))), w)
+			_to(_leg[k][1], _rx(lerpf(1.05, 0.85 + bend, live)), w)
+			_to(_leg[k][2], _rx(0.35), w)
+		else:
+			_to(_leg[k][0], _rx(lerpf(-1.28, -1.12 + kick, live)) * _rz(sgn * (0.1 + 0.1 * vig * sin(t * 0.7 + k))), w)
+			_to(_leg[k][1], _rx(lerpf(0.3, 0.55 + bend, live)), w)
+			_to(_leg[k][2], _rx(0.55), w)
+	# Arms. (Targets are in the model's own space: up its body is +Y, out of its front is +Z.)
+	var cg := _global(_chest)
+	var hy := _global(_hips).origin.y
+	for k in 2:
+		var sgn := 1.0 if k == 0 else -1.0
+		var claw := 0.5 + 0.5 * sin(t * 1.4 + k * PI)
+		var aim: Vector3
+		var pole := Vector3(sgn * 0.9, 0.0, -0.6)
+		if back:
+			var limp := Vector3(sgn * 0.5, cg.origin.y + 0.28, cg.origin.z - 0.5)                   # hanging down past its head
+			var air := Vector3(sgn * 0.28 + 0.14 * sin(t * 1.1 + k), cg.origin.y + 0.12 + 0.22 * sin(t * 0.9 + k * 2.0), cg.origin.z + 0.5 + 0.14 * claw)
+			var push := Vector3(sgn * 0.36, hy + 0.12, -0.1)                                        # on the fence, beside its hips
+			aim = limp.lerp(air.lerp(push, hv), live)
+			pole = Vector3(sgn * 0.9, 0.0, 0.3)
+		else:
+			var limp := Vector3(sgn * 0.22, cg.origin.y + 0.14, cg.origin.z + 0.62)                 # hanging straight down
+			var reach := Vector3(sgn * 0.2 + 0.1 * sin(t * 1.1 + k), cg.origin.y + 0.42 + 0.3 * claw, cg.origin.z + 0.32 - 0.26 * claw)
+			var push := Vector3(sgn * 0.3, hy + 0.14, 0.2)                                          # on the fence, beside its belly
+			# One arm claws at its prey; the other is on the fence more often than not; both shove as it heaves.
+			aim = limp.lerp(reach.lerp(push, maxf(hv, 0.0 if k == _lead else 0.65)), live)
+		var pose := _solve_arm(k, aim, pole, _rx(-0.6 * live))
+		for j in 5:
+			_to(_arm[k][j + 1], pose[j], w)
+		_reach_w[k] = maxf(_reach_w[k], w * live * (1.0 - hv))
+		_pose_fingers(k)
+
+
+func _to(i: int, q: Quaternion, w: float) -> void:
+	_tq[i] = _tq[i].slerp(q, w)
+
+
+## Where a hung body sits: its belly (or the small of its back) on the fence, see-sawing on the points.
+func _hang(e: Enemy) -> void:
+	var live := 1.0 - _dead_w
+	var vig := live * (1.0 - 0.5 * drag) * (1.0 - 0.3 * stiff)
+	var t := _t * lerpf(4.4, 2.3, drag) + _noise_o * 7.0
+	var hv: float = clampf(e.heave, 0.0, 1.0) * live
+	var rock := (0.07 * sin(t * 0.63 + 1.0) * vig + 0.12 * hv) * (-1.0 if _back_w > 0.5 else 1.0)
+	var b := basis * Basis(Vector3.RIGHT, -rock * _hung_w)
+	var on := Vector3(0.0, _global(_hips, _cq).origin.y + 0.1, 0.0)        # the point of its body that is on the fence
+	var lift := Vector3(0.0, CRAWL_HEIGHT + 0.05 * hv, 0.0)                # (a heave lifts it a little off the points)
+	basis = b
+	position = position.lerp(lift - b * on, _hung_w)
 
 
 ## The Enemy has finished rolling from its back onto its front (and turned its facing round to match): from here

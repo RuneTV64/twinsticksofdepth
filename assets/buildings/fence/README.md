@@ -31,9 +31,11 @@ seen, and 31 of 40 level shots reached it; across a board fence it was not seen 
 A picket fence has points, and bodies can be impaled on them (the owner's rule: anything with spikes). The kit
 gives each kind a `spikes` chance (picket 0.3, the others none); the game does the rest (`enemy.gd`):
 
-- A zombie flopping over the top may stick there, and so may one knocked backward onto it. It hangs on the
-  fence, hurt and thrashing, until it pulls itself off, the fence gives way under it, or someone ends it. A
-  body already on the points covers them for the next one over.
+- A zombie flopping over the top may stick there, and so may one knocked backward onto it. Being impaled
+  doesn't kill it: it hangs on the fence alive, writhing, clawing and kicking, and every few seconds heaves
+  to pull itself off, until it does, the fence gives way under it, or someone ends it. A body already on
+  the points covers them for the next one over. (The pose is the game's `zombie_body.gd`; pictures in the
+  repository: `tools/preview/zombie_impaled.png` and `.gif`.)
 - You can catch a leg vaulting one, and coming down on one from a height is a deep wound. Raiders are caught
   too.
 - Cloud run (`tools/impale_test.gd`): of 14 zombies sent over one at a time, 5 stuck; of 30 knocked backward
@@ -104,6 +106,6 @@ and `Door.noun` (`door.gd`).
 - A worn fence is worn all over, not where it was hit. A broken section leaves a clean edge.
 - Raiders don't know a rail fence gives no cover (they just never pick it). Nothing is built to mend or put
   up a fence in play.
-- An impaled zombie has no pose of its own and leaves no blood on the points; nothing made for impaling
-  (sharpened stakes, iron railings) exists yet.
+- An impaled zombie leaves no blood on the points, and the points don't show through it; nothing made for
+  impaling (sharpened stakes, iron railings) exists yet.
 - One style only: no chain link, iron railings, walls or hedges yet.

@@ -180,6 +180,7 @@ var _climb_h0 := 0.0
 ## Everyone hanging on spikes now, alive or dead: a body on the points covers them for the next one over.
 static var impaled: Array[Enemy] = []
 var hung := false                # it is on the spikes (it stays there when it dies, until the corpse goes)
+var heave := 0.0                 # 0..1 as a try to pull itself off the spikes builds (zombie_body.gd poses it)
 var _spiked: Breakable           # what it is climbing over, or hanging on
 var _spike_rolled := false
 var _struggle_t := 0.0
@@ -1174,7 +1175,7 @@ func _impale(b: Breakable, drop_to: Vector3, back: bool) -> void:
 	_set_state("impaled")
 	on_back = back
 	hung = true
-	perch = maxf(b.top - global_position.y - 0.3, 0.2)
+	perch = maxf(b.top - global_position.y - 0.12, 0.2)      # its belly on the points, and the points in it
 	velocity = Vector3.ZERO
 	_knock = Vector3.ZERO
 	_press_t = 0.0
@@ -1197,6 +1198,7 @@ func _impaled_step(delta: float) -> void:
 			_off_spikes(_impale_at)
 			return
 	_struggle_t -= delta
+	heave = clampf(1.0 - _struggle_t / 0.9, 0.0, 1.0)
 	if _struggle_t > 0.0:
 		return
 	_struggle_t = randf_range(impale_struggle.x, impale_struggle.y)
@@ -1211,14 +1213,25 @@ func _impaled_step(delta: float) -> void:
 ## Off the points and onto the ground, in a heap.
 func _off_spikes(to: Vector3) -> void:
 	hung = false
+	heave = 0.0
 	impaled.erase(self)
 	_spiked = null
-	global_position = Vector3(to.x, _impale_at.y, to.z)
-	perch = 0.0
 	if dead:
 		return
-	_set_state("down")
-	_down_t = randf_range(0.8, 2.5)
+	if _xz2(to - _impale_at) < 0.01:
+		# The fence went from under it: it drops where it hung.
+		_set_state("down")
+		_down_t = randf_range(0.8, 2.5)
+		return
+	# It drags itself over and off: the last half of a climb, from where it hung, landing in a heap.
+	_climb_from = _impale_at - (to - _impale_at) * 0.64
+	_climb_to = to
+	_climb_top = perch
+	_climb_h0 = 0.0
+	_climb_len = 1.0
+	_spike_rolled = true
+	_set_state("climb")
+	state_t = 0.5
 
 
 ## Each limb it still has comes off with `chance`, up to `most` of them: torn away in the press.
