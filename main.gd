@@ -546,6 +546,8 @@ func _build_level() -> void:
 	left.put("couch", Vector3(31.5, 0, -28.6), "N")
 	left.put("table", Vector3(34.4, 0, -32.4), "S")
 	left.put("dresser", Vector3(31.5, 0, -33.6), "S")
+	left.put("coffee_table", Vector3(31.5, 0, -29.65), "N")
+	left.rug(Vector3(33.6, 0, -30.4), Vector2(1.6, 1.0), 1)
 	# Fences (assets/buildings/fence): one of each kind, each doing its own job.
 	# A picket front yard for the derelict house, as worn as the house: low cover, and a zombie has to climb it.
 	var picket_yard := FenceKit.new(self, "picket", 2)

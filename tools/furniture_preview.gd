@@ -6,7 +6,9 @@ extends SceneTree
 ##   MODE=pieces WEAR=0 OUT=/tmp/furniture.png xvfb-run -a -s "-screen 0 1100x800x24" godot \
 ##       --rendering-driver opengl3 --resolution 800x600 -s res://furniture_preview.gd
 ## MODE: pieces (every piece on a floor, fronts to the camera), backs (the same turned round), house (a kit
-##       house furnished, opened as the game opens it round someone indoors; FLOOR=1 for upstairs).
+##       house furnished, opened as the game opens it round someone indoors; FLOOR=1 for upstairs), living (the
+##       living room's pieces against a wall with two windows: curtains drawn at one and open at the other, the
+##       fire lit; FIRE=0 leaves it cold).
 ## WEAR 0..2, STAIN 0..2 (pine, oak, walnut), FABRIC 0..2 (brick red, olive, blue), WEATHER 0..5 (the damp
 ## only shows on worn furniture), DIST the camera's distance, LOOK "x,y,z".
 ## Test-only patch for the software renderer: it skips the linear->sRGB step, so the shaders output their
@@ -105,6 +107,30 @@ func _build() -> void:
 		world.add_child(cut)
 		look_at = Vector3(0, HouseKit.STOREY * (storeys - 1) + 0.6, 0.3)
 		dist = 14.5
+	elif mode == "living":
+		# The living room's pieces, fronts to the camera, against a wall with two windows.
+		var k := HouseKit.new(world, Vector3(-7.5, 0, -4.5), 0, 0)
+		k.floor(Rect2i(0, 0, 5, 3), 0)
+		k.wall(Vector2i(0, 0), Vector2i(5, 0), 0, "W.W..", Vector2(0, -1))
+		var f := FurnitureKit.new(world, wear, stain, fabric)
+		f.put("fireplace", Vector3(-4.5, 0, -4.2), "S")
+		f.put("display_cabinet", Vector3(-2.5, 0, -4.22), "S")
+		f.put("piano", Vector3(-0.4, 0, -4.17), "S")
+		f.put("tv_stand", Vector3(2.4, 0, -4.2), "S")
+		f.put("end_table", Vector3(4.0, 0, -4.2), "S")
+		f.put("coffee_table", Vector3(-1.4, 0, -1.6), "S")
+		f.rug(Vector3(2.4, 0, -1.8), Vector2(2.2, 1.4), 0)
+		var c1 := f.curtains(Vector3(-6.0, 1.4, -4.5), Vector3(-6.0, 1.4, -3.0))
+		var c2 := f.curtains(Vector3(0.0, 1.4, -4.5), Vector3(0.0, 1.4, -3.0))
+		if c2 != null:
+			c2.set_drawn(false)
+		if _env("FIRE", 1) == 1:
+			for fire in world.find_children("*", "Campfire", true, false):
+				(fire as Campfire).fuel = 300.0
+				(fire as Campfire).lit = true
+				(fire as Campfire).changed.emit(true)
+		look_at = Vector3(-0.8, 0.8, -3.0)
+		dist = 9.0
 	else:
 		# Every piece, on a floor of the house's boards.
 		var k := HouseKit.new(world, Vector3(-7.5, 0, -4.5), 0, 0)

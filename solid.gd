@@ -12,6 +12,7 @@ extends RefCounted
 ## Long walls are cut where they are hit (`_split`), so a blow knocks a hole a person wide, not the whole wall.
 
 const GLASS_LAYER := 16        # physics layer for things that stop bodies but not sight or shots (glass)
+const SIGHT_LAYER := 32        # ... for things that stop only sight: drawn curtains (window_curtains.gd)
 const SPLIT_OVER := 1.8        # anything longer than this is cut into sections where it is hit
 const MIN_PIECE := 0.6         # a remainder shorter than this goes with the section
 

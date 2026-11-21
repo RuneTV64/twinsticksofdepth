@@ -86,13 +86,13 @@ func _run() -> void:
 		worn.append("%.0f" % ceilf(b.hits_left(12.0, "blunt")))
 		b.host.queue_free()
 	_say("a wardrobe put down sound, damaged, about to give: %s zombie blows" % ", ".join(worn))
-	# ---- cover, in the furnished house: the couch in the living room (its back is to the south wall)
-	var couch_at := Vector2(19.5, -28.6)
-	var c := Cover.find_near(Vector2(19.5, -29.6), 1.6, Vector2(0, 1), 0.05)
+	# ---- cover, in the furnished house: the couch in the living room (its back to the west wall, facing the room)
+	var couch_at := Vector2(18.5, -29.4)
+	var c := Cover.find_near(Vector2(19.5, -29.4), 1.6, Vector2(-1, 0), 0.05)
 	if not c.is_empty():
 		var face: Cover.Face = c["face"]
 		_say("in front of the living room couch: a %s cover face %.2f m high; hunkered there, hidden from across it: %s" % [
-			"low" if face.low else "high", face.top, Cover.shields(face, Cover.spot(face, c["t"]), couch_at + Vector2(0, 0.3))])
+			"low" if face.low else "high", face.top, Cover.shields(face, Cover.spot(face, c["t"]), couch_at + Vector2(-0.4, 0))])
 	# The fridge stops sight; the table doesn't hide someone standing.
 	p.global_position = Vector3(24.46, 0.05, -29.0)       # in the kitchen, south of the fridge
 	await _wait(0.3)

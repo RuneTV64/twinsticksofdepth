@@ -21,6 +21,8 @@ RAMPS = [
     ("ENAMEL",  ["#fbfbf6", "#e4e6e2", "#b8bcbc", "#7c8088", "#42444e"], "white enamel: a fridge"),
     ("EMBER",   ["#fff0b8", "#ffc85e", "#f08a32", "#b04a24", "#5c2620"], "fire behind a stove's door"),
     ("BRASS",   ["#f6e2a0", "#d8b660", "#a6843e", "#6c5430", "#3a2e26"], "knobs and handles"),
+    ("BRICK",   ["#e0a088", "#b8664e", "#8c4636", "#5c2e2a", "#2e1a1c"], "a fireplace's brick"),
+    ("LACQUER", ["#8a7466", "#54423c", "#33282a", "#1e1820", "#0e0c14"], "a piano's black lacquer"),
 ]
 FIRST = 16
 

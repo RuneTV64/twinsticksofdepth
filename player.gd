@@ -1046,6 +1046,8 @@ func use_item(key: String) -> void:
 			purify_water()
 		"glass_shard", "bloody_glass":
 			lay_glass()
+		"rolled_rug":
+			lay_rug(key)
 		"cloth_scrap":
 			wash_cloth()
 		"plank", "nails", "hammer", "crowbar":
@@ -1311,6 +1313,20 @@ func _finish_apart() -> void:
 			_drop(rest)
 	show_status("You take the %s apart: %s." % [nm, ", ".join(got)], 2.2)
 	recompute_stats()
+
+
+## Lay the rug you carry down where you stand, its length the way you face (to the nearest quarter turn).
+func lay_rug(key: String) -> void:
+	var it = inv.slots.get(key)
+	if it == null or it["id"] != "rolled_rug":
+		return
+	var r: Array = it.get("rug", [2.0, 1.4, 0, 1])
+	var turns := posmod(roundi(atan2(-facing.z, facing.x) / (PI * 0.5)), 4)
+	inv.slots.erase(key)
+	Rug.lay(get_parent(), Vector3(global_position.x, global_position.y, global_position.z) + facing * (float(r[0]) * 0.5 - 0.3),
+		Vector2(float(r[0]), float(r[1])), turns, int(r[2]), int(r[3]))
+	recompute_stats()
+	show_status("You unroll the rug. Footsteps on it will be quieter.", 1.8)
 
 
 ## Lay the broken glass you carry on the ground where you stand: an alarm under boots, a trap for bare feet
@@ -2202,7 +2218,7 @@ func _update_sight(delta := 0.0) -> void:
 		sight_rays.resize(SIGHT_RAYS)
 	if _sight_query == null:
 		_sight_query = PhysicsRayQueryParameters3D.new()
-		_sight_query.collision_mask = 1
+		_sight_query.collision_mask = 1 | Solid.SIGHT_LAYER       # walls, and drawn curtains
 	var space := get_world_3d().direct_space_state
 	var eye := global_position + Vector3(0.0, _eye_h, 0.0)
 	_sight_query.from = eye
@@ -2240,9 +2256,10 @@ func can_see(pos: Vector3, radius := 0.4) -> bool:
 
 
 ## Does a straight line from your eyes (or from `from`) reach this point, with nothing solid in the way? Glass
-## doesn't count. `skip` are things to leave out (the sill you are leaning over).
-func line_clear(to: Vector3, from := Vector3.INF, skip: Array[RID] = []) -> bool:
-	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0.0, _eye_h, 0.0) if from == Vector3.INF else from, to, 1)
+## doesn't count; drawn curtains do (they stop sight), unless `mask` is only the solid layer (a shot's line).
+## `skip` are things to leave out (the sill you are leaning over).
+func line_clear(to: Vector3, from := Vector3.INF, skip: Array[RID] = [], mask := 1 | Solid.SIGHT_LAYER) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0.0, _eye_h, 0.0) if from == Vector3.INF else from, to, mask)
 	q.exclude = [get_rid()] + skip
 	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
@@ -2292,7 +2309,7 @@ func _update_hover() -> void:
 			if d < best:
 				# Someone on another floor: only a part a shot could reach counts (what shows over the sill).
 				if absf(en.global_position.y - global_position.y) > Enemy.LEVEL_GAP \
-						and not line_clear(q, muzzle_position(), shot_skips()):
+						and not line_clear(q, muzzle_position(), shot_skips(), 1):
 					continue
 				best = d
 				hover_target = en
@@ -2336,7 +2353,7 @@ func _pick_high(cam_at: Vector3) -> void:
 			continue
 		# Only what a shot or a throw of yours could reach: a far wall seen through the opened roof from the
 		# wrong side of the house is not a target (the near wall is in the way).
-		if not line_clear(at, global_position + Vector3(0.0, 1.4, 0.0), [hit["rid"]]):
+		if not line_clear(at, global_position + Vector3(0.0, 1.4, 0.0), [hit["rid"]], 1):
 			skip.append(hit["rid"])
 			continue
 		# Indoors: whatever is over your own ceiling is out of your sight.
@@ -3418,11 +3435,12 @@ func noise_radius() -> float:
 	var v := Vector2(velocity.x, velocity.z).length()
 	if v < 0.3 or dead:
 		return 0.0
+	var quiet := Rug.QUIET if Rug.under(global_position) != null else 1.0      # a rug muffles footsteps
 	if posture == 2:
-		return noise_prone
+		return noise_prone * quiet
 	if posture == 1:
-		return noise_crouch
-	return noise_run if (running or _dash_t > 0.0 or _roll_t > 0.0) else noise_walk
+		return noise_crouch * quiet
+	return (noise_run if (running or _dash_t > 0.0 or _roll_t > 0.0) else noise_walk) * quiet
 
 
 ## Down low behind something: is it between you and whoever is looking from `from`? (Crouched, low cover close

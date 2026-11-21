@@ -439,8 +439,11 @@ func _can_see_player() -> bool:
 	if d > 0.8 and facing.dot(to / maxf(d, 0.01)) < cos(deg_to_rad(fov) * 0.5):
 		return false
 	var eye := Vector3.UP * 1.5
-	return Projectile.wall_hit(get_world_3d().direct_space_state, global_position + eye,
-		player.global_position + eye, [get_rid(), player.get_rid()]).is_empty()
+	var space := get_world_3d().direct_space_state
+	if not Projectile.wall_hit(space, global_position + eye, player.global_position + eye, [get_rid(), player.get_rid()]).is_empty():
+		return false
+	# Drawn curtains (window_curtains.gd) hide whoever is behind them.
+	return space.intersect_ray(PhysicsRayQueryParameters3D.create(global_position + eye, player.global_position + eye, Solid.SIGHT_LAYER)).is_empty()
 
 
 ## You only see a raider the player could see: in view, and not hunkered behind cover from where you stand.

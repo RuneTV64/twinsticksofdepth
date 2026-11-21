@@ -61,7 +61,8 @@ slots come from clothes and everyone starts dressed ("every player will start in
 (see Clothes): every place to wear things, clothes drawn on the body, pockets from clothes, protection, and the
 living room's cloth. Not seen by the owner. Then the fit table per body and men's clothes that hang like cloth
 (see Clothes). All of it on `main` since 21 Nov 2026 (the owner said to push it).
-Next in the theme: furniture (session 2), then appliances, then everything else.
+The theme's furniture (session 2) was built on 21 Nov 2026, not seen by the owner, on the session branch only
+(see The furniture kit, The living room). Next in the theme: appliances, then everything else.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -1060,6 +1061,38 @@ The owner: "make some furniture for the home you designed". Everything is in
   from across it; the fridge stops sight, the table doesn't; a zombie with a chair or the kitchen table
   between it and the player climbed over in under 3 s; water put on the kitchen stove, once it had wood, a
   match and a pot, had boiled 20 s later. The stairs, floors and aiming tests still pass in the furnished house.
+- The living room (owner, 21 Nov 2026: "Now do the living room furniture", the theme's second session; built
+  the same day, not seen by the owner). Six pieces in the kit, and rugs and curtains. Test
+  `tools/living_test.gd`; sheets `preview/living_room.png` (`tools/furniture_preview.gd` MODE=living, sound
+  with the fire lit and worn out), `preview/furniture_house.png`. The furniture README has the table.
+  - Coffee table, side table, TV cabinet: low cover, each with something to search (`Stash.KINDS`: a shelf
+    underneath, a drawer, a cabinet; the living room's pool). Display cabinet: high cover, glass shelves of
+    china (shader part 15) and a cupboard to search; part glass, so smashed it leaves glass.
+  - Fireplace: brick (about 1,000 zombie blows, 9 sledgehammer), a `Campfire` in its grate like the stove's
+    (wood, a match, a pot boils water) that also lights the room while it burns (`Daylight.add_lamp`,
+    `FurnitureKit.FIRE_LIGHT` 5 m, and a warm `OmniLight3D`; the light goes when it goes out or is broken).
+    New ramps brick and lacquer (`gen_furniture_ramps.py`); the front's firebox, grate and flames are drawn
+    (part 17), with a mantel, a chimney breast (drawn only) and a hearth.
+  - Piano (`piano.gd`, `Piano`, its keys): played, it is heard `HEARD` 28 m off: a lure. 2.5 s between plays.
+  - Rug (`rug.gd`, `Rug`): not a solid thing. Walking on it you are heard `QUIET` 0.5 as far
+    (`Player.noise_radius`). Rolled up when nothing stands on it: "Rolled-up rug" (`rolled_rug`, 6 kg, two
+    hands, a club, cut up for cloth), laid again where you stand (`Player.lay_rug`). Painted (part 20) in the
+    kit's fabric: border, field, medallion.
+  - Curtains (`window_curtains.gd`, `WindowCurtains`, `FurnitureKit.curtains(near, inside)`): drawn, a body
+    on the new `Solid.SIGHT_LAYER` (32), which only sight looks for: the player's view rays, `line_clear` (now
+    with a `mask`; shot lines pass 1), raiders' eyes (`Raider._can_see_player`), zombies noticing you. Shots,
+    throws and bodies go through. Click draws or opens them; Shift+click takes them down into the "Curtains"
+    item. A worn-out house has none.
+  - `furnish` now lays the living room round the fireplace (couch on the west wall with the coffee and side
+    tables, armchair facing the fire, bookshelf, display cabinet, hearth rug, curtains at both windows) and
+    makes the back room a den (piano under its curtained window, rug, TV cabinet, dresser). The derelict house
+    has a worn coffee table and rug. The level has 497 breakable things.
+  - Cloud run: a raider 7 m outside the south window, the player 1 m in: curtains drawn, neither saw the
+    other; open, both did. The piano was heard 24 m off, not 32. Walking on a rug 2.25 m, off it 4.5. The fire
+    lit: lamp light 1.00 at 1.5 m, 0.23 at 4 m; water boiled in 20 s. The stairs, floors, aiming, search,
+    items and break tests still pass in the new layout (the furniture test's couch check moved with the couch).
+  - Not built: a sound for the piano (there are no sounds), a pose for playing; warmth and smoke from the
+    fire; curtains burning or tearing; a rug over glass or on stairs; lamps and the television (appliances).
 - Not done: Forward+ unchecked; nothing can be sat on, slept in or cooked on (five pieces can be searched
   now: see Searching and the grid); nothing can be
   pushed, tipped or stood on (no blocking a door with a wardrobe); the stove gives no light or warmth; no bathroom, and no small things (lamps, rugs, low tables, a television); what
