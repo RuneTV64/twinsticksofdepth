@@ -50,9 +50,7 @@ owner: street lamps and signs (see The street kit, Lamps and signs), the furnitu
 furniture kit), the first working items (see The first working items), and searching furniture with
 the grid screen and a backpack (see Searching and the grid).
 
-Items by theme come next (owner, 21 Nov 2026: "Afterwards I will give you themes (boys room girls room
-bathroom electronics etc) and you will generate a set number of items per theme"). Wait for the themes and
-the number. Each item made then still has to do something (rule 2) and carry its `found` places.
+Items by theme come next (see Themed item batches). Wait for the owner to name the theme.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -949,6 +947,36 @@ is Claude's first guess.
   you walk into is one box round the piece (no stepping between a chair's legs, no seeing under a table);
   one size of each; `furnish` only knows the 3 by 2 house and leaves the basement empty; worn all over,
   not where hit.
+
+## Themed item batches (owner, 21 Nov 2026; nothing built yet)
+
+The owner will name a theme (a room: a boy's room, a girl's room, a bathroom, electronics...) and give a
+number of items. Each theme is done in four sessions, one kind of thing each, in this order:
+
+1. Clothes
+2. Furniture
+3. Appliances
+4. Miscellaneous: books, music, movies, toys, trophies, anything that belongs in that room.
+
+What the owner said to keep in mind (21 Nov 2026):
+
+- Even trash can be recycled and used. Nothing is junk with no use: an empty tin, a wrapper, a broken toy
+  breaks down into something (scrap, a material, a part).
+- Anything that can be held in one or two hands is also a weapon, but most things don't last long at all
+  being smacked against someone's head. So every holdable item needs how it hits and how quickly it breaks
+  doing so, and what it breaks into.
+- Clothes can be worn, torn, tied, and turned into makeshift things: rags, strips to tie with, a molotov's
+  wick. That is why it is done in batches: each kind has its own uses to work out.
+
+So each item made in a batch carries, besides what every item has now (`name`, `w`, `cat`, `size`, `rare`,
+`found`, `for`, a picture recipe in `ItemArt.ART`): how it does as a weapon if held (one or two hands, the
+kind of blow, how hard, how many blows before it breaks); what it breaks or is taken apart into; and for
+clothes, where it is worn, what it keeps out (cold, bites, glass, a blow) and whether it has pockets, and
+what it can be torn or tied into. Furniture and appliances in a batch are made with the furniture kit's
+principles (rule 1 and rule 2, `Solid`, a `Stash` if things are kept in it). Claude's plan, for the first
+session: build what the four batches share before the first items (improvised weapons that wear out with
+each blow, and taking things apart into other things), and propose how clothes are worn (layers, pockets)
+before building them, since that changes the slots.
 
 ## The first working items (built 21 Nov 2026, in review; not seen by the owner)
 
