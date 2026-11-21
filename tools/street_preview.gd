@@ -7,7 +7,9 @@ extends SceneTree
 ##       --rendering-driver opengl3 --resolution 800x600 -s res://street_preview.gd
 ## MODE: shape (one tile, close: SHAPE end, straight, bend, tee or cross), scene (a T junction and the
 ##       streets off it, with grass verges), plan (a small town's worth: every shape in one layout),
-##       town (the plan with kit houses and fences along it).
+##       town (the plan with kit houses and fences along it), props (a lamp and each sign, close).
+## FURNISH=1 stands lamps and signs along the streets. NIGHT=1 turns the daylight down (the lamps' own light
+## shows; the game's darkness is a screen effect this harness doesn't have).
 ## WEATHER 0..5 (the list below), WEAR 0..2, HOLES=1 breaks a few square metres up, DIST the camera's distance,
 ## LOOK "x,y,z".
 ## Test-only patch for the software renderer: it skips the linear->sRGB step, so the shaders output their
@@ -49,6 +51,10 @@ func _build() -> void:
 	sun.rotation = Vector3(deg_to_rad(-55), deg_to_rad(35), 0)      # the level's sun
 	sun.shadow_enabled = true
 	world.add_child(sun)
+	if _env("NIGHT", 0) == 1:
+		sun.light_energy = 0.12
+		env.environment.ambient_light_energy = 0.1
+	Daylight.reset()
 	var w: Array = WEATHER[_env("WEATHER", 1)]
 	RenderingServer.global_shader_parameter_set("ground_season", w[1])
 	RenderingServer.global_shader_parameter_set("cutaway_shape", Vector4(0, 0, 0, 0))     # nobody to cut it open for
@@ -76,7 +82,21 @@ func _build() -> void:
 	var look_at := Vector3(0, 0, 0)
 	var dist := 22.0
 	var s: StreetKit
-	if mode == "shape":
+	if mode == "props":
+		# A lamp and one of each sign, on a short straight.
+		s = StreetKit.new(world, Vector3(-4.0, 0, -9.0), wear)
+		s.plan(["#", "#"])
+		s.open(Vector2i(0, 0), "N")
+		s.open(Vector2i(0, 1), "S")
+		s.build()
+		s.lamp(Vector2(4.6, -5.0))
+		s.signpost(Vector2(4.6, -1.5), "stop", "S")
+		s.name_sign(Vector2(4.6, 1.5))
+		s.signpost(Vector2(4.6, 4.5), "warning", "E")
+		s.signpost(Vector2(-3.6, 3.0), "stop", "N")
+		look_at = Vector3(3.0, 1.2, 0.0)
+		dist = 13.0
+	elif mode == "shape":
 		var shape := OS.get_environment("SHAPE") if OS.get_environment("SHAPE") != "" else "straight"
 		s = StreetKit.new(world, Vector3(-4.0, 0, -4.0), wear)
 		s.add([Vector2i(0, 0)])
@@ -95,10 +115,14 @@ func _build() -> void:
 		look_at = Vector3(0.5, 0, 0)
 		dist = 62.0
 		if mode == "town":
-			HouseKit.house(world, Vector3(-11.5, 0, 0.5), 3, 2, 2, wear, 0)
-			HouseKit.house(world, Vector3(-0.5, 0, 0.5), 2, 2, 1, wear, 1)
-			FenceKit.yard(world, Rect2(-12.5, -3.0, 21.5, 11.0), "picket", "N", wear)
-			HouseKit.house(world, Vector3(-11.5, 0, -27.0), 2, 2, 1, wear, 2)
+			# Inside the loop of streets (x -4..14, z 0..9): two houses with a picket fence between them;
+			# and one more between the two dead ends to the north.
+			HouseKit.house(world, Vector3(-3.5, 0, 1.5), 3, 2, 2, wear, 0)
+			HouseKit.house(world, Vector3(7.5, 0, 1.5), 2, 2, 1, wear, 1)
+			var f := FenceKit.new(world, "picket", wear)
+			f.run(Vector2(5.5, 1.5), Vector2(7.5, 1.5))
+			f.run(Vector2(5.5, 7.5), Vector2(7.5, 7.5))
+			HouseKit.house(world, Vector3(-2.5, 0, -16.5), 2, 2, 1, wear, 2)
 	else:
 		s = StreetKit.new(world, Vector3(-13.0, 0, -9.0), wear)
 		s.plan(["###",
@@ -109,6 +133,8 @@ func _build() -> void:
 		s.build()
 		look_at = Vector3(0.5, 0, -1.5)
 		dist = 27.0
+	if _env("FURNISH", 0) == 1:
+		s.furnish()
 	if _env("HOLES", 0) == 1:
 		# A few square metres broken up, as a sledgehammer leaves them.
 		for b in s.parts:

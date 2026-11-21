@@ -37,6 +37,47 @@ Measured in the game's test level (`tools/street_test.gd`, cloud run, 21 Nov 202
 A square metre takes 10 sledgehammer blows laid sound, 6 cracked, 3 breaking up, and leaves 3 rocks. Fists get
 nowhere.
 
+## Lamps and signs
+
+What stands along a street (`street_kit.gd`: `lamp()`, `signpost()`, `name_sign()`, and `furnish()`, which puts
+them where a street would have them: a lamp on each straight on alternate sides, a stop sign facing what comes
+in on every arm of a junction, a name sign at its corner, a warning where a dead end begins).
+
+**A street lamp** is a 3.5 m steel post with a glass lantern on top.
+
+- Lit, at night it lights the ground for 8 m round it. Whoever stands in that light is seen from as far as by
+  day, and so is whatever they are looking at.
+- The lantern is glass, above your head. Put the crosshair on it and shoot it out, or throw a rock at it, and
+  that stretch of street goes dark. Its glass falls to the ground under it.
+- Bring the post down and the lantern comes with it.
+- Power is a stand-in: a street's lamps are lit unless you say otherwise (`lit`), and one put up worn out is
+  dark.
+
+**A sign** is a steel plate on a thin post: a stop sign, a street name (two blades at a corner), or a warning
+diamond.
+
+- It tells you where you are: walk up to it and the prompt reads it out.
+- It is no cover.
+- It rings when it is hit: a noise you can make on purpose without firing a shot.
+
+Measured in the test level (`tools/lamp_test.gd`, cloud run, 21 Nov 2026):
+
+| | |
+|---|---|
+| At night, under a lit lamp | light 1.00; you are seen from the full daytime distance |
+| At night, in the dark of the crossroads | light 0.08; seen from 0.36 of it |
+| A lamp's light along the ground | full to 2 m, 0.86 at 4 m, 0.33 at 6 m, gone by 8 m |
+| One shot at the lantern from 7.5 m | lantern gone, light out, 1 broken glass under it, post standing |
+| A rock thrown at one from 6.5 m | lantern gone, light out |
+| A lamp post | 3 sledgehammer blows, 18 with the hatchet, about 330 from a zombie; its lantern goes with it |
+| A sign's post | 2 sledgehammer blows, 9 with the hatchet, about 165 from a zombie |
+| A sign punched once | zombies 5 m and 9 m off turned to it; one 14 m off did not hear |
+
+`street_prop.gdshader` draws all of it on plain boxes: the post, the lantern's frame, cap and glass (glowing
+when lit), and each sign's face, cutting away a stop sign's corners and a warning sign's diamond. Wet darkens
+it, frost and snow sit on every cap; wear rusts the posts, fades the paint, shoots holes in the signs and
+breaks the lantern's glass.
+
 ## How it changes
 
 Three things change the look with no change of mesh, as with the house:
@@ -78,13 +119,20 @@ counts in.
 | `preview/street_shapes.png` | The five shapes, and all of them in one plan |
 | `preview/street_seasons.png` | A junction through the year |
 | `preview/street_wear.png` | The three stages of wear, and square metres broken up |
-| `preview/street_town.png` | With kit houses and a fence |
+| `preview/street_town.png` | With kit houses, a fence, lamps and signs |
+| `street_prop.gdshader` | Draws lamp posts, lanterns, sign posts and sign plates |
+| `street_sign.gd` | `StreetSign`: what a sign says to whoever walks up to it |
+| `preview/street_props.png` | A lamp by day and lit, the signs, their wear, in snow |
+| `preview/street_furnished.png` | A junction and a town with their lamps and signs, by day and with the daylight down |
+| `source/lamp_test.gd` | The headless test of lamps and signs (in the repository: `tools/lamp_test.gd`) |
 | `source/street_preview.gd` | The harness that renders the sheets (in the repository: `tools/street_preview.gd`) |
 | `source/street_test.gd` | The headless test of what a street does in play (in the repository: `tools/street_test.gd`) |
 
 What the game itself needed for it, outside this folder: a new kind of ground, `bed` (packed stone and grit),
 which a street lays under itself (`ground.gd` `paint()`, `dirt_types.gdshaderinc` `dirt_bed()`); a surface
-that isn't its whole rectangle (`Breakable.on_shape`); and a weaker surface (`Breakable.thin`).
+that isn't its whole rectangle (`Breakable.on_shape`); and a weaker surface (`Breakable.thin`). For the lamps:
+`Daylight.remove_lamp()`, and the fog shader is now sent the lamps nearest the player when there are more than
+it takes (`fog.gd`).
 
 ## Not checked, not done
 
@@ -93,7 +141,12 @@ that isn't its whole rectangle (`Breakable.on_shape`); and a weaker surface (`Br
 - Streets run north-south and east-west only, on level ground, one width. No diagonals, curves, lanes, or
   parking.
 - The whole tile breaks as pavement: a sidewalk slab is as hard as the carriageway.
-- Nothing is on it: no street lamps, signs, hydrants, benches or parked cars come with the kit.
+- Lamps and signs come with the kit; hydrants, benches, bins, post boxes and parked cars do not.
+- A lamp has no power to lose: it is lit or it isn't. It doesn't flicker, and nothing switches a street off.
+- A sign's plate is part of its post: it can't be hit or taken off on its own, and a shot passes through it.
+- Signs face north, east, south or west only. A name sign shows marks, not letters: the prompt reads it.
+- The lit look in the pictures is the lamp's own light with the daylight turned down. The game's darkness is
+  a screen effect the harness doesn't have.
 - Footsteps are no louder on it than on grass. A pothole doesn't trip or slow anyone.
 - Worn all over, not where it was used. Weeds are drawn, not grown: nothing spreads with the years yet.
 - Two streets laid side by side join into one wide slab.

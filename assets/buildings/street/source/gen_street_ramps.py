@@ -16,6 +16,10 @@ RAMPS = [
     ("YELLOW",   ["#f4d868", "#d6ac3e", "#a57c2e", "#6b4e2a", "#3a2b24"], "road paint: the centre line"),
     ("WHITE",    ["#f6f4ec", "#d6d2c6", "#a6a39c", "#6e6c6e", "#3c3b43"], "road paint: stop lines and crossings"),
     ("IRON",     ["#93877c", "#6e635c", "#4c4547", "#302c33", "#1a1920"], "manhole covers and drain grates: cast iron, rusting"),
+    ("STEEL",    ["#dadde0", "#afb5ba", "#80878f", "#555b65", "#2d313b"], "galvanised steel: lamp posts and sign posts"),
+    ("RED",      ["#f59a78", "#dc4a32", "#aa2c26", "#6c1d23", "#3a151d"], "sign paint: a stop sign"),
+    ("SIGN",     ["#9bd8aa", "#46a26a", "#2c744c", "#1d4c38", "#112b25"], "sign paint: a street name's green"),
+    ("GLOW",     ["#fff8de", "#ffeaae", "#f6cb72", "#c0904e", "#6e4c36"], "a lit lamp's glass"),
 ]
 FIRST = 100
 

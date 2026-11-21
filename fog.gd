@@ -30,6 +30,7 @@ var _explored: Image
 var _explored_tex: ImageTexture
 var _mark_t := 0.0
 var _lamps_sent := -1
+var _lamps_t := 0.0
 var _beams_sent := 0
 ## How black the dead of night is drawn where no lamp reaches (1 = pitch black).
 @export var dark_max := 0.82
@@ -200,14 +201,23 @@ func _process(delta: float) -> void:
 			bs[i] = Vector4(float(b["range"]), float(b["cos"]), Daylight.BEAM_GLOW, 0.0)
 		_mat.set_shader_parameter("beams", bp)
 		_mat.set_shader_parameter("beam_shapes", bs)
-	if _lamps_sent != Daylight.lamps.size():
-		# (Lamps don't move: sent when one is added.)
-		_lamps_sent = Daylight.lamps.size()
+	_lamps_t -= delta
+	var many := Daylight.lamps.size() > Daylight.LAMP_MAX
+	if _lamps_sent != Daylight.lamps_rev or (many and _lamps_t <= 0.0):
+		# Lamps don't move: they are sent when one is added or goes out. With more of them than the shader
+		# takes (a street of lamps), the nearest to the player are sent, picked again twice a second.
+		_lamps_sent = Daylight.lamps_rev
+		_lamps_t = 0.5
+		var near := Daylight.lamps.duplicate()
+		if many:
+			var me := player.global_position
+			near.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+				return (a["pos"] as Vector3).distance_squared_to(me) < (b["pos"] as Vector3).distance_squared_to(me))
 		var arr := PackedVector4Array()
 		arr.resize(Daylight.LAMP_MAX)
-		for i in mini(_lamps_sent, Daylight.LAMP_MAX):
-			var lp: Vector3 = Daylight.lamps[i]["pos"]
-			arr[i] = Vector4(lp.x, lp.y, lp.z, float(Daylight.lamps[i]["radius"]))
+		for i in mini(near.size(), Daylight.LAMP_MAX):
+			var lp: Vector3 = near[i]["pos"]
+			arr[i] = Vector4(lp.x, lp.y, lp.z, float(near[i]["radius"]))
 		_mat.set_shader_parameter("lamps", arr)
 	_mark_t -= delta
 	if _mark_t <= 0.0:

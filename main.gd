@@ -471,10 +471,10 @@ func _build_level() -> void:
 	_sign(Vector3(0, 3.4, -38), "Cul-de-sac ahead: ammo is in some of the houses")
 
 	# Things to break, one of each sort (everything else in the level breaks too): furniture, an appliance,
-	# a street sign. Each is there for a reason: cover, and what it is made of.
+	# (and once a street sign: the street kit has its own now). Each is there for a reason: cover, and what it is made of.
 	_box(Vector3(-4.5, 0.4, -12.5), Vector3(1.6, 0.8, 0.9), Color(0.5, 0.36, 0.22), "wood", "table")
 	_box(Vector3(-6.2, 0.9, -21.2), Vector3(0.8, 1.8, 0.8), Color(0.86, 0.87, 0.85), "metal", "fridge", {"metal": 0.6, "plastic": 0.4})
-	_box(Vector3(5.6, 1.2, -38.2), Vector3(0.12, 2.4, 0.12), Color(0.55, 0.57, 0.6), "metal", "street sign")
+	# (The street sign that stood here is now one of the street kit's own: see _build_culdesac.)
 	# Water (water.gd): a rain barrel and a trough of standing water to fill a bottle from, a fire to boil
 	# it on, and tablets and a filter. The barrel and the trough break like anything else, and the water
 	# goes with them.
@@ -529,6 +529,7 @@ func _build_culdesac() -> void:
 				 " # "])
 	street.open(Vector2i(1, 5), "S")          # it carries on through the gap, to the yard's dirt road
 	street.build()
+	street.furnish()                          # lamps on the straights, signs at the crossroads and the dead ends
 
 	# Houses: center (x, z), width (x), depth (z), which wall the front door is on.
 	_house(Vector2(-14, -53), 10, 12, "E", Color(0.66, 0.6, 0.5))          # street, west side

@@ -19,6 +19,7 @@ static var want := 1.0
 static var time_i := 0
 ## [{"pos": Vector3, "radius": float}]: fires, lamps. At most LAMP_MAX are drawn (the first ones).
 static var lamps: Array[Dictionary] = []
+static var lamps_rev := 0          # goes up whenever a lamp is added or goes out (fog.gd sends them again)
 
 ## Torches people are carrying, by who carries them (instance id): each a beam of light from "pos" along "dir"
 ## (flat), "range" long and "cos" wide (the cosine of half its angle), with a small pool of light round the
@@ -75,6 +76,16 @@ static func time_name() -> String:
 
 static func add_lamp(pos: Vector3, radius: float) -> void:
 	lamps.append({"pos": pos, "radius": radius})
+	lamps_rev += 1
+
+
+## A lamp has gone out (a street lamp shot out, its post brought down): the one at this spot.
+static func remove_lamp(pos: Vector3) -> void:
+	for i in lamps.size():
+		if (lamps[i]["pos"] as Vector3).distance_to(pos) < 0.2:
+			lamps.remove_at(i)
+			lamps_rev += 1
+			return
 
 
 ## How much lamp light falls here, 0 to 1: full near the lamp, fading to nothing at its radius.
