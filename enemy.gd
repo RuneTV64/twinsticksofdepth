@@ -154,6 +154,8 @@ var _in_heap := false
 var _heap_key := Vector2i.ZERO
 var _press_t := 0.0         # how long it has been walking into something
 var _press_box: Cover.Box = null
+var _far_seen := false      # seen by the player from another floor (looked at 4 times a second)
+var _far_t := 0.0
 const LEVEL_GAP := 1.6      # further apart than this in height, two people are on different floors
 var _barred := false        # the way over is shut by glass or boards: it beats on them
 var _smash_t := 0.0
@@ -388,7 +390,16 @@ func hear_noise(pos: Vector3, _by_player := true) -> void:
 ## (Engine properties here are only set when they change: the owner's profiler showed this function as most of the
 ## script time in a 226-zombie crowd, with every zombie re-setting them every tick.)
 func _update_fade(delta: float) -> void:
-	var seen := player == null or player.can_see(global_position)
+	var seen := true
+	if player != null and absf(global_position.y - player.global_position.y) > LEVEL_GAP:
+		# On another floor it takes a line of sight, which costs a ray: asked 4 times a second, not every tick.
+		_far_t -= delta
+		if _far_t <= 0.0:
+			_far_t = 0.25
+			_far_seen = player.can_see(global_position)
+		seen = _far_seen
+	elif player != null:
+		seen = player.can_see(global_position)
 	if seen:
 		_out_t = 0.0
 		_alpha = move_toward(_alpha, 1.0, delta / maxf(fade_time, 0.01))
@@ -1005,7 +1016,7 @@ func _press(delta: float, pressed: bool) -> void:
 	var reach := climb_reach if body.legs() == 2 and not crawling else crawl_reach
 	if perch > 0.3:
 		reach += heap_boost   # shoved up from below by the ones still coming
-	var can_climb := _press_box != null and not _press_box.gone and _press_box.top - perch <= reach
+	var can_climb := _press_box != null and not _press_box.gone and _press_box.on(global_position.y) and _press_box.top - perch <= reach
 	if can_climb and _press_t >= _climb_wait:
 		if _start_climb():
 			return
@@ -1239,7 +1250,7 @@ func _pick_prey() -> void:
 		var dp := Vector2(player.global_position.x - global_position.x, player.global_position.z - global_position.z).length()
 		var notice := aggro_range * (HIDDEN_NOTICE if player.in_cover and player.hidden_from(global_position) else 1.0) \
 			* player.seen_mult() * _still_factor()   # crouched or flat, it has to be nearer to notice you
-		if dp < notice:
+		if dp < notice and absf(player.global_position.y - global_position.y) <= LEVEL_GAP:
 			best = player
 			best_d = dp
 	for r in get_tree().get_nodes_in_group("raiders"):
@@ -1250,6 +1261,13 @@ func _pick_prey() -> void:
 		if dr < notice_r and dr < best_d:
 			best = r
 			best_d = dr
+	# Someone on another floor that it can see (at a window above, down a stairwell): it can't reach them,
+	# but it knows where they are and goes there, as to a noise.
+	if player != null and not player.dead and kind == "shambler" and best != player \
+			and absf(player.global_position.y - global_position.y) > LEVEL_GAP:
+		var dp2 := _xz2(player.global_position - global_position)
+		if dp2 < aggro_range * player.seen_mult() * _still_factor() and player.line_clear(global_position + Vector3(0.0, 1.5, 0.0), player.global_position + Vector3(0.0, 1.5, 0.0)):
+			hear_noise(player.global_position)
 	# Footsteps: one with nothing in sight that hears you move turns toward the sound.
 	if best == null and player != null and not player.dead and kind == "shambler":
 		var nr: float = player.noise_radius() * footstep_hearing

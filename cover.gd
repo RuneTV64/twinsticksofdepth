@@ -9,6 +9,10 @@ extends RefCounted
 ## using it. A place on a face is t meters from a. Everything here is flat (XZ), as Vector2(x, z).
 ##
 ## The Player uses this now; raiders and other players are meant to use the same faces and the same rules.
+##
+## Floors: every box stands on a floor (`base`, the height of that floor: 0 the ground, 2.7 upstairs, -2.7 a
+## basement) and is cover only for someone standing on that floor (`on(feet)`). `top` is how high the thing
+## stands above its own floor. Everything that looks cover up says how high its feet are.
 
 const MIN_TOP := 0.75      # shorter than this hides nobody
 const LOW_TOP := 1.5       # tops up to here are low cover
@@ -16,14 +20,21 @@ const MIN_LEN := 0.6       # a side shorter than this is not a face (the ends of
 const STANDOFF := 0.48     # how far out from a face its user's centre is
 const END_MARGIN := 0.3    # how close to a free end a user's centre can get
 const CLEAR := 0.33        # a spot this close to another box has no room to stand in
+const SAME_FLOOR := 0.7    # feet within this of a box's base are on its floor
+const HEAD := 0.9          # how high the head of someone hunkered is
 
 
 class Box:
 	var rect: Rect2        # footprint: position (x, z), size (x, z)
-	var top := 0.0
+	var base := 0.0        # the height of the floor it stands on
+	var top := 0.0         # how high it stands above that floor
 	var low := false
 	var body: Object
 	var gone := false      # it was broken: whoever was using it has to let go
+
+	## Is someone whose feet are at this height on the floor this stands on?
+	func on(feet: float) -> bool:
+		return absf(feet - base) < SAME_FLOOR
 
 
 class Face:
@@ -35,6 +46,7 @@ class Face:
 	var box: Box
 	var low := false
 	var top := 0.0
+	var base := 0.0
 	# Worked out the first time the face is used, and again after the level changes (see prep):
 	var ready := -1
 	var next: Array = [null, null]      # the face that carries on past each end, if any
@@ -62,14 +74,16 @@ static func box_of(body: Object) -> Box:
 	return by_body.get(body.get_instance_id()) if body != null else null
 
 
-## Register a solid box: centre and size as built. Boxes off the ground (the wall over a window) and ones too low
-## to hide behind are ignored. Low ones are marked on their body so shots know to pass over them.
-static func add_box(body: Object, pos: Vector3, size: Vector3) -> void:
-	var top := pos.y + size.y * 0.5
-	if pos.y - size.y * 0.5 > 0.3 or top < MIN_TOP:
+## Register a solid box: centre and size as built, and the height of the floor it stands on. Boxes off their
+## floor (the wall over a window) and ones too low to hide behind are ignored. Low ones are marked on their
+## body so shots know to pass over them.
+static func add_box(body: Object, pos: Vector3, size: Vector3, floor_y := 0.0) -> void:
+	var top := pos.y + size.y * 0.5 - floor_y
+	if pos.y - size.y * 0.5 - floor_y > 0.3 or top < MIN_TOP:
 		return
 	var b := Box.new()
 	b.rect = Rect2(pos.x - size.x * 0.5, pos.z - size.z * 0.5, size.x, size.z)
+	b.base = floor_y
 	b.top = top
 	b.low = top <= LOW_TOP
 	b.body = body
@@ -113,6 +127,7 @@ static func _add_face(b: Box, a: Vector2, dir: Vector2, length: float, n: Vector
 	f.box = b
 	f.low = b.low
 	f.top = b.top
+	f.base = b.base
 	faces.append(f)
 
 
@@ -135,7 +150,7 @@ static func prep(f: Face) -> void:
 			f.open[end] = nb.low and not f.low
 		else:
 			# A free end, if there is room to step out round it.
-			f.open[end] = has_room(spot(f, f.length + 0.5 if end == 1 else -0.5), null)
+			f.open[end] = has_room(spot(f, f.length + 0.5 if end == 1 else -0.5), null, f.base)
 	f.t_min = 0.0 if f.next[0] != null else END_MARGIN
 	f.t_max = f.length if f.next[1] != null else f.length - END_MARGIN
 	if f.t_max < f.t_min:
@@ -147,7 +162,7 @@ static func prep(f: Face) -> void:
 static func _neighbor(f: Face, end: int) -> Face:
 	var corner := f.a + f.dir * f.length if end == 1 else f.a
 	for o in faces:
-		if o == f or o.n.dot(f.n) < 0.99 or absf((o.a - f.a).dot(f.n)) > 0.12:
+		if o == f or absf(o.base - f.base) > 0.1 or o.n.dot(f.n) < 0.99 or absf((o.a - f.a).dot(f.n)) > 0.12:
 			continue
 		var other_end := o.a if end == 1 else o.a + o.dir * o.length
 		if absf((other_end - corner).dot(f.dir)) < 0.15:
@@ -155,10 +170,13 @@ static func _neighbor(f: Face, end: int) -> Face:
 	return null
 
 
-## Is there room to stand here? Not inside, or right against, any box but `skip`.
-static func has_room(p: Vector2, skip: Box) -> bool:
+## Is there room to stand here? Not inside, or right against, any box but `skip`. `feet` is the floor asked
+## about; left out, it is the floor `skip` stands on (or the ground).
+static func has_room(p: Vector2, skip: Box, feet := NAN) -> bool:
+	if is_nan(feet):
+		feet = skip.base if skip != null else 0.0
 	for b in boxes:
-		if b != skip and b.rect.grow(CLEAR).has_point(p):
+		if b != skip and b.on(feet) and b.rect.grow(CLEAR).has_point(p):
 			return false
 	return true
 
@@ -186,16 +204,27 @@ static func crosses(p: Vector2, q: Vector2, r: Rect2) -> bool:
 
 ## Is someone at `at`, using face f, behind their cover as seen from `from`? True when the line between them
 ## passes through the cover. From the side or from behind them it isn't, and the cover does nothing.
-static func shields(f: Face, at: Vector2, from: Vector2) -> bool:
-	return (from - f.a).dot(f.n) < 0.0 and crosses(from, at, f.box.rect)
+## `rise` is how high the looker (or the gun) is above the floor the cover stands on. From no higher than the
+## cover's top it is simply in the way. From higher, the line comes down over it: it still hides someone
+## hunkered if the line passes under its top where it crosses the cover's near face, and not otherwise. So the
+## higher and the closer the looker, the less low cover is worth; a wall is worth as much as ever.
+static func shields(f: Face, at: Vector2, from: Vector2, rise := 0.0) -> bool:
+	if not ((from - f.a).dot(f.n) < 0.0 and crosses(from, at, f.box.rect)):
+		return false
+	if rise <= f.top:
+		return true
+	var head := minf(HEAD, f.top - 0.2)
+	return head + (rise - head) / maxf(from.distance_to(at), 0.1) * STANDOFF < f.top
 
 
 ## The best cover to slide into from `pos`: within `reach`, on the side you're on, with room to stand. `want`
 ## (a direction, or zero) favours cover that way. Returns {"face", "t"} or an empty Dictionary.
-static func find_near(pos: Vector2, reach: float, want: Vector2) -> Dictionary:
+static func find_near(pos: Vector2, reach: float, want: Vector2, feet := 0.0) -> Dictionary:
 	var best := {}
 	var best_score := INF
 	for f in faces:
+		if absf(f.base - feet) >= SAME_FLOOR:
+			continue
 		var side := (pos - f.a).dot(f.n)
 		var along := (pos - f.a).dot(f.dir)
 		if side < -0.05 or side > reach + STANDOFF or along < -reach or along > f.length + reach:
@@ -218,10 +247,12 @@ static func find_near(pos: Vector2, reach: float, want: Vector2) -> Dictionary:
 ## The cover spot the crosshair at `aim` is pointing out, for someone at `from`: the face within `radius` of the
 ## crosshair, on the side the crosshair is on. With the crosshair on top of the cover, or just past a wall, the
 ## side nearer to `from` wins. Returns {"face", "t"} or an empty Dictionary.
-static func find_aim(aim: Vector2, from: Vector2, radius: float) -> Dictionary:
+static func find_aim(aim: Vector2, from: Vector2, radius: float, feet := 0.0) -> Dictionary:
 	var best := {}
 	var best_score := INF
 	for f in faces:
+		if absf(f.base - feet) >= SAME_FLOOR:
+			continue
 		var along := (aim - f.a).dot(f.dir)
 		if along < -radius or along > f.length + radius:
 			continue

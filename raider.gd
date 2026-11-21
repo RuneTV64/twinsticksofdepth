@@ -420,7 +420,7 @@ func _xz(v: Vector3) -> Vector2:
 ## Hunkered with its cover between it and that point: it can't be seen from there, and can't see there.
 func hidden_from(from: Vector3) -> bool:
 	return in_cover and cover_face != null and cover_mode == "hunker" \
-		and Cover.shields(cover_face, Cover.spot(cover_face, cover_t), _xz(from))
+		and Cover.shields(cover_face, Cover.spot(cover_face, cover_t), _xz(from), from.y - cover_face.base)
 
 
 func _can_see_player() -> bool:
@@ -455,7 +455,7 @@ func _update_fade(delta: float) -> void:
 func cover_result(from: Vector3) -> String:
 	if not in_cover or cover_face == null or cover_mode == "pop":
 		return ""
-	if not Cover.shields(cover_face, Cover.spot(cover_face, cover_t), _xz(from)):
+	if not Cover.shields(cover_face, Cover.spot(cover_face, cover_t), _xz(from), from.y - cover_face.base):
 		return ""
 	if cover_mode == "hunker" or randf() >= player.cover_peek_hit_chance:
 		return "cover"
@@ -869,7 +869,7 @@ func _search(delta: float) -> Vector3:
 ## It has walked straight into something. Low cover it vaults; anything else it goes round, toward the nearer
 ## end. (There is no path finding in the game: this is what keeps a raider from standing against a wall.)
 func _get_past(box: Cover.Box, n: Vector3, going: Vector3) -> void:
-	if box != null and box.low:
+	if box != null and box.low and box.on(global_position.y):
 		var depth := box.rect.size.x if absf(n.x) > absf(n.z) else box.rect.size.y
 		var land := _xz(global_position) - Vector2(n.x, n.z) * (depth + 1.0)
 		if depth <= 2.2 and Cover.has_room(land, box) and Breakable.barrier_between(_xz(global_position), land, global_position.y) == null \
@@ -904,6 +904,8 @@ func _hiding_places() -> Array[Vector3]:
 	var found: Array = []
 	var space := get_world_3d().direct_space_state
 	for f in Cover.faces:
+		if absf(f.base - global_position.y) >= Cover.SAME_FLOOR:
+			continue
 		var along := (me - f.a).dot(f.dir)
 		if absf((me - f.a).dot(f.n)) > 9.0 or along < -9.0 or along > f.length + 9.0:
 			continue
@@ -1113,9 +1115,14 @@ func _open_fight(delta: float, d: Vector3) -> Vector3:
 
 func _fire(at: Vector3, wild: float, zombie: Enemy = null) -> void:
 	var to := at - global_position
+	# Someone on another floor is shot at along the real line to their head (what shows over a sill); on
+	# the same floor, level as before.
+	var rise := to.y
 	to.y = 0.0
 	if to.length() < 0.3:
 		return
+	if absf(rise) > LEVEL_GAP:
+		to.y = rise + 0.4
 	mag -= 1
 	_shot_cd = shot_gap
 	_flash_t = 0.06
@@ -1127,6 +1134,8 @@ func _fire(at: Vector3, wild: float, zombie: Enemy = null) -> void:
 	shot.knock = 1.0
 	shot.targets_player = true
 	shot.exclude = [get_rid()]
+	if in_cover and cover_face != null and cover_face.low and cover_mode == "pop" and is_instance_valid(cover_face.box.body):
+		shot.exclude.append((cover_face.box.body as CollisionObject3D).get_rid())      # leaning out over its own cover
 	if zombie != null:
 		# At a zombie: a small chance of a headshot, as you have.
 		shot.aimed_at = zombie
@@ -1187,6 +1196,8 @@ func _pick_cover(flank: bool) -> Dictionary:
 	var best := {}
 	var best_score := INF
 	for f in Cover.faces:
+		if absf(f.base - global_position.y) >= Cover.SAME_FLOOR:
+			continue
 		var along := (me - f.a).dot(f.dir)
 		var off := (me - f.a).dot(f.n)
 		if absf(off) > cover_search or along < -cover_search or along > f.length + cover_search:

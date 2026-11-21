@@ -140,7 +140,7 @@ func wall(a: Vector2i, b: Vector2i, storey: int, cells: String, outward := Vecto
 		var y := _base(storey) + (y0 + y1) * 0.5
 		var pos := Vector3(p0.x + mid, y, p0.y) if along_x else Vector3(p0.x, y, p0.y + mid)
 		var size := Vector3(d1 - d0, y1 - y0, thick) if along_x else Vector3(thick, y1 - y0, d1 - d0)
-		_worn(Breakable.of(Solid.box(level, pos, size, PAINTS[paint], "concrete" if below else ("plaster" if inside else "wood"), "wall", {}, 0.0, look)))
+		_worn(Breakable.of(Solid.box(level, pos, size, PAINTS[paint], "concrete" if below else ("plaster" if inside else "wood"), "wall", {}, 0.0, look, _base(storey))))
 	for i in n:
 		var d0 := i * CELL - (thick * 0.5 if i == 0 and not inside else 0.0)       # outside walls close the corners
 		var d1 := (i + 1) * CELL + (thick * 0.5 if i == n - 1 and not inside else 0.0)

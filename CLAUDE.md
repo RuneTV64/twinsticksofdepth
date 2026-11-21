@@ -36,8 +36,8 @@ owner: everything can be broken (see Two rules for every object, and Breaking th
 on the ground and ordinary infection; and how clean water is. Tested headless only.
 
 Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
-owner: the house kit, with stairs you can walk and basements (see The house kit). Review sheets in
-`assets/buildings/house/preview/`.
+owner: the house kit, with stairs you can walk and basements, and cover and shooting between floors (see
+The house kit). Review sheets in `assets/buildings/house/preview/`.
 
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
@@ -559,13 +559,55 @@ artifact (see Where game design assets live).
     half landing 1.35, upstairs 2.70 and into the next room, back down, the basement's half landing -1.35,
     its floor -2.70 and across it, back up. A zombie one floor up and 1 m away on the map did not grab the
     player in 10 s; put on the same floor, it did.
+- Cover and shooting between floors (owner, 21 Nov 2026: "we will have to make a rule for shooting in and
+  out of storied windows. Fix the cover system upstairs and downstairs too. I don't really know so I will
+  let you brainstorm"; built the same day, not seen by the owner). The rule Claude picked: **a shot is a
+  straight line, and you can shoot what you can see.** Nothing special-cases windows; the building's own
+  shape decides. Test: `tools/floors_test.gd`.
+  - Cover has floors (`cover.gd`): every box and face has a `base` (the height of the floor it stands on:
+    0, 2.7 upstairs, -2.7 in a basement) and `top` is its height above that. `Solid.box(..., floor_y)` and
+    the kit pass it. Every look-up says how high its feet are (`find_near`, `find_aim`, `has_room`,
+    `Box.on(feet)`), so upstairs you take cover on upstairs walls and under upstairs windows, in a basement
+    on its walls, and never on another floor's. Cloud run: 456 faces on the ground, 62 upstairs, 20 in the
+    basement; by the same wall, feet in the basement get a high face there, on the ground a high face, and
+    upstairs the low face under the window.
+  - Seeing between floors (`Player.can_see`, `line_clear`): someone on another floor is seen if a straight
+    line from your eyes reaches their head or chest (glass doesn't count). Enemies ask 4 times a second.
+  - Aiming and shots: the crosshair picks someone on another floor as it always did (where the camera sees
+    them), but only parts a shot could reach. The shot then goes along the real line to that part
+    (`Player._fire`), and a sloped shot is real geometry: it hits a body only at that body's height
+    (`Projectile._at_height`) and is stopped by walls, floors and sills. (A level shot still passes over
+    low cover, as before; `Projectile.SLOPED`.) Glass in the way shatters.
+  - What comes of it, measured at the kit house's upstairs window:
+    - From the window, standing back from it: the ground near the wall is dead ground. Nothing within
+      2.5 m can be seen or hit; at 5 m only a head; from 9 m everything.
+    - Leaning out: in cover at the sill and popped up (Ready), your shots skip the sill you lean over
+      (`shot_skips()`), so you can shoot straight down the wall. You are then out of cover, as popping up
+      always means.
+    - From the ground at someone standing at the window: at 3 m only the head can be hit; from 8 m the head
+      and chest. Someone 2 m back from the window can't be hit from close in, and only in the head from 16 m.
+  - Height against low cover (`Cover.shields(f, at, from, rise)`): from no higher than the cover's top it
+    is simply in the way; from higher, it hides someone hunkered only if the line passes under its top at
+    its near face. Hunkered behind a crate: hidden from the upstairs window at 6 m and 12 m, not at 3 m. A
+    wall is worth as much as ever.
+  - Raiders: their sight was already a real line. Their shots at someone on another floor now go along
+    the real line to the head; one popped up at low cover skips that cover. A raider at the upstairs
+    window, not in cover: 0 of 10 hit the player 2 m and 5 m out, 6 of 10 at 10 m.
+  - Zombies: one that can see someone on another floor (at a window above, down a stairwell) goes to where
+    they are, as to a noise; it still can't grab through a floor.
+  - Falling (`Player._land_hard`): a drop over `fall_safe` 2 m bruises both legs, staggers you and is
+    heard 6 m; over `fall_hurt` 3.5 m it costs health. Vaulting out of an upstairs window (once the glass
+    is gone) is a 2.7 m drop: bruised legs. In the test the player also landed on the window's own broken
+    glass and cut a foot.
 - Still flat, and to be done before more than one floor plays properly (nothing here is designed with the
-  owner yet): cover knows nothing of height (upstairs you can take "cover" on the ground floor's faces, and
-  basement and upper walls give none); zombies and raiders notice you by distance on the map whatever floor
-  you are on, and have no way of finding stairs (there is no path finding); raiders' sight and shots are not
-  checked for floors; a basement is as light as outdoors; mud, tall grass and blood on the ground still
-  act on someone on another floor above or below them; punches, shoves and finishers go by map distance;
-  the horde's spawning ignores floors; a floor broken through doesn't open a hole to the floor below.
+  owner yet): zombies and raiders have no way of finding stairs (there is no path finding); zombies notice
+  someone on their own floor by distance, through walls, as before; you can't shoot at an upstairs window
+  with nobody seen in it (the crosshair is on your own floor), so you can't break its glass or fire blind
+  into it; blind fire and thrown things stay on your floor; a basement is as light as outdoors; mud, tall
+  grass and blood on the ground still act on someone on another floor above or below them; punches,
+  shoves and finishers go by map distance; the horde's spawning ignores floors; a floor broken through
+  doesn't open a hole to the floor below; zombies and raiders take no harm from a fall; no height bonus or
+  penalty to aim.
 - Also not done: stairs have no handrail, and a stairwell no rail upstairs; a basement has no inside walls,
   windows or hatch; window glass and the dirt under a broken floor are the old plain stand-ins; no window
   frames, gutters, chimney or porch; a worn part is worn all over, not where it was hit; a derelict
@@ -843,6 +885,7 @@ Designed with the owner on 20 Nov 2026 for raiders and other players as well as 
 Design doc: the **Cover System Design** artifact, https://claude.ai/artifact/VpVzHHYeFH4q8hfbBtyckg (a Claude Docs
 document; keep it in step when the rules change).
 
+- (Floors: see "Cover and shooting between floors" under The house kit. Cover is per floor now.)
 - `cover.gd` (`Cover`): no hand placement. Every solid box on the ground (`main.gd` `_box`) is registered; each side
   0.6 m or longer is a cover face. Top up to 1.5 m is low cover (crates, window sills, cars), taller is high. Wall
   pieces in a line join up, so you slide along a wall and under its windows.

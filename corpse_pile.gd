@@ -348,7 +348,7 @@ func _is_solid(cell: Vector2i) -> bool:
 		var c := Vector2((cell.x + 0.5) * CELL, (cell.y + 0.5) * CELL)
 		var inside := false
 		for b in Cover.boxes:
-			if b.rect.has_point(c):
+			if b.on(0.0) and b.rect.has_point(c):
 				inside = true
 				break
 		_solid[cell] = inside

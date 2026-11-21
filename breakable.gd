@@ -45,6 +45,7 @@ var radius := 0.0                # a round surface: only this far from its middl
 var section := 1.2               # how wide a hole a blow knocks in something long
 var salvage_mult := 1.0
 var color := Color(0.5, 0.5, 0.5)
+var floor_y := 0.0               # the height of the floor it stands on (for the cover system)
 var look := Callable()           # (stage) -> Material, for things drawn with their own shader (see Solid.box)
 var splitter := Callable()       # set by Solid for something long: (breakable, at) -> the Breakable for that section
 var on_stage := Callable()       # (stage): the thing shows its damage

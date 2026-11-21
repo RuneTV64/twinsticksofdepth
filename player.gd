@@ -177,6 +177,11 @@ var reload_time := 1.1
 @export var punch_still_speed := 0.6    # m/s; slower than this counts as holding still
 @export var punch_miss_chance := 0.2    # chance a punch in range just doesn't connect
 @export var punch_range := 1.75         # meters
+## Falling (first guesses): a drop of more than `fall_safe` bruises the legs and staggers you; past `fall_hurt`
+## it costs health too. An upstairs window is 2.7 m.
+@export var fall_safe := 2.0
+@export var fall_hurt := 3.5
+var _fall_top := -INF
 ## Bare feet (first guesses). Nobody has shoes until footwear exists, so `barefoot` is true; U toggles it.
 @export var barefoot := true
 @export var glass_cut := 7.0            # the damage of a shard in the foot
@@ -849,8 +854,12 @@ func _physics_process(delta: float) -> void:
 	velocity.x = horiz.x
 	velocity.z = horiz.z
 	if is_on_floor():
+		if _fall_top - global_position.y > fall_safe:
+			_land_hard(_fall_top - global_position.y)
+		_fall_top = global_position.y
 		velocity.y = 0.0
 	else:
+		_fall_top = maxf(_fall_top, global_position.y)
 		velocity.y -= 25.0 * delta
 
 	var pre_vel := horiz
@@ -935,6 +944,20 @@ func purify_water() -> void:
 		show_status("A tablet goes in. Give it a minute.", 2.0)
 	else:
 		show_status("Nothing more you carry will help it. Fire would." if not done.has("boiled") else "You have done what you can for it.", 2.0)
+
+
+## The end of a drop (out of an upstairs window, down a stairwell): bruised legs, a stagger, and from higher
+## up real damage.
+func _land_hard(drop: float) -> void:
+	if dead or invulnerable:
+		return
+	_stagger = maxf(_stagger, 0.6)
+	_wound("bruise", minf((drop - 1.2) * 12.0, 40.0), "LegL")
+	_wound("bruise", minf((drop - 1.2) * 12.0, 40.0), "LegR")
+	if drop > fall_hurt:
+		take_damage((drop - fall_hurt) * 14.0, Vector3.ZERO, 0.0)
+	Earshot.make(global_position, 6.0, get_tree())
+	show_status("You land hard.", 1.2)
 
 
 ## What your foot has just come down on (once a stride): glass, blood, filth.
@@ -1206,7 +1229,7 @@ func _xz(v: Vector3) -> Vector2:
 func hidden_from(from: Vector3, any_mode := false) -> bool:
 	if not in_cover or cover_face == null or (cover_mode != "hunker" and not any_mode):
 		return false
-	return Cover.shields(cover_face, Cover.spot(cover_face, cover_t), _xz(from))
+	return Cover.shields(cover_face, Cover.spot(cover_face, cover_t), _xz(from), from.y - cover_face.base)
 
 
 func leave_cover() -> void:
@@ -1273,7 +1296,7 @@ func _update_cover(delta: float, move_dir: Vector3) -> void:
 		cover_mark_face = null
 		if can and _aim_raw_on and _aim_raw.length() > 1.0:
 			var me := _xz(global_position)
-			var m := Cover.find_aim(me + _xz(_aim_raw), me, cover_aim_radius)
+			var m := Cover.find_aim(me + _xz(_aim_raw), me, cover_aim_radius, global_position.y)
 			if not m.is_empty():
 				var sp := Cover.spot(m["face"], m["t"])
 				var here := me if not (in_cover or cover_entering) else Cover.spot(cover_face, cover_t)
@@ -1322,7 +1345,7 @@ func _cover_tap(move_dir: Vector3) -> void:
 		return
 	var reach := cover_run_reach if running or _dash_t > 0.0 else cover_reach
 	var want := move_dir if move_dir.length() > 0.2 else facing
-	var c := Cover.find_near(_xz(global_position), reach, _xz(want))
+	var c := Cover.find_near(_xz(global_position), reach, _xz(want), global_position.y)
 	if c.is_empty():
 		show_status("No cover in reach", 0.7)
 		return
@@ -1743,7 +1766,31 @@ func can_see(pos: Vector3, radius := 0.4) -> bool:
 	var d := Vector2(pos.x - global_position.x, pos.z - global_position.z).length()
 	# By night the dark closes in; what stands in lamp light still shows from as far as ever.
 	var dark := lerpf(Daylight.sight_share(), 1.0, Daylight.lamp_light(pos))
+	var rise := pos.y - global_position.y
+	if absf(rise) > Enemy.LEVEL_GAP:
+		# On another floor: you see it if a straight line reaches its head or its chest (through a window, a
+		# doorway, a hole, down a stairwell). Looking down, it also has to be out where you can look at all.
+		if d > sight_range * dark + radius or (rise < 0.0 and d > sight_reach_toward(pos) * dark + radius):
+			return false
+		return line_clear(pos + Vector3(0.0, 1.5, 0.0)) or line_clear(pos + Vector3(0.0, 1.0, 0.0))
 	return d <= sight_reach_toward(pos) * dark + radius
+
+
+## Does a straight line from your eyes (or from `from`) reach this point, with nothing solid in the way? Glass
+## doesn't count. `skip` are things to leave out (the sill you are leaning over).
+func line_clear(to: Vector3, from := Vector3.INF, skip: Array[RID] = []) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0.0, _eye_h, 0.0) if from == Vector3.INF else from, to, 1)
+	q.exclude = [get_rid()] + skip
+	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+
+
+## What a shot of yours leaves out: yourself, and, popped up or leaning out from cover, the cover you are
+## leaning over (so from an upstairs window you can shoot down past the sill, at the cost of showing yourself).
+func shot_skips() -> Array[RID]:
+	var out: Array[RID] = [get_rid()]
+	if in_cover and cover_mode == "pop" and cover_face != null and cover_face.low and is_instance_valid(cover_face.box.body):
+		out.append((cover_face.box.body as CollisionObject3D).get_rid())
+	return out
 
 
 ## The reticle is red only when a shot fired right now would really hit an enemy. This traces
@@ -1773,13 +1820,15 @@ func _update_hover() -> void:
 		var pts: Dictionary = en.part_points()
 		for slot: String in pts:
 			var q: Vector3 = pts[slot]
-			if absf(en.global_position.y - global_position.y) > Enemy.LEVEL_GAP:
-				break      # on another floor
 			var g := c + (q - c) * ((c.y - global_position.y) / maxf(c.y - q.y, 0.01))    # where the camera sees it on the floor you stand on
 			var d := _xz(g - aim).length()
 			if slot == "Torso":
 				d *= 0.8        # the biggest part: a little easier to be on
 			if d < best:
+				# Someone on another floor: only a part a shot could reach counts (what shows over the sill).
+				if absf(en.global_position.y - global_position.y) > Enemy.LEVEL_GAP \
+						and not line_clear(q, muzzle_position(), shot_skips()):
+					continue
 				best = d
 				hover_target = en
 				hover_part = slot
@@ -1803,7 +1852,9 @@ func _update_line_of_fire() -> void:
 		# The crosshair is on someone: that is who you are aiming at, if nothing solid is in the way.
 		var m := muzzle_position()
 		var tgt := hover_target.global_position + Vector3(0.0, 1.0, 0.0)
-		var w := Projectile.wall_hit(get_world_3d().direct_space_state, m, tgt, [get_rid()])
+		if absf(hover_target.global_position.y - global_position.y) > Enemy.LEVEL_GAP:
+			tgt = hover_target.part_points().get(hover_part, tgt)      # the line to the part itself
+		var w := Projectile.wall_hit(get_world_3d().direct_space_state, m, tgt, shot_skips())
 		if w.is_empty() or m.distance_to(w["position"]) >= m.distance_to(tgt) - 0.5:
 			reticle_target = hover_target
 			reticle_on_enemy = true
@@ -1951,7 +2002,8 @@ func _handle_collisions(pre_vel: Vector3) -> void:
 	for i in get_slide_collision_count():
 		var c := get_slide_collision(i)
 		var col := c.get_collider()
-		if col != null and col is StaticBody3D and absf(c.get_normal().y) < 0.5 and Cover.box_of(col) != null:
+		if col != null and col is StaticBody3D and absf(c.get_normal().y) < 0.5 and Cover.box_of(col) != null \
+				and Cover.box_of(col).on(global_position.y):
 			_wall_box = Cover.box_of(col)
 			_wall_n = Vector3(c.get_normal().x, 0.0, c.get_normal().z).normalized()
 		if col == null or not col.has_meta("door"):
@@ -2103,7 +2155,13 @@ func _start_reload() -> void:
 
 func _fire() -> void:
 	_fire_cd = fire_interval
-	_shoot(facing, muzzle_position(), true)
+	var aim := facing
+	if reticle_target != null and hover_target == reticle_target \
+			and absf(reticle_target.global_position.y - global_position.y) > Enemy.LEVEL_GAP:
+		# Someone on another floor: the shot goes along the real line to the part the crosshair is on.
+		var at: Vector3 = reticle_target.part_points().get(hover_part, reticle_target.global_position + Vector3.UP)
+		aim = (at - muzzle_position()).normalized()
+	_shoot(aim, muzzle_position(), true)
 	velocity -= facing * shot_kick
 	if camera_rig:
 		camera_rig.kick(-facing * shot_cam_kick)
@@ -2155,7 +2213,7 @@ func _shoot(dir: Vector3, from: Vector3, aimed: bool) -> void:
 	shot.dir = dir
 	shot.speed = shot_speed
 	shot.damage = shot_damage
-	shot.exclude = [get_rid()]
+	shot.exclude = shot_skips()
 	shot.shooter = self
 	# Fired with the reticle on an enemy: the shot is "aimed" at that enemy.
 	if aimed and reticle_target != null and hover_target == reticle_target:
@@ -2719,7 +2777,7 @@ func low_hidden_from(from: Vector3) -> bool:
 	var them := Vector2(from.x, from.z)
 	var reach := crouch_hide_reach if posture == 1 else prone_hide_reach
 	for b in Cover.boxes:
-		if not b.low or not Cover.crosses(them, me, b.rect):
+		if not b.low or not b.on(global_position.y) or not Cover.crosses(them, me, b.rect):
 			continue
 		var near := Vector2(clampf(me.x, b.rect.position.x, b.rect.end.x), clampf(me.y, b.rect.position.y, b.rect.end.y))
 		if me.distance_to(near) <= reach:
@@ -2762,7 +2820,7 @@ func _throw() -> void:
 	if not hit.is_empty():
 		var box := Cover.box_of(hit["collider"])
 		var own := in_cover and cover_face != null and box == cover_face.box
-		if not own and (box == null or box.top > from.y + peak - 0.3):
+		if not own and (box == null or box.base + box.top > from.y + peak - 0.3):
 			# It hits it and drops at its foot.
 			var hp: Vector3 = hit["position"]
 			var back := (from - hp)
@@ -2770,7 +2828,7 @@ func _throw() -> void:
 			to = Vector3(hp.x, 0.05, hp.z) + back.normalized() * 0.35
 			peak *= 0.5
 		elif own:
-			peak = maxf(peak, box.top - from.y + 0.6)     # up and over what you are hiding behind
+			peak = maxf(peak, box.base + box.top - from.y + 0.6)     # up and over what you are hiding behind
 	inv.use(id)
 	var th := Thrown.new()
 	th.item = id

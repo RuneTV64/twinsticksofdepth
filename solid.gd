@@ -27,10 +27,11 @@ static func reset() -> void:
 
 ## A solid box. `stuff` is its material; `what` is what the prompt calls it; `parts` (material -> share) is for
 ## things made of more than one material (an appliance), for what they leave behind.
+## `floor_y` is the height of the floor it stands on (0 the ground): it is cover for people on that floor.
 ## `look` (stage -> Material), if given, is how it is drawn at each stage of damage, in place of the plain
 ## colour: the building pieces pass their own shaders this way (assets/buildings).
 static func box(level: Node, pos: Vector3, size: Vector3, col: Color, stuff := "brick", what := "wall",
-		parts := {}, metal := 0.0, look := Callable()) -> StaticBody3D:
+		parts := {}, metal := 0.0, look := Callable(), floor_y := 0.0) -> StaticBody3D:
 	var b := StaticBody3D.new()
 	b.collision_layer = 1
 	b.position = pos
@@ -46,11 +47,12 @@ static func box(level: Node, pos: Vector3, size: Vector3, col: Color, stuff := "
 	m.material_override = look.call(0) if look.is_valid() else Cutaway.solid(col, metal)   # (both open up for the cutaway)
 	b.add_child(m)
 	level.add_child(b)
-	Cover.add_box(b, pos, size)   # anything solid standing on the ground is cover (cover.gd)
+	Cover.add_box(b, pos, size, floor_y)   # anything solid standing on a floor is cover there (cover.gd)
 	var br := Breakable.attach(b, pos, size, stuff, what)
 	br.parts = parts
 	br.color = col
 	br.look = look
+	br.floor_y = floor_y
 	br.on_stage = func(stage: int) -> void:
 		m.material_override = look.call(stage) if look.is_valid() else Cutaway.solid(col.darkened(0.14 * stage), metal)
 	if maxf(size.x, size.z) > SPLIT_OVER and maxf(size.x, size.z) >= 2.5 * minf(size.x, size.z):
@@ -83,7 +85,7 @@ static func _split(b: Breakable, at: Vector3) -> Breakable:
 		var across := b.rect.get_center()[1 - axis]
 		var pos := Vector3(c, mid_y, across) if axis == 0 else Vector3(across, mid_y, c)
 		var size := Vector3(r[1] - r[0], b.top - b.foot, b.rect.size.y) if axis == 0 else Vector3(b.rect.size.x, b.top - b.foot, r[1] - r[0])
-		var piece := Breakable.of(box(level, pos, size, b.color, b.stuff, b.title, b.parts, 0.0, b.look))
+		var piece := Breakable.of(box(level, pos, size, b.color, b.stuff, b.title, b.parts, 0.0, b.look, b.floor_y))
 		piece.hp = piece.max_hp * share
 		if b.stage > 0:
 			piece.stage = b.stage

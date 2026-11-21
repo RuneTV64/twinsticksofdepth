@@ -56,6 +56,7 @@ func _ready() -> void:
 	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(m)
 	rotation.y = atan2(-dir.x, -dir.z)
+	rotation.x = asin(clampf(dir.y, -1.0, 1.0))        # a shot between floors slopes
 
 
 func _physics_process(delta: float) -> void:
@@ -67,19 +68,17 @@ func _physics_process(delta: float) -> void:
 	var best_p: Player = null
 	if targets_player:
 		var pl := get_tree().get_first_node_in_group("player") as Player
-		if pl != null and not pl.dead and absf(pl.global_position.y + 1.0 - from.y) <= Enemy.LEVEL_GAP:
+		if pl != null and not pl.dead:
 			var t := segment_hit(from, to, pl.global_position, HIT_RADIUS)
-			if t >= 0.0:
+			if t >= 0.0 and _at_height(from, to, t, pl.global_position.y):
 				best_t = t
 				best_p = pl
 	for e in get_tree().get_nodes_in_group("enemies"):
 		var en := e as Enemy
 		if en == null or en.dead or (targets_player and en.kind != "shambler"):
 			continue
-		if absf(en.global_position.y + 1.0 - from.y) > Enemy.LEVEL_GAP:
-			continue      # on another floor
 		var t := segment_hit(from, to, en.global_position, HIT_RADIUS)
-		if t >= 0.0 and t < best_t:
+		if t >= 0.0 and t < best_t and _at_height(from, to, t, en.global_position.y):
 			best_t = t
 			best_e = en
 			best_p = null
@@ -161,14 +160,26 @@ func _physics_process(delta: float) -> void:
 		queue_free()
 
 
+## A shot is a straight line, and may slope (between floors). It only hits a body it passes at that body's
+## height: where it comes nearest, is it between their feet and the top of their head?
+static func _at_height(from: Vector3, to: Vector3, t: float, feet: float) -> bool:
+	var y := lerpf(from.y, to.y, t)
+	return y >= feet - 0.2 and y <= feet + 2.0
+
+
 ## The first wall, door or high cover between two points, or an empty Dictionary. Low cover (crates, window sills,
 ## cars) doesn't stop a shot: it goes over. Someone hunkered behind low cover is protected by the cover rule
 ## instead (Player.take_shot), not by the box. Static so aim checks use the same test as the shot.
+## That is for a level shot. One that slopes (fired between floors, steeper than SLOPED) is a real line: it
+## hits low cover like anything else, so a sill stops a shot from below and hides the ground under a window
+## from above.
+const SLOPED := 0.12
 static func wall_hit(space: PhysicsDirectSpaceState3D, from: Vector3, to: Vector3, skip: Array[RID]) -> Dictionary:
 	var ex: Array[RID] = skip.duplicate()
+	var level := absf(to.y - from.y) <= SLOPED * Vector2(to.x - from.x, to.z - from.z).length()
 	for i in 8:
 		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, 1, ex))
-		if hit.is_empty() or not (hit["collider"] as Object).has_meta("cover_low"):
+		if hit.is_empty() or not level or not (hit["collider"] as Object).has_meta("cover_low"):
 			return hit
 		ex.append(hit["rid"])
 	return {}

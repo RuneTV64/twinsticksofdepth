@@ -89,6 +89,9 @@ Breaking things: everything breaks. Ready, crosshair on it, close by, left-click
   fouls a wound washed with it and can make you ill.
   Y lays the broken glass you carry: a trap for bare feet, an alarm under boots. It stays until picked up.
   Barefoot (U toggles boots), glass goes into your feet. A cut foot takes in what you walk through: wash and dress it.
+  Floors: stairs, upstairs and basements can be walked. Cover works on the floor you are on. A shot is a straight
+  line: from an upstairs window the ground near the wall is hidden unless you take cover at the sill and pop up
+  (Ready) to lean out; from below, only what shows over a sill can be hit. A drop of over 2 m bruises your legs.
   P boards the window by the crosshair   O breaks what the crosshair is on   Shift+O ten minutes of rust and rot
 Cutaway: walls between the camera and you open up. V switches it off and on, to compare.
 Cover test: G test gunner at the crosshair   Shift+G remove them
