@@ -75,6 +75,13 @@ var steroid_t := 0.0
 ## Dirt gets into an open wound (`germs`), most of all through a cut foot walked on (soil()). Left there it
 ## takes hold (`inf` 0 to 1); washed in time, it doesn't. A wound it has taken hold of poisons the blood
 ## (`septic` 0 to 1), and at 1 you die of it. Washed and dressed, the body slowly beats it. Stand-in times.
+## Every wound collects dirt and grime just by being a wound, and has to be cleaned from time to time (owner,
+## 21 Nov 2026); feet collect it far faster, by being walked on (Player._step_in_it). A little the body
+## shrugs off; past that it starts to go bad.
+var open_grime := 1.0 / 1800.0     # germs a second in an open wound
+var dressed_grime := 1.0 / 7200.0  # ... under a dressing: slower, but a dressing gets dirty too
+var shrug := 0.1             # germs the body deals with by itself in an open wound
+var dressed_shrug := 0.25    # ... and under a dressing
 var infect_time := 90.0      # s for a filthy wound (germs 1) to go bad; a little dirt takes much longer
 var hold := 0.5              # from here it has taken hold: washing no longer simply rinses it away
 var fight_time := 300.0      # s for a washed, dressed wound to clear an infection that had taken hold
@@ -156,11 +163,20 @@ static func open(w: Dictionary) -> bool:
 	return w["dressed"] == "" and float(w["closing"]) < 0.8 and w["kind"] != "bruise" and w["kind"] != "break"
 
 
-## The open wounds on the soles of your feet.
-func open_feet() -> Array[Dictionary]:
+## The open wounds on the soles of your feet; or, with `all`, every open wound (for someone crawling).
+func open_feet(all := false) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for w in wounds:
-		if str(w.get("where", "")) == "foot" and open(w):
+		if (all or str(w.get("where", "")) == "foot") and open(w):
+			out.append(w)
+	return out
+
+
+## The wounds on the soles of your feet that are dressed and not yet closed.
+func dressed_feet() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for w in wounds:
+		if str(w.get("where", "")) == "foot" and w["dressed"] != "" and float(w["closing"]) < 0.8:
 			out.append(w)
 	return out
 
@@ -182,10 +198,20 @@ func _tick_infection(dt: float) -> void:
 	for w in wounds:
 		var germs := float(w.get("germs", 0.0))
 		var inf := float(w.get("inf", 0.0))
-		if germs > 0.0 or (inf >= hold and not (w["clean"] and w["dressed"] != "")):
-			inf = minf(inf + dt * maxf(germs, 0.3 if inf >= hold else 0.0) / infect_time, 1.0)
+		var covered: bool = w["dressed"] != ""
+		# It gathers grime, open or dressed, until it has closed.
+		if treatable(w) and float(w["closing"]) < 0.8:
+			germs = minf(germs + dt * (dressed_grime if covered else open_grime), 1.0)
+			w["germs"] = germs
+		var over := germs - (dressed_shrug if covered else shrug)
+		if over > 0.0:
+			w["clean"] = false                           # it wants washing again
+		if inf >= hold and not (over <= 0.0 and covered):
+			inf = minf(inf + dt * maxf(over, 0.3) / infect_time, 1.0)    # it has taken hold: it feeds itself
+		elif over > 0.0:
+			inf = minf(inf + dt * over / infect_time, 1.0)
 		elif inf > 0.0:
-			inf = maxf(inf - dt / fight_time, 0.0)      # washed and covered: the body gets on top of it
+			inf = maxf(inf - dt / fight_time, 0.0)      # clean enough, and the body gets on top of it
 		w["inf"] = inf
 		if inf >= 1.0:
 			bad += 1
@@ -520,6 +546,8 @@ func describe(part: String) -> Array[String]:
 				s += ", bleeding"
 			if w["dressed"] != "":
 				s += ", dressed"
+			if float(w.get("germs", 0.0)) > 0.3:
+				s += ", dirty"
 			if float(w.get("inf", 0.0)) >= 1.0:
 				s += ", hot and swollen"
 			if str(w.get("where", "")) == "foot":
@@ -549,8 +577,10 @@ func describe(part: String) -> Array[String]:
 				s2 += " (infected: wash it, cover it, keep off it)"
 			elif inf >= hold or (medical >= 3 and inf > 0.15):
 				s2 += " (going bad)"
-			elif medical >= 3 and float(w.get("germs", 0.0)) > 0.3:
+			elif float(w.get("germs", 0.0)) > 0.5:
 				s2 += " (filthy: wash it now)"
+			elif float(w.get("germs", 0.0)) > (dressed_shrug if w["dressed"] != "" else shrug):
+				s2 += " (dirty: the dressing wants changing)" if w["dressed"] != "" else " (dirty: it wants washing)"
 			if medical >= 2 and int(w.get("glass", 0)) > 0:
 				s2 += " (glass in it)"
 			out.append(s2)

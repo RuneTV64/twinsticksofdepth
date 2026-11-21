@@ -400,8 +400,7 @@ always infects unless treated and cleaned at once. Every number here is Claude's
 - Crawling on glass (owner, 21 Nov 2026: "a horrible idea"): prone, each drag over glass has a 0.7 chance
   (`Wreck.CRAWL_CUT`) of a shard, boots or not, in an arm, the chest (likeliest) or a leg: a cut there with
   the glass in it. Crawling in boots over 6 shards put all 6 in the player within 1.4 m. Crawling zombies
-  pick it up the same way and don't care. Open wounds elsewhere than the feet don't yet take in dirt from
-  what you crawl through. Not built: raiders seeing and going
+  pick it up the same way and don't care. Not built: raiders seeing and going
   round glass, picking it up or laying it; a bloody shard keeping its blood once laid; a proper control
   for laying (it waits for dropping and placing items).
 - Glass in a wound is drawn out with the tweezers like anything else and comes out as a `bloody_glass` item
@@ -410,12 +409,23 @@ always infects unless treated and cleaned at once. Every number here is Claude's
   where it stood, a raider theirs (not infectious). A stain is fresh for 180 s, then old; rain washes it
   away in about a minute and it dries to nothing in 30 minutes (Wear's clock). Drawn as flat patches, red
   fresh and brown-black old: a stand-in look.
+- Every wound gathers dirt and grime and has to be cleaned from time to time (owner, 21 Nov 2026); feet
+  just gather it a lot faster, most of all barefoot. On the slow clock each wound that isn't a bruise or a
+  break and hasn't closed gains `germs`: `open_grime` (full in 30 minutes) or, under a dressing,
+  `dressed_grime` (2 hours). The body shrugs off a little (`shrug` 0.1 open, 0.25 dressed); past that the
+  wound "wants washing" (its `clean` goes false) and starts to go bad. A dressing has to come off to wash
+  under it, and is lost: that is changing the dressing. Cloud run, a deep arm wound held open for an hour:
+  never washed, it took hold at 583 s and was fully infected at 733 s; washed and bandaged once, it wanted
+  washing at 30 minutes and took hold at 43; with the dressing changed every 10 minutes, nothing.
+  Anyone can see a wound is "dirty"; Medical 2 says whether it wants washing or the dressing changing.
+- A foot wound in boots or under a dressing still takes a quarter of the ordinary dirt of each stride
+  (`covered_dirt`), and none of the blood or rot. Crawling, every open wound you have (not only feet) is
+  dragged through what you crawl over: dirt, blood, rot, and the zombie-blood roll.
 - Walking on an open cut foot (`Player._step_in_it()`, once a stride; open = not dressed and not nearly
   closed): each stride puts dirt in it (`germs`, 0 to 1): ordinary ground a little (`step_dirt` 0.004, up
   to five times that in mud), fresh blood 0.3, old blood or the corpse pile 0.9. Fresh zombie blood also
   rolls for the zombie infection (`blood_takes` 0.3: 110 to 128 in 400 in the cloud), which goes in by
-  that leg exactly as a bite there does (so the leg can still come off in time). A dressed foot takes in
-  nothing.
+  that leg exactly as a bite there does (so the leg can still come off in time).
 - Ordinary infection (`body_health.gd`, `_tick_infection`): dirt left in a wound takes hold (`inf`), faster
   the fouler it is (`infect_time` 90 s at its worst). Washed before it takes hold (`hold` 0.5), that is the
   end of it. After that, washing only stops it getting worse, and the wound has to be kept washed and

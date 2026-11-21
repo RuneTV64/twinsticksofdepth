@@ -181,6 +181,7 @@ var reload_time := 1.1
 @export var barefoot := true
 @export var glass_cut := 7.0            # the damage of a shard in the foot
 @export var step_dirt := 0.004          # how much one stride on ordinary ground fouls an open cut foot (0 to 1)
+@export var covered_dirt := 0.25        # the share of that a booted or dressed foot wound still takes in
 @export var step_blood := 0.3           # ... in fresh blood
 @export var step_gross := 0.9           # ... in old blood, or anything rotten
 ## Breaking things (first guesses): the force of a blow with each thing, times Strength (melee_mult).
@@ -925,26 +926,34 @@ func _step_in_it() -> void:
 		show_status("Glass goes into your foot.", 1.4)
 	elif glass == 1 and not barefoot:
 		show_status("Glass crunches under you.", 0.9)
-	# An open cut on the sole takes in whatever you walk through.
-	if not barefoot or invulnerable:
+	# A wound on the sole takes in what you walk through, far faster than any other wound gathers dirt: open
+	# and barefoot, all of it; in boots or under a dressing, only a little grime. Crawling, every open wound
+	# you have is dragged through it.
+	if invulnerable:
 		return
-	var feet := body.open_feet()
+	for w in body.dressed_feet():
+		body.soil(w, step_dirt * covered_dirt)
+	var feet := body.open_feet(crawl)
 	if feet.is_empty():
+		return
+	if not barefoot and not crawl:
+		for w in feet:
+			body.soil(w, step_dirt * covered_dirt)
 		return
 	var stain := Spill.at(global_position)
 	var foul := step_dirt * (1.0 + 4.0 * (Ground.it.softness(global_position) if Ground.it != null else 0.0))
 	var said := ""
 	if CorpsePile.height_at(global_position) > 0.05 or perch > 0.25:
 		foul = step_gross
-		said = "Your cut foot is in the rot."
+		said = "Your wounds are in the rot." if crawl else "Your cut foot is in the rot."
 	elif not stain.is_empty() and Spill.fresh(stain) and stain["zombie"]:
 		foul = step_blood
-		said = "Your cut foot is in their blood."
+		said = "Your wounds are in their blood." if crawl else "Your cut foot is in their blood."
 		for w in feet:
 			body.blood_in(w["part"])
 	elif not stain.is_empty() and not Spill.fresh(stain):
 		foul = step_gross
-		said = "Your cut foot is in old blood."
+		said = "Your wounds are in old blood." if crawl else "Your cut foot is in old blood."
 	elif not stain.is_empty():
 		foul = step_blood
 	for w in feet:

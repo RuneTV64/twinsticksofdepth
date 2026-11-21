@@ -127,6 +127,34 @@ func _run() -> void:
 			if b.dead_from_sepsis():
 				dead_t = t
 		_say("%s: took hold at %s, fully infected at %s, dead at %s%s; zombie infection: %s" % [case[0], _t(hold_t), _t(bad_t), _t(dead_t), "" if b.wounds.has(cut) else " (the wound closed at %s)" % _t(t), b.infected])
+	# Any wound gathers grime with time: a deep cut on the arm that never closes, left alone.
+	for case2: Array in [["left open, never washed", 0], ["washed and bandaged once at the start", 1], ["washed and bandaged, the dressing changed every 10 minutes", 2]]:
+		b.reset()
+		var arm := b.hurt("deep cut", "ArmL", 30.0)
+		arm["debris"] = 0
+		arm["bleed"] = 0.0
+		if case2[1] >= 1:
+			b.wash(arm)
+			b.dress(arm, "bandage")
+		var tt := 0.0
+		var dirty_t := -1.0
+		var hold2 := -1.0
+		var bad2 := -1.0
+		while tt < 3600.0 and b.wounds.has(arm):
+			arm["closing"] = 0.0            # (held open for the test: how long can a wound be left?)
+			if case2[1] == 2 and fmod(tt, 600.0) < 0.5 and tt > 1.0:
+				b.undress(arm)
+				b.wash(arm)
+				b.dress(arm, "bandage")
+			b.tick(0.5)
+			tt += 0.5
+			if dirty_t < 0.0 and not arm["clean"]:
+				dirty_t = tt
+			if hold2 < 0.0 and float(arm["inf"]) >= b.hold:
+				hold2 = tt
+			if bad2 < 0.0 and float(arm["inf"]) >= 1.0:
+				bad2 = tt
+		_say("arm wound %s: wants washing at %s, took hold at %s, fully infected at %s (an hour watched)" % [case2[0], _t(dirty_t), _t(hold2), _t(bad2)])
 	# Zombie blood: how often one step takes.
 	var took := 0
 	for i in 400:
