@@ -41,6 +41,9 @@ aiming at things above you (see The house kit); buildings that open while you ar
 half strength in a cut wall, and the cursor cutaway (see Camera). Review sheets in
 `assets/buildings/house/preview/` and `tools/preview/cursor_cutaway.png`.
 
+Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
+owner: the fence kit (see The fence kit). The owner has pivoted back to making assets.
+
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
 before then. Claude's answer, for when it comes up again: keep the free cursor when Ready (windows, walls,
@@ -695,6 +698,61 @@ artifact (see Where game design assets live).
   frames, gutters, chimney or porch; a worn part is worn all over, not where it was hit; a derelict
   house's windows are whole; nothing collapses; unchecked on Forward+.
 
+## The fence kit (built 21 Nov 2026, in review; not seen by the owner)
+
+The owner: "We will pivot back to making assets. You made dirt. Now make fences. Same design principle as
+the house, just fences this time." Everything is in `assets/buildings/fence/` (its README has the full
+account) and in the **Building Assets** artifact (`files/Fence/`). On the branch
+`claude/destructible-environment-6yu73c`, not on `main`. Every number is Claude's first guess.
+
+- One style, timber, three kinds, each with a job of its own (rule 2):
+  - `picket`, 1.0 m, painted white: low cover. You crouch behind it, vault it, shoot over it; a zombie
+    climbs it and lands on its face.
+  - `board`, 1.875 m, bare boards: it stops sight and bodies, nobody vaults it, and one zombie can't climb
+    it, so it is beaten down or gone round. The way through is the gate.
+  - `rail`, 1.25 m, posts and three rails: it hides nobody and stops no sight; about four shots in five go
+    through it and the rest hit a rail. It only slows whoever has to get over it.
+  - A gate (1.25 m wide) in any of them: a `Door` called a gate (`Door.noun`), opened with interact.
+- `fence_kit.gd` (`FenceKit`): `FenceKit.new(level, kind, wear, paint)`, `run(a, b, gate_at, outward)` (a
+  run along X or Z; gates by how far along their middle is; `outward` is the good side) and
+  `FenceKit.yard(level, rect, kind, gate_sides, wear, paint, pin)` for a fence right round a rectangle.
+  Each stretch between gates is one thin box through `Solid.box` (rule 1): wood, cut where it is hit, and
+  it leaves splintered wood. Fences are thinner than walls: `Breakable.thin_to(share)` (picket 0.25, board
+  0.4, rail 0.3 of a solid wooden thing its size), and they give half the scrap.
+- `fence.gdshader`, one shader for all of it: it draws posts, pickets, boards, rails and a gate's brace on
+  the box, texel by texel on the ground's grid, and discards the rest, so the gaps are real gaps. It uses
+  the house's shared includes and ramps. The same three things change it as change the house: the season
+  and weather (`ground_season`: wet, bleached, algae at the foot, autumn leaves caught against it, frost,
+  snow on every cap and rail), `wear` 0, 1, 2 (paint peels, timber silvers, pickets and boards snap off or
+  go, rails sag and fall), and the cutaway. Paint -1 bare, 0 to 2 the house's, 3 white.
+- What the game needed for an open fence:
+  - `Solid.open_up(body, gaps)`: the body goes on the glass layer (stops bodies, not sight);
+    `Breakable.gaps` is the share of it that is air, and that share of the shots crossing it go through
+    untouched, the rest stop at a rail (`projectile.gd`); `Cover.Box.open`: it is still a face to vault
+    and a box to climb, but `Cover.shields()` and `Player.low_hidden_from()` say it hides nobody.
+  - `_split` carries `thin`, `gaps` and `salvage_mult` to the pieces it cuts.
+- In the test level: a worn-out picket front yard for the derelict house, a boarded back yard behind both
+  kit houses (its gate is between them), a rail fence round the ploughed field (gate on the west).
+- Review sheets (software renderer; `tools/fence_preview.gd`): `preview/fence_parts.png`,
+  `fence_seasons.png`, `fence_wear.png`, `fence_paints.png`, `fence_house.png`.
+- Cloud run (`tools/fence_test.gd`), a 1.2 m section, sound:
+
+  | Kind | Zombie blows | Punches | Hatchet | Shots | A zombie with you in sight |
+  |---|---|---|---|---|---|
+  | Picket | 3 | 6 | 1 | 8 | climbed over in about 4 s |
+  | Board | 9 | 18 | 2 | 22 | broke through in about 21 s (its gate: 24 s) |
+  | Rail | 5 | 9 | 1 | 11 | climbed over in about 5 s |
+
+  Put up damaged or about to give: 60% and 30% of that. Across the rail fence a zombie 8 m off was seen
+  and 31 of 40 level shots reached it; across the board fence it was not seen and none did. The player got
+  over the picket and the rail with the cover button, not the board. The level has 449 breakable things.
+- Not done: Forward+ unchecked (and the shadows the cut-out throws); posts are drawn, not modelled; fences
+  only run along X or Z on level ground; a bullet stops at a board fence as at a house wall; a gate is a
+  plain door underneath (it blocks sight to its own height even in a rail fence, has no latch or lock,
+  and zombies beat on it rather than climb it); worn all over, not where hit; raiders don't reason about
+  rail fences; nothing to build or mend a fence in play; no other styles (chain link, railings, walls,
+  hedges).
+
 ## Small rules the owner has set (20 Nov 2026)
 
 - The mind goes with the body (owner: zombies follow tracks too, but "the more they rot they lose the ability
@@ -764,8 +822,9 @@ changes, update both, and keep them the same files.
 - Ground assets (dirt, grass, seasons): the **Ground Assets** artifact,
   https://claude.ai/artifact/UJoHeBzm47cZoGwVgMa3xU (`files/Ground/`; in review). The same files as
   `assets/ground/`.
-- Building assets (the house kit): the **Building Assets** artifact, https://claude.ai/artifact/T6hgheyYpqh5JaiJSvoCwr (`files/House/`; in
-  review). The same files as `assets/buildings/house/`.
+- Building assets (the house kit and the fence kit): the **Building Assets** artifact,
+  https://claude.ai/artifact/T6hgheyYpqh5JaiJSvoCwr (`files/House/` and `files/Fence/`; in review). The same
+  files as `assets/buildings/house/` and `assets/buildings/fence/` (the harnesses are in `tools/`).
 - Before starting asset work, check the Artifacts first. Work done in an earlier chat may only be there, not in git.
 - Layout inside an asset artifact: `files/<AssetName>/`. Models are `.glb.b64.txt` (base64 of the .glb, since
   artifacts can't hold .glb). Godot scripts and shaders are `.gd.txt` / `.gdshader.txt`, Python `.py.txt`. The

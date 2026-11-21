@@ -31,6 +31,8 @@ class Box:
 	var low := false
 	var body: Object
 	var gone := false      # it was broken: whoever was using it has to let go
+	var open := false      # you can see and shoot through it (a rail fence): it hides and shields nobody,
+	                       # but it is still something to vault or climb (Solid.open_up)
 
 	## Is someone whose feet are at this height on the floor this stands on?
 	func on(feet: float) -> bool:
@@ -209,7 +211,7 @@ static func crosses(p: Vector2, q: Vector2, r: Rect2) -> bool:
 ## hunkered if the line passes under its top where it crosses the cover's near face, and not otherwise. So the
 ## higher and the closer the looker, the less low cover is worth; a wall is worth as much as ever.
 static func shields(f: Face, at: Vector2, from: Vector2, rise := 0.0) -> bool:
-	if not ((from - f.a).dot(f.n) < 0.0 and crosses(from, at, f.box.rect)):
+	if f.box.open or not ((from - f.a).dot(f.n) < 0.0 and crosses(from, at, f.box.rect)):
 		return false
 	if rise <= f.top:
 		return true

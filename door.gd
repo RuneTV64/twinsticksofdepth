@@ -27,6 +27,7 @@ var _push_vel := 0.0
 var _weaken := 0.0
 var _shake := 0.0
 var _panel: MeshInstance3D
+var noun := "door"             # what the prompt calls it (a fence's gate: "gate")
 var breakable: Breakable       # a door breaks like anything else: zombies beat on it, an axe goes through it
 
 
@@ -152,7 +153,7 @@ func interact_point() -> Vector3:
 func prompt_text(_p: Player) -> String:
 	if locked and is_shut():
 		return "Locked (bash it: dash into it)" if _p.can_bash() else "Locked (you aren't strong enough to bash it in)"
-	return "Open door" if is_shut() else "Close door"
+	return ("Open %s" if is_shut() else "Close %s") % noun
 
 
 func interact(p: Player) -> void:

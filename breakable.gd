@@ -40,6 +40,9 @@ var stage := 0                   # 0 sound, 1 damaged, 2 failing
 var fixed := false               # the edge of the test map: not part of the world, never breaks
 var barrier := false             # fills an opening someone could otherwise climb through (a pane, boards)
 var lets_shots := false          # a shot goes through it (and breaks it): glass
+var gaps := 0.0                  # the share of it that is air (a rail fence 0.8): it stops bodies, not sight,
+                                 # and that share of the shots that cross it go through untouched (Solid.open_up)
+var thin := 1.0                  # its strength as a share of a solid thing of its size (a fence is not a wall)
 var surface := false             # a floor or pavement: worked a square metre at a time
 var radius := 0.0                # a round surface: only this far from its middle is really there
 var section := 1.2               # how wide a hole a blow knocks in something long
@@ -81,6 +84,13 @@ static func of(body: Object) -> Breakable:
 		return null
 	var b = body.get_meta("breakable")
 	return b if is_instance_valid(b) else null
+
+
+## Make it this much weaker than a solid thing its size (fence boards against a framed wall).
+func thin_to(share: float) -> void:
+	max_hp = max_hp / thin * share
+	hp = hp / thin * share
+	thin = share
 
 
 static func reset() -> void:

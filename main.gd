@@ -49,6 +49,7 @@ func _ready() -> void:
 	Cover.clear()
 	Solid.reset()
 	HouseKit.reset()
+	FenceKit.reset()
 	Cutaway.reset()
 	add_child(Wear.new())
 	add_child(Spill.new())
@@ -492,6 +493,20 @@ func _build_level() -> void:
 	# it, to compare. Every part of them is a Solid like the rest of the level.
 	HouseKit.house(self, Vector3(18, 0, -34), 3, 2, 2, 0, 0, Vector4(-1.0, 0.0, 0.0, 0.0), true)
 	HouseKit.house(self, Vector3(30, 0, -34), 2, 2, 1, 2, 1)
+	# Fences (assets/buildings/fence): one of each kind, each doing its own job.
+	# A picket front yard for the derelict house, as worn as the house: low cover, and a zombie has to climb it.
+	var picket_yard := FenceKit.new(self, "picket", 2)
+	picket_yard.run(Vector2(30, -27.85), Vector2(30, -23.5), [], Vector2(-1, 0))
+	picket_yard.run(Vector2(30, -23.5), Vector2(36, -23.5), [3.0])
+	picket_yard.run(Vector2(36, -27.85), Vector2(36, -23.5))
+	# A boarded back yard behind both houses, against the yard's wall: nothing sees in, and the only way in
+	# without breaking something is the gate between the houses.
+	var board_yard := FenceKit.new(self, "board")
+	board_yard.run(Vector2(18, -39.5), Vector2(18, -34.15), [], Vector2(-1, 0))
+	board_yard.run(Vector2(36, -39.5), Vector2(36, -34.15))
+	board_yard.run(Vector2(27.15, -34), Vector2(29.85, -34), [1.35])
+	# A rail fence round the ploughed field: it hides nobody and stops no shot, it only slows what crosses it.
+	FenceKit.yard(self, Rect2(18, 16, 18, 17), "rail", "W")
 	_sign(Vector3(22.5, 3.4, -27), "Kit house: two storeys and a basement. The stairs are inside, to the left")
 	_sign(Vector3(33, 3.4, -27), "The same kit, derelict: far easier to break into")
 

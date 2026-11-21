@@ -60,6 +60,21 @@ static func box(level: Node, pos: Vector3, size: Vector3, col: Color, stuff := "
 	return b
 
 
+## Make something just built with `box` open: rails with air between (a post-and-rail fence). It still stops
+## bodies, and can be vaulted, climbed and broken, but it is on the glass layer, so sight and shots don't
+## stop at it: `gaps` of the shots that cross it go through untouched, the rest hit a rail. It hides and
+## shields nobody (cover.gd, Box.open).
+static func open_up(body: Node, gaps: float) -> void:
+	(body as CollisionObject3D).collision_layer = GLASS_LAYER
+	body.remove_meta("cover_low")
+	var c := Cover.box_of(body)
+	if c != null:
+		c.open = true
+	var br := Breakable.of(body)
+	if br != null:
+		br.gaps = gaps
+
+
 ## Cut the section round `at` out of something long, as pieces of its own. Returns the section's Breakable.
 static func _split(b: Breakable, at: Vector3) -> Breakable:
 	var axis := 0 if b.rect.size.x >= b.rect.size.y else 1
@@ -86,7 +101,12 @@ static func _split(b: Breakable, at: Vector3) -> Breakable:
 		var pos := Vector3(c, mid_y, across) if axis == 0 else Vector3(across, mid_y, c)
 		var size := Vector3(r[1] - r[0], b.top - b.foot, b.rect.size.y) if axis == 0 else Vector3(b.rect.size.x, b.top - b.foot, r[1] - r[0])
 		var piece := Breakable.of(box(level, pos, size, b.color, b.stuff, b.title, b.parts, 0.0, b.look, b.floor_y))
+		if b.thin != 1.0:
+			piece.thin_to(b.thin)
 		piece.hp = piece.max_hp * share
+		piece.salvage_mult = b.salvage_mult
+		if b.gaps > 0.0:
+			open_up(piece.host, b.gaps)
 		if b.stage > 0:
 			piece.stage = b.stage
 			piece.on_stage.call(b.stage)

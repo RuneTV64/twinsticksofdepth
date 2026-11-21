@@ -2844,7 +2844,7 @@ func low_hidden_from(from: Vector3) -> bool:
 	var them := Vector2(from.x, from.z)
 	var reach := crouch_hide_reach if posture == 1 else prone_hide_reach
 	for b in Cover.boxes:
-		if not b.low or not b.on(global_position.y) or not Cover.crosses(them, me, b.rect):
+		if not b.low or b.open or not b.on(global_position.y) or not Cover.crosses(them, me, b.rect):
 			continue
 		var near := Vector2(clampf(me.x, b.rect.position.x, b.rect.end.x), clampf(me.y, b.rect.position.y, b.rect.end.y))
 		if me.distance_to(near) <= reach:

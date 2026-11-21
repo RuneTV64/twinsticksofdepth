@@ -95,7 +95,13 @@ func _physics_process(delta: float) -> void:
 		if gh.is_empty() or from.distance_to(gh["position"]) / maxf(from.distance_to(to), 0.0001) >= minf(wall_t, best_t):
 			break
 		var pane := Breakable.of(gh["collider"])
-		if pane != null:
+		if pane != null and pane.gaps > 0.0:
+			# Rails with air between: most shots go through untouched; the rest hit a rail and stop there.
+			if randf() >= pane.gaps:
+				hit = gh
+				wall_t = from.distance_to(gh["position"]) / maxf(from.distance_to(to), 0.0001)
+				break
+		elif pane != null:
 			pane.hit(damage, "pierce", gh["position"], shooter if is_instance_valid(shooter) else null)
 		gq.exclude = gq.exclude + [gh["rid"]]
 	if not hit.is_empty():
