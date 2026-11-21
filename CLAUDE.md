@@ -180,6 +180,27 @@ The aim is something like Project Zomboid with its own, better flavour. Two plac
   cover, stealth, the cutaway, the art and the posing are all built for this view. Close-up moments (the
   drawer, the treatment screen, a scope, peeking) can borrow first-person's closeness without a switch.
 
+## Reference: Zomboid's buildings and the art style (talked over 21 Nov 2026)
+
+- How many buildings Zomboid has: its only official number is Build 42's "1,400 new unique buildings" and
+  20,000 new tiles (about 35,000 tiles in all; Build 41 had about 15,000), plus about 400 procedural basements
+  and 75 unique ones. Counts of 8,500 to 9,600 placed buildings come from fan map tools and disagree; an AI
+  summary's "2,000 to 3,000 unique templates" had no source. Zomboid has no building models: mappers lay out
+  every building by hand from flat tiles. Ours is closer to that than to prefabs, but a layout is a function
+  call (`HouseKit.house(...)`), not hand placing. So the number to grow is kinds of piece and styles, and how
+  much variety the kit makes by itself, not a count of hand-made buildings.
+- An outside AI's take on the 8-shade style, and the verdict: its praise fits and is already built (speed of
+  making assets by code, storeys and breaking things in 3D, gear on one skeleton; gear and clothes must carry
+  the rest-position data, `CUSTOM0`, or painted detail slides on them). Its camera advice doesn't fit: the
+  camera is a perspective one (50 degrees, `camera_rig.gd`), fixed at 45 degrees and never turning (owner), at
+  full resolution, zooming 4.5 to 45 m, so a low render resolution scaled up would change pixel size with the
+  zoom; our pixels are fixed in the world instead (16 to the metre), which may shimmer zoomed right out.
+  "Reserve the brightest two shades for loot" doesn't fit either: each material has its own natural 8-shade
+  ramp. The real risk it named is readability (answered for characters by Outlines). Worth keeping for loot
+  and furniture: can a small item on a cluttered table be spotted in the dark, and room corners read at night?
+  Night darkness is the fog-of-war layer (up to 82% black), so that is where that is won or lost. Corner
+  shading in rooms would go in the house shaders; not designed.
+
 ## How fighting should feel (owner, 21 Nov 2026)
 
 The fights are one of the main places the game is to beat Zomboid, whose combat feels clunky. The owner: "I
