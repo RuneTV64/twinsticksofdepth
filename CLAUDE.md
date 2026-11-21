@@ -50,7 +50,10 @@ street lamps and signs (see The street kit, Lamps and signs), the furniture kit 
 furniture kit), the first working items (see The first working items), and searching furniture with
 the grid screen and a backpack (see Searching and the grid).
 
-Items by theme come next (see Themed item batches). Wait for the owner to name the theme.
+Items by theme come next (see Themed item batches). Wait for the owner to name the theme. The owner moved
+to a fresh chat to consolidate (21 Nov 2026) and will pick up by saying "the first theme is ...". When they
+do, that starts session 1 of that theme, clothes; begin by building what the four batches share and
+proposing how clothes are worn (see Themed item batches), then ask how many items if they don't say.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
