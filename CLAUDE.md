@@ -35,15 +35,19 @@ Built 21 Nov 2026, on `main` since the owner said to push it, but not yet seen o
 owner: everything can be broken (see Two rules for every object, and Breaking things); bare feet, blood
 on the ground and ordinary infection; and how clean water is. Tested headless only.
 
-Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
-owner: the house kit, with stairs you can walk and basements, cover and shooting between floors, and
+Built 21 Nov 2026, on `main` since the owner said to push it, but not yet seen or played by the owner:
+the house kit, with stairs you can walk and basements, cover and shooting between floors, and
 aiming at things above you (see The house kit); buildings that open while you are inside them, glass at
 half strength in a cut wall, and the cursor cutaway (see Camera). Review sheets in
 `assets/buildings/house/preview/` and `tools/preview/cursor_cutaway.png`.
 
-Open with the owner (21 Nov 2026), to be talked through, not built: whether shooting at what the cursor
-covers is too clunky, and whether firearms should lock on with the cursor kept for when the weapon is not
-Ready. The owner said to build the cursor cutaway first and then answer honestly.
+Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
+shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
+before then. Claude's answer, for when it comes up again: keep the free cursor when Ready (windows, walls,
+a spot in the dark and throwing need it), and consider a lock-on that keeps part aiming (the crosshair
+snaps to the nearest enemy, a nudge of the mouse picks the part, a firm move breaks it) and a visible
+spread ring in place of the hidden hit roll. What to watch for in play: can a head be picked without
+zooming in, do misses feel like your own fault, does aiming near a house ever pick the wrong thing.
 
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
