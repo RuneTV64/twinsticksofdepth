@@ -35,6 +35,9 @@ Built 21 Nov 2026, on `main` since the owner said to push it, but not yet seen o
 owner: everything can be broken (see Two rules for every object, and Breaking things); bare feet, blood
 on the ground and ordinary infection; and how clean water is. Tested headless only.
 
+Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
+owner: the house kit (see The house kit). Review sheets in `assets/buildings/house/preview/`.
+
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
 with more meat than bone; spawning and horde migration; modular buildings; the clean-up lore. A session on a
@@ -491,6 +494,52 @@ with heat, fire, chemicals or a water filter, all to be added. Every number is C
   time, water going bad again, chemicals other than tablets (bleach, iodine), filters wearing by how dirty
   the water was, zombie blood or bodies fouling a water source, food.
 
+## The house kit (built 21 Nov 2026, in review; not seen by the owner)
+
+The owner: parts to create modular homes with; one style for now, with several shaders to simulate the
+weather, the seasons and the levels of durability; usable for houses of several rooms and levels.
+Everything is in `assets/buildings/house/` (its README has the full account) and in the **Building Assets**
+artifact (see Where game design assets live).
+
+- One style: a timber house, painted clapboard outside (three paints: cream, sage, slate), plaster inside,
+  floorboards, a pitched shingle roof. Laid out on a grid of 3 m cells (`HouseKit.CELL`), walls 2.6 m, a
+  storey 2.7 m.
+- `house_kit.gd` (`HouseKit`): `wall(a, b, storey, cells, outward)` with a letter a cell ("." solid, "W"
+  window, "D" door, "O" open doorway; no `outward` = an inside wall), `floor(cells, storey, skip)`,
+  `stairs(cell, storey, dir)`, `roof(cells, storeys)`, and `HouseKit.house(level, origin, wide, deep, storeys,
+  wear, paint)` for an ordinary house: a front door to the south, windows all round, rooms with open
+  doorways, stairs in the north-west corner, a gable roof.
+- Every part goes through `Solid` (rule 1): outside walls and roof wood, inside walls plaster, floors wood
+  surfaces, windows the usual panes, the door a `Door`. `Solid.box` now takes a `look` (stage -> Material)
+  so a part keeps its shader through the stages of damage and when a long wall is cut where it is hit.
+- Four shaders (`house_wall`, `house_roof`, `house_floor`, `house_trim`) on the ground's texel grid and
+  8-shade recipe, with their own ramps (`house_ramps.gdshaderinc`, from `source/gen_house_ramps.py`). Three
+  things change them, with no change of mesh:
+  - the season and weather: they read `ground_season`, as the ground does (wet streaks, a bleached summer,
+    algae and moss in the damp seasons, autumn leaves on the roof, frost, snow lying and drifting);
+  - `wear` 0, 1, 2: the breakable thing's three stages of damage (peeling paint then missing boards;
+    cracked plaster then bare lath, damp and mould; missing shingles; split and missing floorboards). The
+    weather only gets indoors as a house wears;
+  - the cutaway (every one includes it).
+  One shared material for each shader, set of values and stage (`HouseKit.mat`), so no per-object values.
+- Durability is real: a house built worn (`wear` 1 or 2) has parts at 60% or 30% strength.
+- `Breakable.REACH_UP` 1.9 m: anything whose underside is higher (upper storeys, roofs, the wall over a
+  door or window) can't be picked with the crosshair or beaten on by a zombie from the ground. It can still
+  be broken by code.
+- In the test level: a sound two-storey house (3 by 2 cells) and a small derelict one beside it, in the
+  north-east of the yard.
+- Review sheets (software renderer; `tools/house_preview.gd`, MODE house, open or parts):
+  `preview/house_seasons.png`, `house_wear.png`, `house_parts.png`, `house_paints.png`.
+- Cloud run in the level: 427 breakable things now; a zombie at a kit house goes for a window; one outside
+  the derelict house with the player inside was in through the window in about half a minute; a sound
+  outside wall section takes about 4 hatchet blows.
+- Not done: nobody can go upstairs. The game is flat (aiming on the ground, cover, sight, zombies), so
+  upper storeys, their floors and the stairs are parts that exist and break but can't be walked; making
+  levels playable is its own job, to be designed with the owner. Also: window glass and the dirt under a
+  broken floor are the old plain stand-ins; no window frames, gutters, chimney or porch; a worn part is
+  worn all over, not where it was hit; a derelict house's windows are whole; nothing collapses; unchecked on
+  Forward+.
+
 ## Small rules the owner has set (20 Nov 2026)
 
 - The mind goes with the body (owner: zombies follow tracks too, but "the more they rot they lose the ability
@@ -560,6 +609,8 @@ changes, update both, and keep them the same files.
 - Ground assets (dirt, grass, seasons): the **Ground Assets** artifact,
   https://claude.ai/artifact/UJoHeBzm47cZoGwVgMa3xU (`files/Ground/`; in review). The same files as
   `assets/ground/`.
+- Building assets (the house kit): the **Building Assets** artifact, https://claude.ai/artifact/T6hgheyYpqh5JaiJSvoCwr (`files/House/`; in
+  review). The same files as `assets/buildings/house/`.
 - Before starting asset work, check the Artifacts first. Work done in an earlier chat may only be there, not in git.
 - Layout inside an asset artifact: `files/<AssetName>/`. Models are `.glb.b64.txt` (base64 of the .glb, since
   artifacts can't hold .glb). Godot scripts and shaders are `.gd.txt` / `.gdshader.txt`, Python `.py.txt`. The

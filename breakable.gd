@@ -22,6 +22,7 @@ signal broke(by: Node)
 signal struck(stage: int)
 
 const CELL := 2.0
+const REACH_UP := 1.9            # something whose underside is higher than this can't be got at from the ground
 static var _grid := {}                    # Vector2i -> Array of Breakable
 static var barriers: Array[Breakable] = []
 static var count := 0
@@ -44,6 +45,7 @@ var radius := 0.0                # a round surface: only this far from its middl
 var section := 1.2               # how wide a hole a blow knocks in something long
 var salvage_mult := 1.0
 var color := Color(0.5, 0.5, 0.5)
+var look := Callable()           # (stage) -> Material, for things drawn with their own shader (see Solid.box)
 var splitter := Callable()       # set by Solid for something long: (breakable, at) -> the Breakable for that section
 var on_stage := Callable()       # (stage): the thing shows its damage
 var on_cell := Callable()        # (cell: Vector2i): a surface shows a hole
@@ -290,7 +292,7 @@ static func weakest(pos: Vector2, dir: Vector2, reach: float, force: float, kind
 	var best: Breakable = null
 	var best_n := INF
 	for b in near(pos, reach):
-		if b.surface or b.fixed or not b.alive():
+		if b.surface or b.fixed or not b.alive() or b.foot > REACH_UP:
 			continue
 		var to := pos.clamp(b.rect.position, b.rect.end) - pos
 		if to.length() > 0.05 and to.normalized().dot(dir) < 0.3:
@@ -305,7 +307,7 @@ static func weakest(pos: Vector2, dir: Vector2, reach: float, force: float, kind
 ## The pane or boards across the straight line from a to b, if any: what stops a climb through a window.
 static func barrier_between(a: Vector2, b: Vector2) -> Breakable:
 	for x in barriers:
-		if x.alive() and Cover.crosses(a, b, x.rect.grow(0.05)):
+		if x.alive() and x.foot <= REACH_UP and Cover.crosses(a, b, x.rect.grow(0.05)):
 			return x
 	return null
 
@@ -315,7 +317,7 @@ static func under(p: Vector2, slack := 0.3) -> Breakable:
 	var best: Breakable = null
 	var best_d := INF
 	for b in near(p, slack):
-		if b.fixed or not b.alive():
+		if b.fixed or not b.alive() or b.foot > REACH_UP:
 			continue
 		var d := b.gap_to(p) + (10.0 if b.surface else 0.0) - (0.5 if b.barrier else 0.0)
 		if b.surface and (b.holed(Vector3(p.x, 0.0, p.y)) or not b.on_it(p)):

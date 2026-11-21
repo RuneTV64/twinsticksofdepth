@@ -48,6 +48,7 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	Cover.clear()
 	Solid.reset()
+	HouseKit.reset()
 	add_child(Wear.new())
 	add_child(Spill.new())
 	TallGrass.clear()
@@ -484,6 +485,13 @@ func _build_level() -> void:
 	add_child(kit)
 	_sign(Vector3(-9, 2.2, 6), "Water: fill a bottle here. Boil it on the fire, or Shift+I treats it. I drinks")
 	_sign(Vector3(0, 2.6, 5), "Break things: Ready, crosshair on it, left-click (P boards a window)")
+
+	# Houses from the kit (assets/buildings/house): a sound two-storey one, and a small derelict one beside
+	# it, to compare. Every part of them is a Solid like the rest of the level.
+	HouseKit.house(self, Vector3(18, 0, -34), 3, 2, 2)
+	HouseKit.house(self, Vector3(30, 0, -34), 2, 2, 1, 2, 1)
+	_sign(Vector3(22.5, 3.4, -27), "Kit house: two storeys (nobody can go upstairs yet)")
+	_sign(Vector3(33, 3.4, -27), "The same kit, derelict: far easier to break into")
 
 	_build_raider_camp()
 	_build_culdesac()
