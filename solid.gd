@@ -102,6 +102,20 @@ static func _split(b: Breakable, at: Vector3) -> Breakable:
 
 
 ## Window glass across an opening: centre and size of the pane.
+static var _glass := {}
+
+## Window glass by stage of damage (glass.gdshader: it shows at half strength where the cutaway has opened
+## the wall round it). One shared material a stage.
+static func glass(stage: int) -> ShaderMaterial:
+	if not _glass.has(stage):
+		var mat := ShaderMaterial.new()
+		mat.shader = load("res://glass.gdshader")
+		var c := Color(0.6, 0.8, 0.95, 0.28) if stage == 0 else Color(0.8, 0.88, 0.95, 0.28 + 0.2 * stage)
+		mat.set_shader_parameter("tint", c)
+		_glass[stage] = mat
+	return _glass[stage]
+
+
 static func pane(level: Node, pos: Vector3, size: Vector3) -> Breakable:
 	var b := StaticBody3D.new()
 	b.collision_layer = GLASS_LAYER
@@ -116,11 +130,7 @@ static func pane(level: Node, pos: Vector3, size: Vector3) -> Breakable:
 	var bm := BoxMesh.new()
 	bm.size = size
 	m.mesh = bm
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.6, 0.8, 0.95, 0.28)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.roughness = 0.1
-	m.material_override = mat
+	m.material_override = glass(0)
 	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	b.add_child(m)
 	level.add_child(b)
@@ -128,7 +138,7 @@ static func pane(level: Node, pos: Vector3, size: Vector3) -> Breakable:
 	br.barrier = true
 	br.lets_shots = true
 	br.reindex()
-	br.on_stage = func(stage: int) -> void: mat.albedo_color = Color(0.8, 0.88, 0.95, 0.28 + 0.2 * stage)   # crazed
+	br.on_stage = func(stage: int) -> void: m.material_override = glass(stage)   # crazed
 	var thick := Vector3(maxf(size.x, 0.12), size.y, maxf(size.z, 0.12))
 	windows.append({"pos": pos, "size": thick, "level": level, "pane": br, "boards": null})
 	return br

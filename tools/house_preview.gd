@@ -50,6 +50,9 @@ func _build() -> void:
 	var w: Array = WEATHER[_env("WEATHER", 1)]
 	RenderingServer.global_shader_parameter_set("ground_season", w[1])
 	RenderingServer.global_shader_parameter_set("cutaway_shape", Vector4(0, 0, 0, 0))     # nobody to cut it open for
+	RenderingServer.global_shader_parameter_set("cutaway_aim", Vector4(0, 0, 0, 0))
+	RenderingServer.global_shader_parameter_set("cutaway_room2", Vector4(0, 0, 0, 0))
+	Cutaway.reset()
 	Cover.clear()
 	Solid.reset()
 	HouseKit.reset()
@@ -110,6 +113,9 @@ func _build() -> void:
 			HouseKit.house(world, Vector3(-4.5, 0, -3), 3, 2, storeys, wear, paint, Vector4(-1, 0, 0, 0), cellar)
 			dist = 21.0
 			look_at = Vector3(0, 2.0, 0)
+	if OS.get_environment("LOOK") != "":
+		var l := OS.get_environment("LOOK").split_floats(",")
+		look_at = Vector3(l[0], l[1], l[2])
 	if OS.get_environment("DIST") != "":
 		dist = float(OS.get_environment("DIST"))
 	var cam := Camera3D.new()
@@ -123,6 +129,62 @@ func _build() -> void:
 	cam.position = Vector3(0.0, sin(pitch) * dist, cos(pitch) * dist)
 	cam.rotation = Vector3(-pitch, 0.0, 0.0)
 	cam.current = true
+	# The cutaway as the game runs it (cutaway.gd), round a stand-in for the player:
+	#   WHO="x,y,z"      where the player's feet are (a plain figure is stood there)
+	#   AIM="x,y,z"      weapon Ready, the crosshair on this spot of the player's floor
+	#   AIMHIGH="x,y,z"  weapon Ready, the crosshair on a thing above the storey, at this spot on it
+	if OS.get_environment("WHO") != "":
+		var gs := GDScript.new()
+		gs.source_code = "extends Node3D\nvar dead := false\nvar armed := false\nvar free_look := false\nvar reticle_visible := true\nvar reticle_offset := Vector3.ZERO\nvar aim_high = null\nvar aim_high_at := Vector3.ZERO\nvar perch := 0.0\n"
+		gs.reload()
+		var who := Node3D.new()
+		who.set_script(gs)
+		var f := OS.get_environment("WHO").split_floats(",")
+		who.position = Vector3(f[0], f[1], f[2])
+		world.add_child(who)
+		var fig := MeshInstance3D.new()
+		var cm := CapsuleMesh.new()
+		cm.radius = 0.28
+		cm.height = 1.8
+		fig.mesh = cm
+		var fm := StandardMaterial3D.new()
+		fm.albedo_color = Color(0.85, 0.55, 0.3)
+		fig.material_override = fm
+		fig.position.y = 0.9
+		who.add_child(fig)
+		var spot := Vector3.INF
+		if OS.get_environment("AIM") != "":
+			var v := OS.get_environment("AIM").split_floats(",")
+			spot = Vector3(v[0], v[1], v[2])
+			who.set("armed", true)
+			who.set("reticle_offset", spot - who.position)
+		if OS.get_environment("AIMHIGH") != "":
+			var v := OS.get_environment("AIMHIGH").split_floats(",")
+			spot = Vector3(v[0], v[1], v[2])
+			who.set("armed", true)
+			who.set("reticle_offset", Vector3(spot.x, who.position.y, spot.z) - who.position)
+			who.set("aim_high", who)
+			who.set("aim_high_at", spot)
+		var cut := Cutaway.new()
+		cut.player = who
+		cut.camera = cam
+		cut.room_ease = 0.001      # no easing: the picture is taken a few frames in
+		cut.aim_ease = 0.001
+		world.add_child(cut)
+		if spot != Vector3.INF:
+			# The crosshair, drawn where it would be.
+			var ring := MeshInstance3D.new()
+			var tm := TorusMesh.new()
+			tm.inner_radius = 0.26
+			tm.outer_radius = 0.34
+			ring.mesh = tm
+			var rm := StandardMaterial3D.new()
+			rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			rm.albedo_color = Color(1.0, 0.2, 0.15)
+			rm.no_depth_test = true
+			ring.material_override = rm
+			ring.position = spot + Vector3(0, 0.05, 0)
+			world.add_child(ring)
 
 
 func _process(_d: float) -> bool:

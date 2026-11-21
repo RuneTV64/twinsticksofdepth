@@ -1811,10 +1811,10 @@ func _update_hover() -> void:
 	hover_target = null
 	hover_part = ""
 	hover_breakable = null
+	aim_high = null
 	if not armed or dead or not reticle_visible:
 		return
 	hover_breakable = Breakable.under(_xz(global_position + reticle_offset), 0.3, global_position.y)
-	aim_high = null
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
@@ -1851,7 +1851,8 @@ func _pick_high(cam_at: Vector3) -> void:
 	var to := global_position + reticle_offset
 	var skip: Array[RID] = [get_rid()]
 	var space := get_world_3d().direct_space_state
-	for i in 6:
+	var lidded := false
+	for i in 12:
 		var q := PhysicsRayQueryParameters3D.create(cam_at, to, 1 | Solid.GLASS_LAYER)
 		q.exclude = skip
 		var hit := space.intersect_ray(q)
@@ -1863,9 +1864,26 @@ func _pick_high(cam_at: Vector3) -> void:
 		if Cutaway.hides(at):
 			skip.append(hit["rid"])
 			continue
+		# A lid (a roof, an upper floor, the top of a wall: what you look down on) is never what you are
+		# aiming at. The crosshair looks through it, and the cursor cutaway opens it (cutaway.gd), so a
+		# window in a wall that faces away from the camera can be aimed at from behind.
+		if absf((hit["normal"] as Vector3).y) > 0.5:
+			skip.append(hit["rid"])
+			lidded = true
+			continue
 		var b := Breakable.of(hit["collider"])
 		if b == null or not b.alive():
 			return
+		# Under a lid (inside the house, seen only because the roof opens) only a window or its boards is a
+		# target: otherwise the far wall would get in the way of aiming at the ground behind the house.
+		if lidded and not b.barrier:
+			skip.append(hit["rid"])
+			continue
+		# Only what a shot or a throw of yours could reach: a far wall seen through the opened roof from the
+		# wrong side of the house is not a target (the near wall is in the way).
+		if not line_clear(at, global_position + Vector3(0.0, 1.4, 0.0), [hit["rid"]]):
+			skip.append(hit["rid"])
+			continue
 		# Indoors: whatever is over your own ceiling is out of your sight.
 		var head := global_position + Vector3(0.0, 1.5, 0.0)
 		var roof := space.intersect_ray(PhysicsRayQueryParameters3D.create(head, head + Vector3(0.0, 7.0, 0.0), 1, [get_rid()]))

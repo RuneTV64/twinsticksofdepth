@@ -53,7 +53,8 @@ func _run() -> void:
 	var spots := [
 		["the middle upstairs window", Vector3(22.5, 4.15, -27.99)],
 		["the wall between two upstairs windows", Vector3(21.0, 4.2, -27.84)],
-		["the roof", Vector3(22.5, 6.3, -29.5)],
+		["the roof (a lid: looked through)", Vector3(22.5, 6.3, -29.5)],
+		["the far (north) wall's upstairs window, through the roof, from the wrong side", Vector3(22.5, 4.15, -33.9)],
 		["a ground-floor window", Vector3(19.5, 1.45, -27.99)],
 		["open ground", Vector3(24.0, 0.0, -16.0)],
 	]
@@ -97,12 +98,53 @@ func _run() -> void:
 		if n is ItemPickup and n.small and n.title == "Rock" and n.global_position.distance_to(Vector3(21.0, 0.0, -27.3)) < 1.5:
 			where = "on the ground at the foot of the wall (y %.2f)" % n.global_position.y
 	_say("a rock thrown with the crosshair on %s: the wall took %s damage; the rock lies %s" % [on, "some" if wall != null and is_instance_valid(wall) and wall.hp < hp0 else "no", where])
-	# Indoors: what is over your head is cut away, so the crosshair isn't on it.
+	# The far side of the house: a window in a wall that faces away from the camera, aimed at from behind it.
+	p.global_position = Vector3(20.0, 0.05, -38.0)
+	p.weapon = "gun"
+	p.mag = 6
+	await _wait(1.0)
+	on = _point_at(Vector3(22.5, 4.15, -33.9))
+	var cut: Cutaway = main.cutaway
+	cut._aim_r = 0.0
+	cut._aim(p.global_position, 0.0, 1.0)
+	_say("north of the house, crosshair over the north wall's upstairs window (it faces away from the camera): on %s; the cursor cutaway is open %.1f m round it, at height %.1f" % [on, cut._aim_r, cut._aim_focus.y])
+	_say("  the wall beside that window, the same way: on %s" % _point_at(Vector3(21.0, 4.2, -33.9)))
+	on = _point_at(Vector3(22.5, 4.15, -33.9))
+	p._fire_cd = 0.0
+	p._fire()
+	await _wait(0.6)
+	_say("one shot: the window is %s" % _pane(Vector3(22.5, 4.15, -34.0)))
+	# The cursor cutaway on the flat: weapon Ready, crosshair on the ground behind a wall.
+	p.global_position = Vector3(22.5, 0.05, -20.0)
+	await _wait(0.5)
+	_point_at(Vector3(22.5, 0.0, -25.0))
+	cut._aim_r = 0.0
+	cut._aim(p.global_position, 0.0, 1.0)
+	_say("weapon Ready, crosshair on the ground 5 m off: the cursor cutaway is open %.1f m round it" % cut._aim_r)
+	p.armed = false
+	p.free_look = false
+	cut._aim(p.global_position, 0.0, 1.0)
+	_say("weapon away and not looking about: open %.1f m" % cut._aim_r)
+	p.reticle_offset = Vector3(0.0, 0.0, -1.0)
+	p.armed = true
+	cut._aim(p.global_position, 0.0, 1.0)
+	_say("weapon Ready, crosshair 1 m from you: open %.1f m" % cut._aim_r)
+	# Indoors: the building opens. What is over your head is cut away, so the crosshair isn't on it.
 	p.global_position = Vector3(25.5, 0.05, -29.6)
 	await _wait(1.0)
+	_say("indoors on the ground floor: the building is open %.0f%%; floor %.1f, walls kept below %.2f, everything over %.2f gone" % [Cutaway._room2.w * 100.0, Cutaway._room2.x, Cutaway._room2.y, Cutaway._room2.z])
+	_say("  cut away: the south (near) wall at 1.8 m %s, the north (far) wall at 1.8 m %s, a wall between rooms at 1.8 m %s, the floor upstairs %s, the roof %s, the near wall at 0.5 m %s" % [
+		Cutaway.hides(Vector3(22.5, 1.8, -28.0)), Cutaway.hides(Vector3(22.5, 1.8, -33.9)), Cutaway.hides(Vector3(24.0, 1.8, -30.0)),
+		Cutaway.hides(Vector3(22.5, 2.65, -31.0)), Cutaway.hides(Vector3(22.5, 6.0, -31.0)), Cutaway.hides(Vector3(22.5, 0.5, -28.0))])
 	_say("standing indoors on the ground floor, crosshair where the floor above would be: on %s" % _point_at(Vector3(25.5, 2.7, -31.0)))
 	# Upstairs at the window, crosshair on the ground outside.
 	p.global_position = Vector3(22.5, 2.7, -28.62)
 	await _wait(1.0)
+	_say("upstairs: floor %.1f, walls kept below %.2f, everything over %.2f gone; the roof cut away %s, the ground floor's near wall %s" % [
+		Cutaway._room2.x, Cutaway._room2.y, Cutaway._room2.z, Cutaway.hides(Vector3(22.5, 6.0, -31.0)), Cutaway.hides(Vector3(22.5, 1.8, -28.0))])
 	_say("upstairs at the window, crosshair on the ground outside: on %s" % _point_at(Vector3(22.5, 0.0, -20.0)))
+	p.global_position = Vector3(22.5, 0.05, -20.0)
+	p.armed = false
+	await _wait(1.0)
+	_say("outside again: the building is open %.0f%%" % (Cutaway._room2.w * 100.0))
 	quit()

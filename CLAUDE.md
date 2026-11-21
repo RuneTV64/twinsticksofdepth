@@ -37,7 +37,13 @@ on the ground and ordinary infection; and how clean water is. Tested headless on
 
 Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
 owner: the house kit, with stairs you can walk and basements, cover and shooting between floors, and
-aiming at things above you (see The house kit). Review sheets in `assets/buildings/house/preview/`.
+aiming at things above you (see The house kit); buildings that open while you are inside them, glass at
+half strength in a cut wall, and the cursor cutaway (see Camera). Review sheets in
+`assets/buildings/house/preview/` and `tools/preview/cursor_cutaway.png`.
+
+Open with the owner (21 Nov 2026), to be talked through, not built: whether shooting at what the cursor
+covers is too clunky, and whether firearms should lock on with the cursor kept for when the weapon is not
+Ready. The owner said to build the cursor cutaway first and then answer honestly.
 
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
@@ -91,7 +97,37 @@ say what a picture can't show).
   `project.godot` under `[shader_globals]`). The test level's walls, crates and doors use `Cutaway.solid(colour)`
   (`level_solid.gdshader`, one shared material per colour). V switches it off and on. The cut edge isn't capped
   (you see through the wall, not a filled section), and cut parts stop casting shadows.
-- The buildings themselves are for another day (owner): custom modular building pieces in the 8-shade pixel look.
+- Indoors, the whole building opens (owner, 21 Nov 2026: "Walls should cutaway while player is inside the
+  building and windows should show albeit at 50% transparency"; built the same day, not seen by the owner).
+  - Whatever builds a building says where it stands: `Cutaway.add_building(rect, low, high, ground, storey,
+    eaves)` (`HouseKit.house` does; so do `main.gd`'s `_house` and the yard house). While the player's feet
+    are inside a footprint, every wall comes down to the keep height (0.95 m) wherever it hides that
+    building's floor: the walls on the camera's side and the walls between rooms. The far walls (north and
+    west) stand whole. Everything over the storey you are on goes: upper floors, the roof (`room_ceiling`
+    2.58 m over your floor). Upstairs the ground floor stays; in a basement the house above goes.
+  - It opens and closes over `room_ease` 0.3 s, dithered, as you go in and out, and follows you a storey at
+    a time on the stairs (`room_climb`).
+  - Stairs stand (`cutaway_hidden_standing` in the trim shader), so you can see the way up from across the
+    house; they still open round the player and under the lid.
+  - Window glass is never cut (`glass.gdshader`, `Solid.glass(stage)`, one shared material a stage): where
+    the wall round it has gone, in any of the three openings, the pane is drawn at 50%. Glass over your
+    storey goes with that storey.
+  - `Cutaway.hides()` knows the building opening, so the crosshair can't be on what isn't drawn.
+- The cursor cutaway (built 21 Nov 2026, not seen by the owner): with the weapon Ready, or looking about
+  with free look, the same opening is cut toward the crosshair (`cutaway.gd` `_aim()`, shader globals
+  `cutaway_aim`, `cutaway_aim2`): 2.2 m round the line of sight to the crosshair's spot on your floor, once
+  it is 2 m or more from you, easing in over 0.14 s. So a wall, a floor above or a roof never hides the spot
+  you are aiming at. When the crosshair is on something above your storey (`aim_high`) it opens to that thing
+  instead. Weapon away and not looking about, nothing opens. What it shows you is the place, not who is
+  there: the fog of war and sight are unchanged.
+- Sheet: `tools/preview/cursor_cutaway.png` (`tools/house_preview.gd` with WHO, AIM, AIMHIGH, LOOK: it runs
+  the real `Cutaway` node round a stand-in figure). Software renderer; easing and the dither in motion are
+  for the owner's PC.
+- Not done: things drawn without the cutaway float when the floor under them goes (pickups, wreckage and
+  blood upstairs, a zombie you can see up a stairwell); doors are cut like walls (their feet stay); a
+  building is one rectangle (an L-shaped house needs more than one); raiders and zombies inside an opened
+  building are still only drawn if you can see them.
+- More buildings are for another day (owner): custom modular building pieces in the 8-shade pixel look.
   Their shaders must include the cutaway.
 - Render: `tools/preview/cutaway.png` (off and on, behind a one-storey wall and behind a tall block), made by
   `tools/cutaway_preview.gd`.
@@ -615,6 +651,16 @@ artifact (see Where game design assets live).
     aiming at. It is the same idea already used for which part of an enemy the crosshair is on. The mark
     is drawn on the thing itself, which is the same place on the screen; it turns to the red x and the
     prompt names the thing.
+  - Lids and far-side windows (21 Nov 2026, with the cursor cutaway; the owner had asked how windows on the
+    far side of a house could be aimed at). A lid (a roof, an upper floor, the top of a wall: any face you
+    look down on) is never the target: the ray goes on through it. So from the far side of a house the
+    crosshair can be put on an upstairs window in a wall that faces away from the camera, seen from behind
+    through the roof, which the cursor cutaway opens. Under a lid only a window or its boards counts (not
+    the wall, or the far wall would get in the way of aiming at the ground behind a house), and only if a
+    straight line from you reaches it (from the wrong side of the house the near wall is in the way, so
+    nothing is picked). Roofs can no longer be aimed at. Up to 12 rays on a frame that goes through lids.
+    Cloud run: 4 m north of the kit house, the north wall's upstairs window was picked, the cutaway opened
+    2.2 m round it, and one shot broke it; the wall beside it was not picked; from the south side, neither.
   - A shot then goes along the real line to that spot (`_fire`), a throw arcs to it (`_throw`,
     `Thrown.at_thing`): through glass, breaking it, and on to land on the floor inside (a rock lies
     upstairs, the noise is upstairs); off a wall or a roof, which takes the knock, and down to the ground at
@@ -623,16 +669,16 @@ artifact (see Where game design assets live).
     the open are untouched); anything the cutaway has opened up (`Cutaway.hides()`: it isn't drawn);
     anything above your own ceiling when you are indoors; an enemy under the crosshair comes first.
   - The roof is solid now (shots and thrown things hit it; nothing walks on it).
-  - Cloud run, player 8 m south of the kit house: crosshair over the middle upstairs window, the wall
-    between two windows and the roof picked each of them; over a ground-floor window and over open ground,
+  - Cloud run, player 8 m south of the kit house: crosshair over the middle upstairs window and the wall
+    between two windows picked each of them (the roof was picked too then; it no longer is); over a ground-floor window and over open ground,
     nothing (flat aim). One shot broke the upstairs window and left its glass on the ground under it. A
     rock thrown at another went through and lay on the floor upstairs; one thrown at the wall knocked it
     and lay at its foot. Indoors, and from upstairs looking down, nothing was picked.
   - Not done: the body and gun still turn toward the crosshair's spot on the floor, not toward the thing
     (the shot itself goes to the thing); no arc is shown before a throw; blind fire from cover doesn't use
     it; raiders don't aim at windows; things above you on your own storey (a high shelf, a lamp) can't be
-    aimed at. Windows that face away from the camera (north and west walls) can't be picked, since they
-    can't be seen: a real limit of a camera that never turns.
+    aimed at. (Windows that face away from the camera could not be picked when this was built; they can
+    now: see Lids and far-side windows.)
 - Still flat, and to be done before more than one floor plays properly (nothing here is designed with the
   owner yet): zombies and raiders have no way of finding stairs (there is no path finding); zombies notice
   someone on their own floor by distance, through walls, as before; blind fire stays on your floor; a basement is as light as outdoors; mud, tall

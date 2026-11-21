@@ -26,7 +26,8 @@ void vertex() {
 }
 
 void fragment() {
-	if (cutaway_hidden(wp, FRAGCOORD.xy)) {
+	// Stairs stand while you are indoors (you need to see the way up); everything else opens as walls do.
+	if (stair_run > 0.0 ? cutaway_hidden_standing(wp, FRAGCOORD.xy) : cutaway_hidden(wp, FRAGCOORD.xy)) {
 		discard;
 	}
 	vec3 n = normalize(wn);

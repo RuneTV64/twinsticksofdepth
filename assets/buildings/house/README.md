@@ -86,3 +86,12 @@ ground's shader takes part in the cutaway, so it opens up over someone in a base
 - A worn part is drawn worn all over; it doesn't show where it was hit.
 - Nothing falls when what held it up is broken.
 - Unchecked on Forward+: the colours, the stepped light and the cost.
+
+## Opening up (cutaway.gd)
+
+`HouseKit.house` tells the cutaway where the house stands (`Cutaway.add_building`). While the player is inside,
+its near walls and inside walls come down to 0.95 m, everything over the storey they are on goes, and the far
+walls stand. Stairs stand (`house_trim.gdshader` uses `cutaway_hidden_standing` when `stair_run` is set). Window
+glass is `glass.gdshader` (in the project root, with `solid.gd`): it is never cut, and shows at 50% where the wall
+round it has gone. A house put together by hand from `wall()`, `floor()` and `roof()` must call
+`Cutaway.add_building` itself. Sheet: `tools/preview/cursor_cutaway.png`.

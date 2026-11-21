@@ -438,4 +438,8 @@ static func house(in_level: Node, at_pos: Vector3, wide: int, deep: int, storeys
 		if has_stairs and not top:
 			k.stairs(well, s, Vector2i(0, 1))
 	k.roof(all, storeys)
+	# So the building opens round whoever is inside it (cutaway.gd).
+	var top_y := float(storeys) * STOREY + float(maxi(wide, deep)) * CELL * 0.5 * PITCH + 1.0
+	Cutaway.add_building(Rect2(k.at(Vector2.ZERO), Vector2(wide, deep) * CELL), at_pos.y - (STOREY if cellar else 0.0),
+		at_pos.y + top_y, at_pos.y, STOREY, EAVES + 0.3)
 	return k

@@ -49,6 +49,7 @@ func _ready() -> void:
 	Cover.clear()
 	Solid.reset()
 	HouseKit.reset()
+	Cutaway.reset()
 	add_child(Wear.new())
 	add_child(Spill.new())
 	TallGrass.clear()
@@ -402,6 +403,7 @@ func _build_level() -> void:
 
 	# House: x -7..7, z -22..-10
 	var hc := Color(0.62, 0.56, 0.47)
+	Cutaway.add_building(Rect2(-7, -22, 14, 12), 0.0, WALL_H + 0.2, 0.0, 2.7, 0.3)   # it opens round whoever is inside
 	_box(Vector3(-3.9, WALL_H / 2, -10), Vector3(6.2, WALL_H, WALL_T), hc)   # south, left of door
 	_box(Vector3(3.9, WALL_H / 2, -10), Vector3(6.2, WALL_H, WALL_T), hc)    # south, right of door
 	_box(Vector3(0, WALL_H / 2, -22), Vector3(14.4, WALL_H, WALL_T), hc)     # north
@@ -557,6 +559,7 @@ func _house(c: Vector2, w: float, d: float, door_side: String, col: Color,
 	var x1 := c.x + w * 0.5
 	var z0 := c.y - d * 0.5   # north wall
 	var z1 := c.y + d * 0.5   # south wall
+	Cutaway.add_building(Rect2(x0, z0, w, d), 0.0, WALL_H + 0.2, 0.0, 2.7, 0.3)   # it opens round whoever is inside
 	_flat_box(Vector3(c.x, 0.02, c.y), Vector3(w, 0.04, d), Color(0.4, 0.33, 0.26))   # floorboards
 	_wall(Vector2(x0, z0), Vector2(x1, z0), _openings(w, door_side == "N"), col)
 	_wall(Vector2(x0, z1), Vector2(x1, z1), _openings(w, door_side == "S"), col)

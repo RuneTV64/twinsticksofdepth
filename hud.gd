@@ -95,7 +95,7 @@ Breaking things: everything breaks. Ready, crosshair on it, close by, left-click
   The crosshair hits what it covers: put it over an upstairs window, a wall or a roof and a shot or a thrown rock
   goes there. Glass breaks; a rock through an upstairs window lands, and is heard, upstairs.
   P boards the window by the crosshair   O breaks what the crosshair is on   Shift+O ten minutes of rust and rot
-Cutaway: walls between the camera and you open up. V switches it off and on, to compare.
+Cutaway: walls between the camera and you open up; indoors the whole building opens (windows stay, faint); Ready, it opens to the crosshair too. V switches it off and on.
 Cover test: G test gunner at the crosshair   Shift+G remove them
 Raiders: a camp in the south-west of the yard.  T adds one at the crosshair   Shift+T removes those
 F1 hide help    F2 hide the UI (once: the clutter; twice: all of it)    Esc free mouse"""
