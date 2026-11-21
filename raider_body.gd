@@ -46,7 +46,7 @@ func roll() -> void:
 	_mesh.set_instance_shader_parameter("variant", look.variant)
 	_mesh.set_instance_shader_parameter("hair_color", look.hair)
 	_mesh.set_instance_shader_parameter("look_seed", look.seed)
-	dress(Clothes.layers_from(outfit(rng)))
+	dress(Clothes.layers_from(outfit(rng), body_kind))
 
 
 ## What a raider has on (owner, 21 Nov 2026: clothes, so they read as raiders and not as copies of you). Rolled,

@@ -1092,7 +1092,7 @@ func _worn_changed() -> void:
 ## Draw what you wear as it is now (holes, blood and all).
 func _redress() -> void:
 	if _body != null:
-		_body.dress(Clothes.layers_of(inv.worn))
+		_body.dress(Clothes.layers_of(inv.worn, _body.body_kind))
 
 
 ## Everyone starts dressed (owner, 21 Nov 2026), and somewhere there is something to loot. A stand-in until who
@@ -1409,7 +1409,7 @@ func _step_in_it() -> void:
 			if not body.missing.has(part):
 				places.append(part)
 		var part: String = places[randi() % places.size()]
-		var met := Clothes.meet(inv.worn, part, "cut")
+		var met := Clothes.meet(inv.worn, part, "cut", _body.body_kind)
 		_redress()
 		if not (met["stopped"] as Dictionary).is_empty():
 			show_status("Glass catches in your %s." % Items.name_of(met["stopped"]["id"]).to_lower(), 1.2)
@@ -3610,7 +3610,7 @@ func _wound(kind: String, amount: float, part: String) -> void:
 		return
 	if kind == "bite" or kind == "cut":
 		# What you wear there may stop it: a bite stopped is a bruise and a tear in the cloth.
-		var met := Clothes.meet(inv.worn, part, kind)
+		var met := Clothes.meet(inv.worn, part, kind, _body.body_kind)
 		_redress()
 		if not (met["stopped"] as Dictionary).is_empty():
 			var nm := Items.name_of(met["stopped"]["id"]).to_lower()
@@ -3626,7 +3626,7 @@ func _wound(kind: String, amount: float, part: String) -> void:
 ## How much of a blow to the head gets through what is on it (a helmet: little). 1 = all of it.
 func head_share() -> float:
 	var share := 1.0
-	for it in Clothes.over(inv.worn, "Head", ["head", 1.76]):
+	for it in Clothes.over(inv.worn, "Head", Clothes.crown_spot(_body.body_kind), _body.body_kind):
 		share *= 1.0 - float(Items.DEFS[it["id"]].get("guard", {}).get("blow", 0.0))
 	return share
 

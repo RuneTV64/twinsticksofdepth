@@ -1171,14 +1171,34 @@ back), `clothes_living_room.png` (the game's own items), `raiders_dressed.png`, 
   the next character started dressed.
 - More bodies are coming (owner, 21 Nov 2026): a female body at least, and male skinny, husky and obese with
   female ones to match, "as good as the existing one turned out". Clothes are to be made in one batch for now
-  and fitted to the new bodies after they exist. What will need fitting: `Clothes.MARK` (the heights cuts are
-  named by) is this body's, and a few sizes are written into `clothes.gdshader` (the lenses' spacing, how wide
-  the face is, the pack's width, where a strap runs, where laces are). Make those a per-body table so a new body
-  is its own numbers plus a review sheet, not every outfit again. What fits by itself: the clothes are drawn on
-  each body's own mesh and pushed out along its own surface, so a belly, a bust or thin arms are followed; the
-  body areas come from bone names, so a new body needs the same 72-bone skeleton and names. A new body built
-  from the same recipe (`male_body_muscular.js`, same skeleton, same detail data, the rest position in CUSTOM0)
-  works with every pose, the skin shaders and the clothes; each will want a shambler of its own as well.
+  and fitted to the new bodies after they exist. The fit is a table per body (owner: "Do the per-body table
+  now"; built 21 Nov 2026): `Clothes.BODIES[kind]` holds `marks` (every height cuts are named by) and `fit`
+  (every size the shader needs that belongs to the body: the face, the eyes, a strap's line, a pack, where an
+  open front and buttons start, jeans' seams, the middle of a foot, where jeans wear pale). The shader reads them
+  as uniforms (`fit_face`, `fit_eyes`, `fit_strap`, `fit_back`, `fit_front`, `fit_legs`), and the bite spots and
+  the helmet check come from the marks. `PlayerBody.body_kind` says which body (every body now is
+  `male_muscular`); the player and raiders pass it through. Moving the numbers into the table changed nothing:
+  the clothes sheets rendered before and after were identical, pixel for pixel. For a new body:
+  `tools/body_fit.gd` (MODEL=...) prints a draft from `Clothes.measure()`, which takes the body's bones and
+  skin (`Clothes.raw()`) and puts every mark and size where the muscular male has it between the same
+  measures; paste it under the body's name, set `body_kind`, and check the sheets. Measured against itself the
+  muscular male comes out as his own table exactly; it has never measured a different body. What fits by
+  itself: clothes are drawn on each body's own mesh, so a belly, a bust or thin arms are followed; the body
+  areas come from bone names, so a new body needs the same 72-bone skeleton and names, and each will want a
+  shambler of its own as well.
+- Men's clothes look like men's clothes (owner, 21 Nov 2026: "The man looks like he has breasts when he's
+  wearing clothes. He should look like a buff man wearing a shirt", and "Maybe its the design of the clothes
+  too. Very feminine"). The copy the clothes are drawn on was skin tight: it followed the hollow under each pec
+  and the waist's taper. Now it hangs like cloth (`Clothes._drape`, `_drape_arms`, `_soft_normals`, when the
+  copy is built): it falls from the chest instead of tucking under the pecs (`DRAPE_FALL` 0.08 inward a metre
+  of drop), bridges hollows up to 7 cm wide (between the pecs, the abs, the spine), hangs straight down the sides
+  from the chest and lats (at most 1.5 cm out, the arms hang close), and sleeves hang from the shoulder and
+  biceps (outward only, at most 3 cm); its shading is softened over the torso and arms; a shirt stands 6 mm off
+  the torso. The cuts: the tee, long sleeve and hoodie have a crew neck and come down over the hips (and the
+  tops of the thighs, which hang with the torso); the tank top has shoulders (it was strapless). Sheet:
+  `tools/preview/clothes_menswear.png` (top before, then after front and side; `tools/clothes_preview.gd`
+  ROW=2, a close-up of the chest). Faint light patches remain on pale long sleeves close up. The female bodies
+  will want their own drape (a bust is not to be bridged flat): `_drape` is per mesh, so it can be told by body.
 - Not built: clothes on zombies (and loot by what they wore); clothes that show in the world when dropped (a
   pickup is a box); getting wet, washing, mending; warmth doing anything; noise (a parka rustles); clothes
   slowing you; the outline is drawn round the body, so zoomed right in a coat can stand a little past it;

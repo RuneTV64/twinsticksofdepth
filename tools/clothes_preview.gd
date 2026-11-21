@@ -25,6 +25,16 @@ static func L(cut: String, ink: String, more := {}) -> Dictionary:
 
 
 func _outfits(row: int) -> Array:
+	if row == 2:
+		# Close up on the chest: a shirt on a muscular man must read as a man in a shirt.
+		return [
+			["Bare", []],
+			["T-shirt", [L("tee", "white")]],
+			["Dark t-shirt", [L("tee", "dark")]],
+			["Tank top", [L("tank", "green")]],
+			["Shirt, buttoned", [_as(L("longsleeve", "#8aa0b8", {"detail": "buttons"}), "shirt")]],
+			["Hoodie", [_as(L("hoodie", "red", {"thick": 0.012}), "shirt")]],
+		]
 	if row == 1:
 		return [
 			["Bare (for scale)", []],
@@ -110,7 +120,7 @@ func _build(row: int) -> void:
 		turn = Vector3(0, 0, -1)
 	for i in cells.size():
 		var c: Array = cells[i]
-		var x := (i - (cells.size() - 1) * 0.5) * GAP
+		var x := (i - (cells.size() - 1) * 0.5) * (0.75 if row == 2 else GAP)
 		var p := Player.new()
 		p.position = Vector3(x, 0.0, 0.0)
 		world.add_child(p)
@@ -150,7 +160,7 @@ func _build(row: int) -> void:
 		l.no_depth_test = true
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.width = 200
-		l.position = Vector3(x, 2.25, 0.0)
+		l.position = Vector3(x, 1.75 if row == 2 else 2.25, 0.0)
 		world.add_child(l)
 	var cam := Camera3D.new()
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
@@ -158,6 +168,10 @@ func _build(row: int) -> void:
 	world.add_child(cam)
 	cam.position = Vector3(0.0, 4.0, 12.0)
 	cam.look_at(Vector3(0.0, 1.05, 0.0))
+	if row == 2:
+		cam.size = 1.1          # the chest, close
+		cam.position = Vector3(0.0, 3.0, 12.0)
+		cam.look_at(Vector3(0.0, 1.28, 0.0))
 	cam.make_current()
 
 

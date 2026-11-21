@@ -15,6 +15,8 @@ shader_type spatial;
 // Bayer dither, and patterned texel by texel (40 to the metre on the body at rest): knit, denim, check, stripes,
 // leather, lace, print, metal, glass. Grime and blood lie on it in blotches.
 // Areas: 0 torso, 1 arm, 2 hand, 3 leg, 4 foot, 5 neck, 6 head, 7 face (the front of the head, worked out here).
+// Every size that belongs to the body rather than the garment (where the eyes are, how wide the face is, where a
+// strap crosses...) comes in as the body's fit (Clothes.BODIES, set by clothes.gd), so one shader dresses every body.
 render_mode unshaded, cull_back;
 
 #define MAXL 14
@@ -34,10 +36,14 @@ uniform float ambient = 0.13;
 uniform float pixel_size = 1.0;
 uniform vec3 tint_color = vec3(1.0, 0.35, 0.3);
 uniform float tint_amount = 0.0;
-// Landmarks of the body at rest (m): set by clothes.gd from the one body there is.
-uniform float eyes_y = 1.69;
-uniform float waist_y = 1.0;
-uniform float face_z = 0.03;
+// The body's fit (m, at rest): Clothes.BODIES[body]["fit"], sent by Clothes.put_on(). The defaults are the
+// muscular male's.
+uniform vec4 fit_face = vec4(0.03, 0.072, 1.69, 0.033);      // face plane z, face half width, eye height, eye half spacing
+uniform vec4 fit_eyes = vec4(0.02, 0.055, 1.0, 1.725);       // lens size, temple x, waist height, top of the face
+uniform vec4 fit_strap = vec4(0.16, 1.47, -0.15, 0.95);      // a strap across the chest: shoulder x, y; other hip x, y
+uniform vec4 fit_back = vec4(0.024, 0.16, 0.085, -0.03);     // strap half width, pack half width, pack strap x, back z
+uniform vec4 fit_front = vec4(0.04, 0.06, 0.13, 0.12);       // open front z, button z, leg seam x, foot middle x
+uniform vec4 fit_legs = vec4(0.58, 0.78, 0.0, 0.0);          // where jeans wear pale on the thigh: low, high
 
 varying vec3 rest;
 varying vec4 area_a;        // one-hot areas 0-3 and 4-7, so the area can be told mid-triangle
@@ -53,7 +59,7 @@ float b4(vec2 a) { return b2(0.5 * a) * 0.25 + b2(a); }
 
 int area_at(float a, vec3 r) {
 	int k = int(a + 0.5);
-	if (k == 6 && r.z > face_z && abs(r.x) < 0.072 && r.y < eyes_y + 0.035) {
+	if (k == 6 && r.z > fit_face.x && abs(r.x) < fit_face.y && r.y < fit_eyes.w) {
 		k = 7;
 	}
 	return k;
@@ -80,35 +86,36 @@ bool covers(int i, int k, vec3 r) {
 	}
 	if (shape == 3) {
 		// Lenses: two rounds over the eyes and a bridge between, and the arms back along the sides of the head.
+		float ey = fit_face.z;
 		if (k == 7) {
-			vec2 e = vec2(abs(r.x) - 0.033, r.y - eyes_y);
-			return length(e * vec2(1.0, 1.25)) < 0.02 || (abs(r.x) < 0.014 && abs(r.y - eyes_y - 0.006) < 0.004);
+			vec2 e = vec2(abs(r.x) - fit_face.w, r.y - ey);
+			return length(e * vec2(1.0, 1.25)) < fit_eyes.x || (abs(r.x) < fit_face.w * 0.4242424 && abs(r.y - ey - 0.006) < 0.004);
 		}
-		return k == 6 && abs(r.y - eyes_y - 0.004) < 0.005 && abs(r.x) > 0.055 && r.z > -0.06;
+		return k == 6 && abs(r.y - ey - 0.004) < 0.005 && abs(r.x) > fit_eyes.y && r.z > fit_face.x - 0.09;
 	}
 	vec2 lh = range_of(i, k);
 	if (shape == 1) {
 		// A strap across the body, shoulder to the other hip, front and back.
 		if (k != 0) return false;
 		float sx = (side == 2) ? -1.0 : 1.0;
-		vec2 a = vec2(0.16 * sx, 1.47);
-		vec2 b = vec2(-0.15 * sx, 0.95);
+		vec2 a = vec2(fit_strap.x * sx, fit_strap.y);
+		vec2 b = vec2(fit_strap.z * sx, fit_strap.w);
 		vec2 d = normalize(b - a);
 		vec2 p = vec2(r.x, r.y) - a;
 		float t = dot(p, d);
-		return t > -0.02 && t < length(b - a) + 0.03 && abs(p.x * d.y - p.y * d.x) < 0.024;
+		return t > -0.02 && t < length(b - a) + 0.03 && abs(p.x * d.y - p.y * d.x) < fit_back.x;
 	}
 	if (r.y < lh.x || r.y > lh.y) return false;
 	if (shape == 2) {
 		// A pack on the back: the back of the torso inside the range, and straps over the shoulders in front.
 		if (k != 0) return false;
-		if (r.z < -0.03 && abs(r.x) < 0.16) return true;
-		return r.z > -0.03 && abs(abs(r.x) - 0.085) < 0.022 && r.y > waist_y + 0.12;
+		if (r.z < fit_back.w && abs(r.x) < fit_back.y) return true;
+		return r.z > fit_back.w && abs(abs(r.x) - fit_back.z) < 0.022 && r.y > fit_eyes.z + 0.12;
 	}
-	if (shape == 4 && k == 7 && abs(r.y - eyes_y) < 0.016 && abs(r.x) < 0.064) {
+	if (shape == 4 && k == 7 && abs(r.y - fit_face.z) < fit_eyes.x * 0.8 && abs(r.x) < fit_face.y * 0.8888889) {
 		return false;      // the slot for the eyes in a balaclava
 	}
-	if (form[i].z > 0.0 && k == 0 && r.z > 0.04 && abs(r.x) < form[i].z * 0.5) {
+	if (form[i].z > 0.0 && k == 0 && r.z > fit_front.x && abs(r.x) < form[i].z * 0.5) {
 		return false;      // worn open down the front
 	}
 	return true;
@@ -135,18 +142,21 @@ void vertex() {
 		if (!covers(i, k, rest)) continue;
 		float th = ink_b[i].w;
 		int shape = int(form[i].x + 0.5);
-		if (shape == 2 && rest.z < -0.03) {
+		if (k == 0 && shape == 0) {
+			th += 0.006;      // cloth stands a little off the torso: a shirt is not a second skin
+		}
+		if (shape == 2 && rest.z < fit_back.w) {
 			// The pack: rounded, thickest in its middle.
 			vec2 lh = cov_a[i].xy;
-			float u = abs(rest.x) / 0.16;
+			float u = abs(rest.x) / fit_back.y;
 			float v = abs(rest.y - (lh.x + lh.y) * 0.5) / max((lh.y - lh.x) * 0.5, 0.05);
 			th *= clamp(1.0 - u * u * 0.7 - v * v * 0.7, 0.15, 1.0);
 		}
 		if (form[i].w > 0.0 && (k == 0 || k == 3)) {
 			// Flare: it hangs away from the body below where it starts (a skirt, a cloak, a long coat).
 			vec2 lh = range_of(i, k == 0 ? 0 : 3);
-			float from = k == 0 ? waist_y : lh.y;
-			th += form[i].w * max(min(from, waist_y) - rest.y, 0.0);
+			float from = k == 0 ? fit_eyes.z : lh.y;
+			th += form[i].w * max(min(from, fit_eyes.z) - rest.y, 0.0);
 		}
 		push = max(push, th);
 	}
@@ -197,7 +207,7 @@ void fragment() {
 	} else if (pat == 2) {
 		if (mod(tx.x + tx.y, 3.0) < 1.0) shift -= 0.5;              // denim: a twill of paler threads,
 		second = n < 0.025;                                           // a fleck of the second colour,
-		if (k == 3 && r.z > 0.02 && r.y > 0.58 && r.y < 0.78) shift -= 0.7;   // and worn pale on the thighs
+		if (k == 3 && r.z > 0.02 && r.y > fit_legs.x && r.y < fit_legs.y) shift -= 0.7;   // and worn pale on the thighs
 	} else if (pat == 3) {
 		bool bx = mod(tx.x, 5.0) < 1.0;
 		bool by = mod(tx.y, 5.0) < 1.0;
@@ -223,12 +233,12 @@ void fragment() {
 	if (int(form[top].x + 0.5) == 0 && (r.y - lh.x < 0.012 || lh.y - r.y < 0.012)) shift += 0.8;
 	// Front details.
 	int det = int(wear[top].w + 0.5);
-	if (k == 0 && r.z > 0.06) {
+	if (k == 0 && r.z > fit_front.y) {
 		if (det == 1 && abs(r.x) < 0.006 && mod(tx.y, 5.0) < 1.0) shift -= 1.5;     // buttons
 		if (det == 2 && abs(r.x) < 0.004) { second = true; shift -= 0.5; }            // zip
 	}
-	if (det == 4 && k == 3 && abs(r.x) > 0.11 && abs(abs(r.x) - 0.13) < 0.004) shift += 0.9;   // seams down the legs
-	if (det == 3 && k == 4 && r.z > 0.03 && r.y > 0.035 && abs(abs(r.x) - 0.12) < 0.02 && mod(tx.y, 2.0) < 1.0) second = true;   // laces
+	if (det == 4 && k == 3 && abs(r.x) > fit_front.z - 0.02 && abs(abs(r.x) - fit_front.z) < 0.004) shift += 0.9;   // seams down the legs
+	if (det == 3 && k == 4 && r.z > 0.03 && r.y > 0.035 && abs(abs(r.x) - fit_front.w) < 0.02 && mod(tx.y, 2.0) < 1.0) second = true;   // laces
 	// Grime and blood.
 	float g = wear[top].y;
 	float bl = wear[top].z;

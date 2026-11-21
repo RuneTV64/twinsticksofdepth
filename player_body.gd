@@ -52,6 +52,8 @@ var _outline_on := true
 var _flash := Vector2(-1.0, -1.0)
 var _weapon: Node3D
 var _clothes: MeshInstance3D        # what is worn, drawn over the body (clothes.gd); made the first time it is dressed
+## Which body this is, for the clothes' fit (Clothes.BODIES). Every body built from this model is the muscular male.
+var body_kind := Clothes.DEFAULT_BODY
 var _clothes_tint := -1.0
 
 var _n := 0
@@ -533,7 +535,7 @@ func dress(layers: Array) -> void:
 	if _clothes == null:
 		if layers.is_empty():
 			return
-		_clothes = Clothes.put_on(_mesh, pixel_size)
+		_clothes = Clothes.put_on(_mesh, pixel_size, body_kind)
 		if is_inside_tree():
 			var suns := get_tree().root.find_children("*", "DirectionalLight3D", true, false)
 			if not suns.is_empty():
