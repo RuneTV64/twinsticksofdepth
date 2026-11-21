@@ -872,7 +872,7 @@ func _get_past(box: Cover.Box, n: Vector3, going: Vector3) -> void:
 	if box != null and box.low:
 		var depth := box.rect.size.x if absf(n.x) > absf(n.z) else box.rect.size.y
 		var land := _xz(global_position) - Vector2(n.x, n.z) * (depth + 1.0)
-		if depth <= 2.2 and Cover.has_room(land, box) and Breakable.barrier_between(_xz(global_position), land) == null \
+		if depth <= 2.2 and Cover.has_room(land, box) and Breakable.barrier_between(_xz(global_position), land, global_position.y) == null \
 				and (Cover.bounds.size == Vector2.ZERO or Cover.bounds.grow(-1.0).has_point(land)):
 			_vault_from = global_position
 			_vault_to = Vector3(land.x, global_position.y, land.y)

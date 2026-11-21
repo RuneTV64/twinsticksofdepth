@@ -8,6 +8,7 @@ shader_type spatial;
 #include "res://assets/buildings/house/house_lib.gdshaderinc"
 
 uniform bool along_x = true;
+uniform bool concrete = false;     // a basement's slab, not boards
 
 varying vec3 wp;
 varying vec3 wn;
@@ -28,6 +29,27 @@ void fragment() {
 	vec2 t = house_texel(uv);
 	vec2 p = house_point(t);
 	float w = wear * 0.5;
+	if (concrete) {
+		// A poured slab: joints every 3 m, stains, cracks; water lies on it when the ground is wet.
+		Surf cs = gsurf(R_STONE, 0.52 + (gfbm(p * 1.2) - 0.5) * 0.14 + (gnoise(p * 11.0) - 0.5) * 0.05);
+		if (mod(t.x, 48.0) < 1.0 || mod(t.y, 48.0) < 1.0) {
+			cs.v -= 0.18;
+		}
+		GroundCell cc = gcell(p * 0.9 + 4.0);
+		if (cc.d2 - cc.d1 < 0.04 && gnoise(p * 0.6 + 8.0) < 0.25 + w * 0.7) {
+			cs.v -= 0.28;
+		}
+		float pool = gfbm(p * 0.7 + 12.0);
+		if (pool < (e.wet * 0.24 + w * 0.14) - 0.02) {
+			cs = gsurf(R_WATER, 0.3 + pool * 0.6);
+		} else if (pool < e.wet * 0.5 + w * 0.3 + 0.1) {
+			cs.v -= 0.14;
+		}
+		ltexel = t;
+		ALBEDO=pow(house_color(cs, t),vec3(2.2));
+		ROUGHNESS = 1.0;
+		SPECULAR = 0.0;
+	} else {
 	float lane = floor(t.y / 3.0);
 	float in_lane = mod(t.y, 3.0);
 	float shift = gh1(vec2(lane, 3.0)) * 50.0;
@@ -61,6 +83,7 @@ void fragment() {
 	ALBEDO=pow(c,vec3(2.2));
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
+	}
 }
 
 #include "res://assets/buildings/house/house_light.gdshaderinc"

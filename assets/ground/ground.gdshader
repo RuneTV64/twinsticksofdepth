@@ -3,6 +3,7 @@ shader_type spatial;
 // The borders between kinds wander and break up into single texels, so nothing meets on a straight line.
 // It follows the season and the weather (seasons.gd).
 #include "res://assets/ground/ground_lib.gdshaderinc"
+#include "res://cutaway.gdshaderinc"      // the ground opens up over someone in a basement
 #include "res://assets/ground/dirt_types.gdshaderinc"
 #include "res://assets/ground/grass_types.gdshaderinc"
 
@@ -25,6 +26,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (cutaway_hidden(wp, FRAGCOORD.xy)) {
+		discard;
+	}
 	vec2 texel = ground_texel(wp.xz);
 	vec2 p = ground_point(texel);
 	GroundEnv e = ground_env(ground_season);

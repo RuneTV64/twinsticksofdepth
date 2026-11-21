@@ -880,7 +880,8 @@ func _update_ground() -> void:
 	if moved.length() >= (0.2 if crawl else stride) and perch < 0.25:
 		_step_from = global_position
 		_step_side = -_step_side
-		Ground.it.stamp(global_position, moved, _step_side, crawl, true)
+		if absf(global_position.y) < 0.5:       # (not on an upper floor or in a basement)
+			Ground.it.stamp(global_position, moved, _step_side, crawl, true)
 		_step_in_it()
 
 
@@ -1469,7 +1470,7 @@ func _try_vault() -> void:
 		show_status("Too deep to vault", 0.8)
 		return
 	var land := Cover.spot(f, cover_t) - f.n * (f.depth + Cover.STANDOFF * 2.0)
-	var shut := Breakable.barrier_between(_xz(global_position), land)
+	var shut := Breakable.barrier_between(_xz(global_position), land, global_position.y)
 	if shut != null:
 		show_status("The %s is in the way: break it first" % ("window is shut and" if shut.stuff == "glass" else shut.title), 1.2)
 		return
@@ -1757,7 +1758,7 @@ func _update_hover() -> void:
 	hover_breakable = null
 	if not armed or dead or not reticle_visible:
 		return
-	hover_breakable = Breakable.under(_xz(global_position + reticle_offset))
+	hover_breakable = Breakable.under(_xz(global_position + reticle_offset), 0.3, global_position.y)
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
@@ -1772,7 +1773,9 @@ func _update_hover() -> void:
 		var pts: Dictionary = en.part_points()
 		for slot: String in pts:
 			var q: Vector3 = pts[slot]
-			var g := c + (q - c) * (c.y / maxf(c.y - q.y, 0.01))    # where the camera sees it on the ground
+			if absf(en.global_position.y - global_position.y) > Enemy.LEVEL_GAP:
+				break      # on another floor
+			var g := c + (q - c) * ((c.y - global_position.y) / maxf(c.y - q.y, 0.01))    # where the camera sees it on the floor you stand on
 			var d := _xz(g - aim).length()
 			if slot == "Torso":
 				d *= 0.8        # the biggest part: a little easier to be on

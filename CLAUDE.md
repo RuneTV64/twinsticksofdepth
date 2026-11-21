@@ -36,7 +36,8 @@ owner: everything can be broken (see Two rules for every object, and Breaking th
 on the ground and ordinary infection; and how clean water is. Tested headless only.
 
 Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
-owner: the house kit (see The house kit). Review sheets in `assets/buildings/house/preview/`.
+owner: the house kit, with stairs you can walk and basements (see The house kit). Review sheets in
+`assets/buildings/house/preview/`.
 
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
@@ -506,9 +507,9 @@ artifact (see Where game design assets live).
   storey 2.7 m.
 - `house_kit.gd` (`HouseKit`): `wall(a, b, storey, cells, outward)` with a letter a cell ("." solid, "W"
   window, "D" door, "O" open doorway; no `outward` = an inside wall), `floor(cells, storey, skip)`,
-  `stairs(cell, storey, dir)`, `roof(cells, storeys)`, and `HouseKit.house(level, origin, wide, deep, storeys,
-  wear, paint)` for an ordinary house: a front door to the south, windows all round, rooms with open
-  doorways, stairs in the north-west corner, a gable roof.
+  `stairs(cell, storey, open)`, `basement(cells)`, `roof(cells, storeys)`, and `HouseKit.house(level, origin,
+  wide, deep, storeys, wear, paint, pin, cellar)` for an ordinary house: a front door to the south, windows
+  all round, rooms with open doorways, stairs in the north-west corner, a gable roof.
 - Every part goes through `Solid` (rule 1): outside walls and roof wood, inside walls plaster, floors wood
   surfaces, windows the usual panes, the door a `Door`. `Solid.box` now takes a `look` (stage -> Material)
   so a part keeps its shader through the stages of damage and when a long wall is cut where it is hit.
@@ -523,22 +524,52 @@ artifact (see Where game design assets live).
   - the cutaway (every one includes it).
   One shared material for each shader, set of values and stage (`HouseKit.mat`), so no per-object values.
 - Durability is real: a house built worn (`wear` 1 or 2) has parts at 60% or 30% strength.
-- `Breakable.REACH_UP` 1.9 m: anything whose underside is higher (upper storeys, roofs, the wall over a
-  door or window) can't be picked with the crosshair or beaten on by a zombie from the ground. It can still
-  be broken by code.
-- In the test level: a sound two-storey house (3 by 2 cells) and a small derelict one beside it, in the
-  north-east of the yard.
+- `Breakable.REACH_UP` 1.9 m: anything whose underside is that far above your feet (the storey above, a
+  roof, the wall over a door or window), or that is under the floor you stand on, can't be picked with the
+  crosshair or beaten on by a zombie. It can still be broken by code.
+- In the test level: a sound two-storey house (3 by 2 cells) with a basement, and a small derelict one
+  beside it, in the north-east of the yard.
 - Review sheets (software renderer; `tools/house_preview.gd`, MODE house, open or parts):
   `preview/house_seasons.png`, `house_wear.png`, `house_parts.png`, `house_paints.png`.
 - Cloud run in the level: 427 breakable things now; a zombie at a kit house goes for a window; one outside
   the derelict house with the player inside was in through the window in about half a minute; a sound
   outside wall section takes about 4 hatchet blows.
-- Not done: nobody can go upstairs. The game is flat (aiming on the ground, cover, sight, zombies), so
-  upper storeys, their floors and the stairs are parts that exist and break but can't be walked; making
-  levels playable is its own job, to be designed with the owner. Also: window glass and the dirt under a
-  broken floor are the old plain stand-ins; no window frames, gutters, chimney or porch; a worn part is
-  worn all over, not where it was hit; a derelict house's windows are whole; nothing collapses; unchecked on
-  Forward+.
+- Stairs that look like stairs, and basements (owner, 21 Nov 2026; not seen by the owner). Sheets:
+  `preview/house_stairs.png`, `house_basement.png`.
+  - `stairs(cell, storey, open)`: two flights of 6 steps and a half landing in one cell, turning back on
+    themselves, so they start and finish on the side `open` points to. That neighbouring cell must be open
+    floor on both storeys with no wall between (wall kind "_"). Each step is a box of its own, open
+    underneath (0.28 m thick), so one stair stands over another: a basement's under the ground floor's. The
+    trim shader's `stair_run` and `stair_dir` give bare wooden treads, a pale nosing, the shadow of the
+    next riser, darker risers.
+  - They are real: each flight is a ramp (35 degrees) and the landing a platform, and a floor with air
+    under it (upstairs, over a basement) is a solid body. So upper storeys and basements can be walked.
+  - `basement(cells)`: a pit cut in the ground (`ground_pit.gd`, `GroundPit.cut(rect)`: it rebuilds the
+    ground's mesh and collision as strips round the holes, from outside the ground asset), concrete block
+    walls (`wall()` on storey -1; `house_wall` with `masonry`) and a concrete slab (`house_floor` with
+    `concrete`; water lies on it when the ground is wet). `HouseKit.house(..., cellar)` puts one under the
+    whole house with stairs down. The kit house in the level has one.
+  - The ground's shader now includes the cutaway, so the ground opens over someone in a basement. (That
+    is the one change to the ground asset; its artifact has it.)
+  - Floors kept apart (`Enemy.LEVEL_GAP` 1.6 m of height): a shot doesn't hit someone on another floor; a
+    zombie can't see, grab or bite through a floor (it goes to where it lost you); the crosshair, zombies'
+    beating and vaulting only reach what is on your floor (`Breakable.in_reach(feet)`, replacing the flat
+    `REACH_UP` test); part aiming is taken on the floor you stand on; no footprints off the ground.
+  - Cloud run in the level (`tools/stairs_test.gd`, a body with the player's shape): ground floor 0.00,
+    half landing 1.35, upstairs 2.70 and into the next room, back down, the basement's half landing -1.35,
+    its floor -2.70 and across it, back up. A zombie one floor up and 1 m away on the map did not grab the
+    player in 10 s; put on the same floor, it did.
+- Still flat, and to be done before more than one floor plays properly (nothing here is designed with the
+  owner yet): cover knows nothing of height (upstairs you can take "cover" on the ground floor's faces, and
+  basement and upper walls give none); zombies and raiders notice you by distance on the map whatever floor
+  you are on, and have no way of finding stairs (there is no path finding); raiders' sight and shots are not
+  checked for floors; a basement is as light as outdoors; mud, tall grass and blood on the ground still
+  act on someone on another floor above or below them; punches, shoves and finishers go by map distance;
+  the horde's spawning ignores floors; a floor broken through doesn't open a hole to the floor below.
+- Also not done: stairs have no handrail, and a stairwell no rail upstairs; a basement has no inside walls,
+  windows or hatch; window glass and the dirt under a broken floor are the old plain stand-ins; no window
+  frames, gutters, chimney or porch; a worn part is worn all over, not where it was hit; a derelict
+  house's windows are whole; nothing collapses; unchecked on Forward+.
 
 ## Small rules the owner has set (20 Nov 2026)
 

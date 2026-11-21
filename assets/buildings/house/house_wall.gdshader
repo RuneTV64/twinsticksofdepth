@@ -15,6 +15,7 @@ uniform vec3 outward = vec3(0.0, 0.0, 1.0);
 uniform bool inside_wall = false;
 uniform int paint : hint_range(0, 2) = 0;      // H_PAINT cream, H_SAGE, H_SLATE
 uniform float ground_y = 0.0;                  // the height of the ground this storey's wall stands on
+uniform bool masonry = false;                  // a basement wall: concrete block, both sides
 uniform bool footing = true;                   // a ground-floor wall has a stone footing; upper storeys don't
 
 varying vec3 wp;
@@ -66,6 +67,39 @@ Surf siding(vec2 p, vec2 t, float y, GroundEnv e) {
 	return s;
 }
 
+// A basement wall: courses of concrete block, damp at the foot, crumbling as it wears.
+Surf blockwork(vec2 p, vec2 t, float y, GroundEnv e) {
+	float w = wear * 0.5;
+	float row = floor(t.y / 3.0);
+	float shift = mod(row, 2.0) * 3.0;
+	float block = floor((t.x + shift) / 6.0);
+	float id = gh1(vec2(block, row));
+	Surf s = gsurf(R_STONE, 0.6 + (id - 0.5) * 0.14 + (gnoise(p * 9.0) - 0.5) * 0.06);
+	if (mod(t.y, 3.0) < 1.0 || mod(t.x + shift, 6.0) < 1.0) {
+		s.v -= 0.2;                                 // the mortar joints
+	}
+	// The ground's damp comes through: a tide mark up from the floor, higher in the wet, and salts above it.
+	float damp = 0.25 + e.wet * 0.35 + e.spring * 0.15 + w * 0.5;
+	float tide = damp * (0.5 + gnoise(vec2(p.x * 1.3, 4.0)));
+	if (y < tide) {
+		s.v -= 0.16;
+		if (gfbm(p * vec2(2.0, 5.0) + 3.0) < damp * 0.35) {
+			s = gsurf(R_GREEN, 0.2);
+		}
+	} else if (y < tide + 0.2 && gh1(t * 0.83) < 0.35) {
+		s.v += 0.16;
+	}
+	// Cracks down through the joints, then blocks spalled away.
+	GroundCell c = gcell(p * 1.3 + 9.0);
+	if (c.d2 - c.d1 < 0.05 && gnoise(p * 0.7 + 2.0) < w * 0.9) {
+		s.v -= 0.3;
+	}
+	if (id < (wear - 1.0) * 0.18) {
+		s = gsurf(R_STONE, 0.22 + gnoise(p * 14.0) * 0.12);
+	}
+	return s;
+}
+
 Surf plaster(vec2 p, vec2 t, float y, GroundEnv e) {
 	float w = wear * 0.5;
 	if (y < 0.13) {
@@ -105,7 +139,9 @@ void fragment() {
 	vec2 p = house_point(t);
 	float y = wp.y - ground_y;
 	Surf s;
-	if (top) {
+	if (masonry) {
+		s = blockwork(p, t, y, e);
+	} else if (top) {
 		// The top of a wall or a sill: trim, with the weather lying on it.
 		s = house_weather(surf(H_TRIM, 0.7 - wear * 0.08), p, t, e, 1.0, y);
 	} else if (inside_wall || dot(n, outward) < -0.3) {

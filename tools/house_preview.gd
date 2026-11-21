@@ -6,7 +6,8 @@ extends SceneTree
 ##   MODE=house WEATHER=1 WEAR=0 OUT=/tmp/house.png xvfb-run -a -s "-screen 0 1400x1000x24" godot \
 ##       --rendering-driver opengl3 --resolution 1100x800 -s res://house_preview.gd
 ## MODE: house (a 3 by 2 cell house; STOREYS, default 2), open (the same with the upper storey and roof left
-##       off, to see the rooms), parts (every part on its own).
+##       off, to see the rooms), cellar (a basement on its own, open to the sky), parts (every part on its
+##       own). CELLAR=1 puts a basement under the house.
 ## WEATHER 0..5 (the list below), WEAR 0..2, PAINT 0..2, DIST the camera's distance.
 ## Test-only patch for the software renderer: it skips the linear->sRGB step, so the shaders output their
 ## palette colours directly (HouseKit.raw_colors). Shadows are not drawn by it.
@@ -51,6 +52,7 @@ func _build() -> void:
 	RenderingServer.global_shader_parameter_set("cutaway_shape", Vector4(0, 0, 0, 0))     # nobody to cut it open for
 	Cover.clear()
 	Solid.reset()
+	HouseKit.reset()
 	HouseKit.raw_colors = true
 	var g := Ground.new()
 	world.add_child(g)
@@ -79,7 +81,7 @@ func _build() -> void:
 		k.origin = Vector3(-10.5, 0, 2.5)
 		k.floor(Rect2i(0, 0, 1, 1), 0)
 		k.origin.x += 4.0
-		k.stairs(Vector2i(0, 0), 0, Vector2i(1, 0))
+		k.stairs(Vector2i(0, 0), 0, Vector2i(0, 1))
 		k.origin.x += 5.0
 		k.origin.y = -2.3            # the roof alone, set down on the ground
 		k.roof(Rect2i(0, 0, 2, 1), 1)
@@ -87,16 +89,25 @@ func _build() -> void:
 		look_at = Vector3(0, 0, 2.0)
 	else:
 		var storeys := _env("STOREYS", 2)
+		var cellar := _env("CELLAR", 0) == 1
 		if mode == "open":
 			# The ground floor with nothing over it, to see the rooms, the floor and the stairs.
-			var k := HouseKit.house(world, Vector3(-4.5, 0, -3), 3, 2, 1, wear, paint)
+			var k := HouseKit.house(world, Vector3(-4.5, 0, -3), 3, 2, 1, wear, paint, Vector4(-1, 0, 0, 0), cellar)
 			for b in k.parts:
 				if is_instance_valid(b) and b.title == "roof":
 					b.host.queue_free()
-			k.stairs(Vector2i(0, 0), 0, Vector2i(1, 0))
+			if not cellar:
+				k.stairs(Vector2i(0, 0), 0, Vector2i(0, 1))
 			dist = 15.0
+		elif mode == "cellar":
+			# A basement on its own, with its stairs, open to the sky.
+			var k := HouseKit.new(world, Vector3(-4.5, 0, -3), wear, paint)
+			k.basement(Rect2i(0, 0, 3, 2))
+			k.stairs(Vector2i(0, 0), -1, Vector2i(0, 1))
+			dist = 15.0
+			look_at = Vector3(0, -1.5, 0)
 		else:
-			HouseKit.house(world, Vector3(-4.5, 0, -3), 3, 2, storeys, wear, paint)
+			HouseKit.house(world, Vector3(-4.5, 0, -3), 3, 2, storeys, wear, paint, Vector4(-1, 0, 0, 0), cellar)
 			dist = 21.0
 			look_at = Vector3(0, 2.0, 0)
 	if OS.get_environment("DIST") != "":

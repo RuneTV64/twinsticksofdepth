@@ -22,7 +22,7 @@ signal broke(by: Node)
 signal struck(stage: int)
 
 const CELL := 2.0
-const REACH_UP := 1.9            # something whose underside is higher than this can't be got at from the ground
+const REACH_UP := 1.9            # something whose underside is this far above your feet can't be got at
 static var _grid := {}                    # Vector2i -> Array of Breakable
 static var barriers: Array[Breakable] = []
 static var count := 0
@@ -285,14 +285,22 @@ func _hit_surface(force: float, kind: String, at: Vector3, by: Node) -> float:
 
 # ---- what zombies and climbers ask ----
 
+## Can someone whose feet are at height `feet` get at it? Not if it is overhead (the wall over a door, the
+## storey above) or under the floor they stand on (the basement).
+func in_reach(feet: float) -> bool:
+	if surface:
+		return top >= feet - 0.3 and foot <= feet + 0.3
+	return foot <= feet + REACH_UP and top >= feet + 0.2
+
+
 ## What something pressed up against the world at `pos`, facing `dir`, would tear at: of everything breakable
 ## within `reach` in front of it, the one that will go soonest under blows of this force. Null when there is
 ## nothing, or nothing it could ever get through.
-static func weakest(pos: Vector2, dir: Vector2, reach: float, force: float, kind := "blunt") -> Breakable:
+static func weakest(pos: Vector2, dir: Vector2, reach: float, force: float, kind := "blunt", feet := 0.0) -> Breakable:
 	var best: Breakable = null
 	var best_n := INF
 	for b in near(pos, reach):
-		if b.surface or b.fixed or not b.alive() or b.foot > REACH_UP:
+		if b.surface or b.fixed or not b.alive() or not b.in_reach(feet):
 			continue
 		var to := pos.clamp(b.rect.position, b.rect.end) - pos
 		if to.length() > 0.05 and to.normalized().dot(dir) < 0.3:
@@ -305,19 +313,19 @@ static func weakest(pos: Vector2, dir: Vector2, reach: float, force: float, kind
 
 
 ## The pane or boards across the straight line from a to b, if any: what stops a climb through a window.
-static func barrier_between(a: Vector2, b: Vector2) -> Breakable:
+static func barrier_between(a: Vector2, b: Vector2, feet := 0.0) -> Breakable:
 	for x in barriers:
-		if x.alive() and x.foot <= REACH_UP and Cover.crosses(a, b, x.rect.grow(0.05)):
+		if x.alive() and x.in_reach(feet) and Cover.crosses(a, b, x.rect.grow(0.05)):
 			return x
 	return null
 
 
 ## The breakable thing at this spot on the ground for the crosshair: something standing first, then a surface.
-static func under(p: Vector2, slack := 0.3) -> Breakable:
+static func under(p: Vector2, slack := 0.3, feet := 0.0) -> Breakable:
 	var best: Breakable = null
 	var best_d := INF
 	for b in near(p, slack):
-		if b.fixed or not b.alive() or b.foot > REACH_UP:
+		if b.fixed or not b.alive() or not b.in_reach(feet):
 			continue
 		var d := b.gap_to(p) + (10.0 if b.surface else 0.0) - (0.5 if b.barrier else 0.0)
 		if b.surface and (b.holed(Vector3(p.x, 0.0, p.y)) or not b.on_it(p)):

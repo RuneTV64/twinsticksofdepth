@@ -67,7 +67,7 @@ func _physics_process(delta: float) -> void:
 	var best_p: Player = null
 	if targets_player:
 		var pl := get_tree().get_first_node_in_group("player") as Player
-		if pl != null and not pl.dead:
+		if pl != null and not pl.dead and absf(pl.global_position.y + 1.0 - from.y) <= Enemy.LEVEL_GAP:
 			var t := segment_hit(from, to, pl.global_position, HIT_RADIUS)
 			if t >= 0.0:
 				best_t = t
@@ -76,6 +76,8 @@ func _physics_process(delta: float) -> void:
 		var en := e as Enemy
 		if en == null or en.dead or (targets_player and en.kind != "shambler"):
 			continue
+		if absf(en.global_position.y + 1.0 - from.y) > Enemy.LEVEL_GAP:
+			continue      # on another floor
 		var t := segment_hit(from, to, en.global_position, HIT_RADIUS)
 		if t >= 0.0 and t < best_t:
 			best_t = t
@@ -87,7 +89,7 @@ func _physics_process(delta: float) -> void:
 	if not hit.is_empty():
 		wall_t = from.distance_to(hit["position"]) / maxf(from.distance_to(to), 0.0001)
 	# Glass in the way: the shot goes through it and it shatters.
-	var pane := Breakable.barrier_between(Vector2(from.x, from.z), Vector2(to.x, to.z))
+	var pane := Breakable.barrier_between(Vector2(from.x, from.z), Vector2(to.x, to.z), from.y - 1.2)
 	if pane != null and pane.lets_shots and from.y >= pane.foot and from.y <= pane.top:
 		var pc := Vector3(pane.rect.get_center().x, from.y, pane.rect.get_center().y)
 		if (pc - from).dot(to - from) / maxf((to - from).length_squared(), 0.0001) < minf(wall_t, best_t):

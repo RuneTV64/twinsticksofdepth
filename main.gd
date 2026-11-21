@@ -488,9 +488,9 @@ func _build_level() -> void:
 
 	# Houses from the kit (assets/buildings/house): a sound two-storey one, and a small derelict one beside
 	# it, to compare. Every part of them is a Solid like the rest of the level.
-	HouseKit.house(self, Vector3(18, 0, -34), 3, 2, 2)
+	HouseKit.house(self, Vector3(18, 0, -34), 3, 2, 2, 0, 0, Vector4(-1.0, 0.0, 0.0, 0.0), true)
 	HouseKit.house(self, Vector3(30, 0, -34), 2, 2, 1, 2, 1)
-	_sign(Vector3(22.5, 3.4, -27), "Kit house: two storeys (nobody can go upstairs yet)")
+	_sign(Vector3(22.5, 3.4, -27), "Kit house: two storeys and a basement. The stairs are inside, to the left")
 	_sign(Vector3(33, 3.4, -27), "The same kit, derelict: far easier to break into")
 
 	_build_raider_camp()

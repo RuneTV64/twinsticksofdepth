@@ -154,6 +154,7 @@ var _in_heap := false
 var _heap_key := Vector2i.ZERO
 var _press_t := 0.0         # how long it has been walking into something
 var _press_box: Cover.Box = null
+const LEVEL_GAP := 1.6      # further apart than this in height, two people are on different floors
 var _barred := false        # the way over is shut by glass or boards: it beats on them
 var _smash_t := 0.0
 var _press_n := Vector3.ZERO
@@ -434,6 +435,8 @@ func _leave_tracks() -> void:
 	moved.y = 0.0
 	if moved.length() >= (0.25 if crawling else 0.75):
 		_step_from = global_position
+		if absf(global_position.y) > 0.5:
+			return       # indoors on another floor: no prints, no mud
 		_step_side = -_step_side
 		_ground_slow = Ground.it.slow_at(global_position)
 		# Broken glass crunches under anyone, and goes into bare feet: a raider's (it hurts him), and a
@@ -1013,7 +1016,7 @@ func _press(delta: float, pressed: bool) -> void:
 	if _smash_t <= 0.0 and (not can_climb or _barred) and (chasing or _drive > 0.0) and Breakable.count > 0:
 		_smash_t = smash_every * randf_range(0.8, 1.3) * (1.0 + body.stiff)
 		var force := smash_force * body.walk_mult
-		var b := Breakable.weakest(Vector2(global_position.x, global_position.z), Vector2(-_press_n.x, -_press_n.z), smash_reach, force)
+		var b := Breakable.weakest(Vector2(global_position.x, global_position.z), Vector2(-_press_n.x, -_press_n.z), smash_reach, force, "blunt", global_position.y)
 		if b != null:
 			b.hit(force, "blunt", global_position - _press_n * 0.4 + Vector3(0.0, 1.0, 0.0), self)
 	_heap_t -= delta
@@ -1046,7 +1049,7 @@ func _start_climb() -> bool:
 	var land := Vector2(global_position.x, global_position.z) + Vector2(dir.x, dir.z) * (depth + 1.0)
 	if not Cover.has_room(land, _press_box):
 		return false
-	if Breakable.barrier_between(Vector2(global_position.x, global_position.z), land) != null:
+	if Breakable.barrier_between(Vector2(global_position.x, global_position.z), land, global_position.y) != null:
 		_barred = true     # a pane or boards across the opening: it has to break them first
 		return false
 	if Cover.bounds.size != Vector2.ZERO and not Cover.bounds.grow(-1.0).has_point(land):
@@ -1286,9 +1289,12 @@ func _think(delta: float) -> Vector3:
 		return Vector3.ZERO
 
 	var to: Vector3 = prey.global_position - global_position
+	var floors_apart := absf(to.y) > LEVEL_GAP
 	to.y = 0.0
 	var dist := to.length()
 	var d := to / dist if dist > 0.01 else facing
+	if floors_apart:
+		dist += 50.0      # on another floor: it can't see, reach or grab them through it. It goes to where it lost them
 	# Hunkered behind cover, out of its sight, it only notices you from much closer. One that was already after
 	# you goes to where it last saw you.
 	var notice := aggro_range
