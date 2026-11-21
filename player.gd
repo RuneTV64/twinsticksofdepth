@@ -450,6 +450,14 @@ var _reticle: MeshInstance3D
 var _reticle_x: MeshInstance3D
 ## Something that can be broken is under the crosshair (breakable.gd: everything solid has one).
 var hover_breakable: Breakable = null
+## The crosshair hits what it covers. It is a point on the floor you stand on, but on the screen it may lie
+## over something that stands above the storey you are on: an upstairs window, the wall round it, a roof. That
+## thing is what you are aiming at (`aim_high`, at `aim_high_at`): a shot or a throw goes to it. Anything on
+## your own storey is aimed at as it always was, level along the floor, so nothing about ordinary aiming
+## changes; and under a ceiling, nothing above the ceiling counts (you can't see it from where you stand).
+var aim_high: Breakable = null
+var aim_high_at := Vector3.ZERO
+const AIM_HIGH := 2.6            # m above your feet (a wall's height): from here up, the crosshair is "on" the thing itself
 var _reticle_mat: StandardMaterial3D
 
 
@@ -1806,9 +1814,11 @@ func _update_hover() -> void:
 	if not armed or dead or not reticle_visible:
 		return
 	hover_breakable = Breakable.under(_xz(global_position + reticle_offset), 0.3, global_position.y)
+	aim_high = null
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
+	_pick_high(cam.global_position)
 	var c := cam.global_position
 	var aim := global_position + reticle_offset
 	var reach := current_reticle_range() + 2.0
@@ -1832,6 +1842,39 @@ func _update_hover() -> void:
 				best = d
 				hover_target = en
 				hover_part = slot
+
+
+## What the crosshair covers that stands above your storey: the first solid thing (or glass) on the line from
+## the camera to the crosshair's spot on the floor, if that is higher than AIM_HIGH above your feet. One ray a
+## frame (a second when it finds something). Things the cutaway has opened up aren't drawn, so the crosshair can't be on them.
+func _pick_high(cam_at: Vector3) -> void:
+	var to := global_position + reticle_offset
+	var skip: Array[RID] = [get_rid()]
+	var space := get_world_3d().direct_space_state
+	for i in 6:
+		var q := PhysicsRayQueryParameters3D.create(cam_at, to, 1 | Solid.GLASS_LAYER)
+		q.exclude = skip
+		var hit := space.intersect_ray(q)
+		if hit.is_empty():
+			return
+		var at: Vector3 = hit["position"]
+		if at.y <= global_position.y + AIM_HIGH:
+			return             # low enough to be aimed at along the floor, as ever
+		if Cutaway.hides(at):
+			skip.append(hit["rid"])
+			continue
+		var b := Breakable.of(hit["collider"])
+		if b == null or not b.alive():
+			return
+		# Indoors: whatever is over your own ceiling is out of your sight.
+		var head := global_position + Vector3(0.0, 1.5, 0.0)
+		var roof := space.intersect_ray(PhysicsRayQueryParameters3D.create(head, head + Vector3(0.0, 7.0, 0.0), 1, [get_rid()]))
+		if not roof.is_empty() and at.y >= (roof["position"] as Vector3).y - 0.3:
+			return
+		aim_high = b
+		aim_high_at = at
+		hover_breakable = b       # (the red x and the prompt)
+		return
 
 
 ## The chance a shot at this range lands on the part aimed at: better up close, with Dexterity, with a better
@@ -2161,6 +2204,9 @@ func _fire() -> void:
 		# Someone on another floor: the shot goes along the real line to the part the crosshair is on.
 		var at: Vector3 = reticle_target.part_points().get(hover_part, reticle_target.global_position + Vector3.UP)
 		aim = (at - muzzle_position()).normalized()
+	elif hover_target == null and aim_high != null and is_instance_valid(aim_high):
+		# The crosshair is on something above head height (an upstairs window): the shot goes to that spot.
+		aim = (aim_high_at - muzzle_position()).normalized()
 	_shoot(aim, muzzle_position(), true)
 	velocity -= facing * shot_kick
 	if camera_rig:
@@ -2290,6 +2336,7 @@ func break_tool(b: Breakable) -> Array:
 ## Can you reach the breakable thing under the crosshair?
 func can_break() -> bool:
 	return armed and hover_breakable != null and is_instance_valid(hover_breakable) and hover_breakable.alive() \
+		and hover_breakable.in_reach(global_position.y) \
 		and hover_breakable.gap_to(_xz(global_position)) <= break_reach \
 		and _xz(reticle_offset).length() <= break_reach + 1.0
 
@@ -2408,6 +2455,8 @@ func interact_prompt() -> String:
 		return "[Left-click]  Take him down quietly"
 	if weapon == "throw" and (armed or in_cover) and finish_target == null:
 		var id := throw_item()
+		if id != "" and armed and aim_high != null and is_instance_valid(aim_high):
+			return "[Left-click]  Throw the %s at the %s" % [Items.name_of(id).to_lower(), aim_high.title]
 		return "[Left-click]  Throw the %s at the crosshair" % Items.name_of(id).to_lower() if id != "" else "Nothing to throw"
 	if finish_target == null and finish_pile != null:
 		return "[%s]  %s it, in case it's alive" % ["Left-click",
@@ -2829,11 +2878,18 @@ func _throw() -> void:
 			peak *= 0.5
 		elif own:
 			peak = maxf(peak, box.base + box.top - from.y + 0.6)     # up and over what you are hiding behind
+	var high := aim_high if armed and aim_high != null and is_instance_valid(aim_high) \
+		and _xz(aim_high_at - global_position).length() <= throw_range() + 2.0 else null
+	if high != null:
+		# The crosshair is on something above head height: it is thrown at that. Glass it goes through.
+		to = aim_high_at
+		peak = 0.3 + _xz(to - from).length() * 0.06
 	inv.use(id)
 	var th := Thrown.new()
 	th.item = id
 	th.from = from
 	th.to = to
+	th.at_thing = high
 	th.peak = peak
 	th.flight = 0.45 + from.distance_to(to) * 0.045
 	th.thrower = self
@@ -2964,6 +3020,10 @@ func _update_visuals(delta: float) -> void:
 	_reticle.visible = reticle_visible and not dead and not on_it
 	_reticle_x.visible = reticle_visible and not dead and on_it
 	_reticle.global_position = global_position + reticle_offset + Vector3(0.0, 0.08, 0.0)
+	if armed and aim_high != null and is_instance_valid(aim_high):
+		# On something above head height the mark sits on the thing itself. It is on the same line from the
+		# camera, so on the screen it has not moved.
+		_reticle.global_position = aim_high_at
 	_reticle_x.global_position = _reticle.global_position
 	# The cursor stays the same size on the screen however far in or out the camera is.
 	var cs := cursor_size * (camera_rig.distance / 18.0 if camera_rig else 1.0)

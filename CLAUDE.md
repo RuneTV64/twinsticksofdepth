@@ -36,8 +36,8 @@ owner: everything can be broken (see Two rules for every object, and Breaking th
 on the ground and ordinary infection; and how clean water is. Tested headless only.
 
 Built 21 Nov 2026 on the branch `claude/destructible-environment-6yu73c`, not on `main` and not seen by the
-owner: the house kit, with stairs you can walk and basements, and cover and shooting between floors (see
-The house kit). Review sheets in `assets/buildings/house/preview/`.
+owner: the house kit, with stairs you can walk and basements, cover and shooting between floors, and
+aiming at things above you (see The house kit). Review sheets in `assets/buildings/house/preview/`.
 
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
@@ -599,11 +599,43 @@ artifact (see Where game design assets live).
     heard 6 m; over `fall_hurt` 3.5 m it costs health. Vaulting out of an upstairs window (once the glass
     is gone) is a 2.7 m drop: bruised legs. In the test the player also landed on the window's own broken
     glass and cut a foot.
+- Aiming at things above you (owner, 21 Nov 2026: aiming at upstairs windows and shooting or throwing at
+  them must break them; "we might need to change the aiming system. Deliberate on this. I want a SMOOTH
+  gameplay experience. Zomboid plays like junk"; built the same day, not seen by the owner). What Claude
+  decided: the aiming system stays; one rule is added. **The crosshair hits what it covers.** Test:
+  `tools/aim_test.gd`.
+  - Why not change it: the crosshair on the floor is what makes moving, facing, the camera's lead and
+    aiming at people feel the way they do, and all of that is flat. A modifier key or a "floor up, floor
+    down" aim mode is what makes Zomboid clumsy; a crosshair that snaps onto walls as it crosses them would
+    jerk. So nothing about the mouse, the keys or ordinary aiming changes.
+  - The rule (`Player._pick_high`, `aim_high`, `aim_high_at`): the crosshair is a point on your floor, but
+    on the screen it may lie over something that stands above your storey (more than `AIM_HIGH` 2.6 m above
+    your feet): an upstairs window, the wall round it, a roof. That is found with one ray a frame from the
+    camera to the crosshair's spot; the first solid thing or glass on it, if that high, is what you are
+    aiming at. It is the same idea already used for which part of an enemy the crosshair is on. The mark
+    is drawn on the thing itself, which is the same place on the screen; it turns to the red x and the
+    prompt names the thing.
+  - A shot then goes along the real line to that spot (`_fire`), a throw arcs to it (`_throw`,
+    `Thrown.at_thing`): through glass, breaking it, and on to land on the floor inside (a rock lies
+    upstairs, the noise is upstairs); off a wall or a roof, which takes the knock, and down to the ground at
+    its foot. Glass is now found along the shot's own line (`projectile.gd`), so a sloped shot breaks it.
+  - What doesn't count: anything on your own storey (aimed at level, as always, so fights indoors and in
+    the open are untouched); anything the cutaway has opened up (`Cutaway.hides()`: it isn't drawn);
+    anything above your own ceiling when you are indoors; an enemy under the crosshair comes first.
+  - The roof is solid now (shots and thrown things hit it; nothing walks on it).
+  - Cloud run, player 8 m south of the kit house: crosshair over the middle upstairs window, the wall
+    between two windows and the roof picked each of them; over a ground-floor window and over open ground,
+    nothing (flat aim). One shot broke the upstairs window and left its glass on the ground under it. A
+    rock thrown at another went through and lay on the floor upstairs; one thrown at the wall knocked it
+    and lay at its foot. Indoors, and from upstairs looking down, nothing was picked.
+  - Not done: the body and gun still turn toward the crosshair's spot on the floor, not toward the thing
+    (the shot itself goes to the thing); no arc is shown before a throw; blind fire from cover doesn't use
+    it; raiders don't aim at windows; things above you on your own storey (a high shelf, a lamp) can't be
+    aimed at. Windows that face away from the camera (north and west walls) can't be picked, since they
+    can't be seen: a real limit of a camera that never turns.
 - Still flat, and to be done before more than one floor plays properly (nothing here is designed with the
   owner yet): zombies and raiders have no way of finding stairs (there is no path finding); zombies notice
-  someone on their own floor by distance, through walls, as before; you can't shoot at an upstairs window
-  with nobody seen in it (the crosshair is on your own floor), so you can't break its glass or fire blind
-  into it; blind fire and thrown things stay on your floor; a basement is as light as outdoors; mud, tall
+  someone on their own floor by distance, through walls, as before; blind fire stays on your floor; a basement is as light as outdoors; mud, tall
   grass and blood on the ground still act on someone on another floor above or below them; punches,
   shoves and finishers go by map distance; the horde's spawning ignores floors; a floor broken through
   doesn't open a hole to the floor below; zombies and raiders take no harm from a fall; no height bonus or

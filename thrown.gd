@@ -14,6 +14,12 @@ var peak := 2.0              # how high the arc goes above the straight line
 var flight := 0.8
 var thrower: Node = null
 var _t := 0.0
+## Thrown at something above head height (Player.aim_high: an upstairs window, a wall, a roof): `to` is the
+## spot on it. Glass it breaks and goes through, to land on the floor inside; anything else it strikes and
+## drops from, to the ground at its foot.
+var at_thing: Breakable = null
+var _high := false               # it was thrown at something (asked once: the thing may be gone by the time it lands)
+var _second := false             # on its way down after reaching what it was thrown at
 var _pane: Breakable = null      # a window in the way: it goes through it
 var _pane_u := 0.0
 
@@ -28,6 +34,7 @@ func _ready() -> void:
 	m.material_override = mat
 	add_child(m)
 	global_position = from
+	_high = at_thing != null
 	# Glass between the hand and where it is going breaks as the thing passes.
 	var p0 := Vector2(from.x, from.z)
 	var p1 := Vector2(to.x, to.z)
@@ -48,7 +55,29 @@ func _process(delta: float) -> void:
 			_pane.hit(15.0, "blunt", global_position, thrower)
 		_pane = null
 	if u >= 1.0:
-		_land()
+		if _high and not _second:
+			_strike()
+		else:
+			_land()
+
+
+## It has reached what it was thrown at. Through glass and on to the floor beyond; off anything else and down.
+func _strike() -> void:
+	_second = true
+	var along := Vector3(to.x - from.x, 0.0, to.z - from.z).normalized()
+	var through := false
+	if is_instance_valid(at_thing) and at_thing.alive():
+		through = at_thing.lets_shots
+		at_thing.hit(15.0, "blunt", to, thrower)
+		through = through and not (is_instance_valid(at_thing) and at_thing.alive())
+	var over := to + along * (1.1 if through else -0.45)
+	var down := PhysicsRayQueryParameters3D.create(over, over + Vector3.DOWN * 12.0, 1)
+	var hit := get_world_3d().direct_space_state.intersect_ray(down)
+	from = to
+	to = hit["position"] if not hit.is_empty() else Vector3(over.x, 0.05, over.z)
+	peak = 0.1
+	flight = clampf(sqrt(maxf(from.y - to.y, 0.2) / 4.9), 0.2, 1.2)      # the time a drop of that height takes
+	_t = 0.0
 
 
 func _land() -> void:
@@ -59,6 +88,6 @@ func _land() -> void:
 		p.small = true
 		p.tint = LOOK["rock"][1]
 		p.contents = [Items.make("rock")]
-		p.position = Vector3(to.x, 0.0, to.z)
+		p.position = Vector3(to.x, to.y if _second else 0.0, to.z)      # (upstairs, if it went in at a window)
 		get_parent().add_child(p)
 	queue_free()

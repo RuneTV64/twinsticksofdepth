@@ -15,6 +15,11 @@ extends Node
 var player: Node3D
 var camera: Camera3D
 
+# What the shader was last told, kept so scripts can ask the same question (`hides()`).
+static var _focus := Vector3.ZERO
+static var _view := Vector3.DOWN
+static var _shape := Vector4.ZERO
+
 static var _shader: Shader
 static var _materials := {}
 
@@ -33,13 +38,32 @@ static func solid(color: Color, metal := 0.0) -> ShaderMaterial:
 	return _materials[key]
 
 
+## Is this point of the world cut away right now (not drawn, so not something the crosshair can be on)?
+## The same test as the shader's, without the dithered edge.
+static func hides(wp: Vector3) -> bool:
+	if _shape.w < 0.5 or wp.y < _shape.z or _view.y > -0.05:
+		return false
+	var flat := Vector2(_view.x, _view.z).normalized()
+	if Vector2(wp.x - _focus.x, wp.z - _focus.z).dot(flat) > -0.25:
+		return false
+	var t := (_focus.y - wp.y) / _view.y
+	if t <= 0.0:
+		return false
+	var at := wp + _view * t
+	return Vector2(at.x - _focus.x, at.z - _focus.z).length() < _shape.x - _shape.y * 0.5
+
+
 func _process(_delta: float) -> void:
 	if player == null or camera == null or not enabled or player.get("dead"):
-		RenderingServer.global_shader_parameter_set("cutaway_shape", Vector4(radius, soft, 0.0, 0.0))
+		_shape = Vector4(radius, soft, 0.0, 0.0)
+		RenderingServer.global_shader_parameter_set("cutaway_shape", _shape)
 		return
 	var feet := player.global_position
 	# Standing on bodies raises the player (perch): the opening follows.
 	var lift: float = player.get("perch") if player.get("perch") != null else 0.0
-	RenderingServer.global_shader_parameter_set("cutaway_focus", feet + Vector3(0.0, 1.0 + lift, 0.0))
-	RenderingServer.global_shader_parameter_set("cutaway_view", -camera.global_transform.basis.z)
-	RenderingServer.global_shader_parameter_set("cutaway_shape", Vector4(radius, soft, feet.y + keep_below + lift, 1.0))
+	_focus = feet + Vector3(0.0, 1.0 + lift, 0.0)
+	_view = -camera.global_transform.basis.z
+	_shape = Vector4(radius, soft, feet.y + keep_below + lift, 1.0)
+	RenderingServer.global_shader_parameter_set("cutaway_focus", _focus)
+	RenderingServer.global_shader_parameter_set("cutaway_view", _view)
+	RenderingServer.global_shader_parameter_set("cutaway_shape", _shape)

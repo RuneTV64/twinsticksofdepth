@@ -365,6 +365,17 @@ func roof(cells: Rect2i, storeys: int, ridge_x := -1) -> void:
 	var mid := (a + b) * 0.5
 	var br := Breakable.attach(m, Vector3(mid.x, y0 + rise * 0.5, mid.y), Vector3(b.x - a.x + EAVES * 2.0, rise, b.y - a.y + EAVES * 2.0), "wood", "roof")
 	br.on_stage = dress
+	# It is solid: a shot or a thrown rock hits it, and the crosshair can be on it.
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	var shape := CollisionShape3D.new()
+	var tri := ConcavePolygonShape3D.new()
+	tri.backface_collision = true
+	tri.set_faces(mesh.get_faces())
+	shape.shape = tri
+	body.add_child(shape)
+	body.set_meta("breakable", br)
+	m.add_child(body)
 	_worn(br)
 
 
