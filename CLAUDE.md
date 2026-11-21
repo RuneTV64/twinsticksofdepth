@@ -59,8 +59,8 @@ weapons and taking apart). Then the owner's answers (21 Nov 2026): the living ro
 slots come from clothes and everyone starts dressed ("every player will start in a place they can loot");
 "Make clothes good... dress my character to the nines"; and push the weapons work to `main`. Built the same day
 (see Clothes): every place to wear things, clothes drawn on the body, pockets from clothes, protection, and the
-living room's cloth. Not seen by the owner. The push to `main` was refused by the session's permission check:
-everything is on the session branch, waiting for the owner to merge it or allow the push.
+living room's cloth. Not seen by the owner. Then the fit table per body and men's clothes that hang like cloth
+(see Clothes). All of it on `main` since 21 Nov 2026 (the owner said to push it).
 Next in the theme: furniture (session 2), then appliances, then everything else.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
@@ -1210,7 +1210,7 @@ back), `clothes_living_room.png` (the game's own items), `raiders_dressed.png`, 
 
 The plumbing every themed batch needs (owner: anything held in one or two hands is a weapon, most things don't
 last long against a head; nothing is junk, everything comes apart into something). The owner said to put it on
-`main` (21 Nov 2026); the push was refused by the session's permission check, so it is on the session branch.
+`main` (21 Nov 2026); it is there, with the clothes.
 Every number is Claude's first guess. Test `tools/melee_test.gd`; sheet `tools/preview/held_weapons.png`.
 
 - Item fields (`items.gd`, documented at the top): `hit` (hands, kind blunt/chop/pierce, force, smash and
