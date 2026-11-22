@@ -24,6 +24,13 @@ shader_type spatial;
 //   19 keys          a piano's keyboard from above: white keys, the black ones in their twos and threes
 //   20 rug           a patterned rug: a border, a field, a medallion in the middle, in the piece's fabric
 //   21 curtain       curtains hanging in folds, in the fabric, with a hem
+//   22 tv front      a television's screen in its bezel, with its knobs; lit (burning) it glows and flickers
+//   23 plastic       dark plastic: a television's or a radio's case
+//   24 shade         a lamp shade, pleated linen; lit, it glows warm
+//   25 radio front   a speaker grille and a dial, the dial lit while it plays
+//   26 beige         old beige plastic: a phone, a lamp's base
+//   27 keypad        a phone's top: the buttons
+//   28 brass         a lamp's stem and foot
 //
 // The mesh tells it which: UV is the spot on the face in metres, UV2 the face's size, COLOR.r the part, COLOR.g
 // a number of the face's own (so two faces don't wear alike).
@@ -291,6 +298,52 @@ void fragment() {
 		if (tv < 1.0 || tv >= th - 1.0) {
 			s.v -= 0.14;
 		}
+	} else if (role == 22 || role == 23 || role == 25) {
+		// Dark plastic, a lighter line at its edges.
+		s = surf(F_IRON, 0.42 + (edge ? 0.1 : 0.0) + (gnoise(p * 6.0) - 0.5) * 0.04);
+		if (role == 22 && tu >= 1.0 && tu <= tw - 3.0 && tv >= 1.0 && tv <= th - 2.0) {
+			// The screen: dark glass with a glint, or lit, a cold flickering light with lines across it.
+			if (burning) {
+				glow = true;
+				float fl = gh1(vec2(floor(TIME * 7.0), seed * 31.0));
+				s = surf(F_SCREEN, 0.7 + 0.18 * fl - (mod(tv + floor(TIME * 3.0), 3.0) < 1.0 ? 0.12 : 0.0));
+			} else {
+				s = surf(F_SCREEN, (tu == 1.0 && tv >= th - 3.0) ? 0.38 : 0.04);
+			}
+			if (gh1(t * 0.61) < w * 0.25) {
+				s = surf(F_SCREEN, 0.55);                       // cracks in the glass
+			}
+		} else if (role == 22 && tu >= tw - 2.0 && mod(tv, 2.0) < 1.0 && tv >= 1.0 && tv <= th - 2.0) {
+			s = surf(F_BRASS, 0.5);                             // the knobs
+		} else if (role == 25) {
+			if (tu < tw * 0.6 && !edge) {
+				s.v -= mod(tu + tv, 2.0) < 1.0 ? 0.16 : 0.0;    // the grille
+			} else if (!edge && tv == floor(th * 0.5)) {
+				glow = burning;
+				s = burning ? surf(F_EMBER, 0.8) : surf(F_BRASS, 0.55);    // the dial
+			}
+		}
+	} else if (role == 24) {
+		// A lamp shade: pleats down it, a darker rim top and bottom; lit, it glows from inside.
+		hard = false;
+		s = surf(F_LINEN, 0.72 + (mod(tu, 2.0) < 1.0 ? 0.04 : -0.04));
+		if (tv < 1.0 || tv >= th - 1.0) {
+			s.v -= 0.12;
+		}
+		if (burning) {
+			glow = true;
+			s = surf(F_EMBER, 0.86 + (mod(tu, 2.0) < 1.0 ? 0.04 : -0.02) - (tv < 1.0 || tv >= th - 1.0 ? 0.1 : 0.0));
+		}
+	} else if (role == 26 || role == 27) {
+		s = surf(F_BEIGE, 0.6 + (edge ? -0.08 : 0.0) + (gnoise(p * 6.0) - 0.5) * 0.04);
+		if (role == 27 && !edge && mod(tu + tv, 2.0) < 1.0) {
+			s.v -= 0.14;                                        // the buttons
+		}
+	} else if (role == 28) {
+		s = surf(F_BRASS, 0.55 + (edge ? 0.12 : 0.0));
+	}
+	if (role >= 22 && gfbm(p * 5.0 + 3.0) < w * 0.45 - 0.1) {
+		s.v -= 0.1;                                             // knocks, grime, sun-fade
 	}
 	if (role <= 3 || role == 13 || role == 14 || role == 15) {
 		s.v -= edge ? 0.1 : 0.0;                                // every wooden part has its outline

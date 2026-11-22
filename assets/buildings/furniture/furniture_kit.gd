@@ -71,8 +71,8 @@ const LATER := {
 	"dresser": "(its drawers are searched now: stash.gd)",
 	"bookshelf": "books: skills to read up on (its shelves are searched now: stash.gd)",
 	"coffee_table": "a surface things are left on",
-	"end_table": "a lamp on it, when there are lamps",
-	"tv_stand": "the television, with the appliances",
+	"end_table": "(a lamp stands on it: appliance.gd)",
+	"tv_stand": "(the television stands on it: appliance.gd)",
 	"display_cabinet": "the good china, and whatever else was kept for best",
 	"fireplace": "warmth, when there is a warmth need; cooking",
 	"piano": "",
@@ -105,6 +105,13 @@ const LACQUER := 18             # a piano's case
 const KEYS := 19                # a piano's keyboard, seen from above
 const RUG := 20
 const CURTAIN := 21
+const TV_FRONT := 22            # a television's front: the screen in its bezel, the knobs; lit when it is on
+const PLASTIC := 23             # dark plastic: a television's or a radio's case
+const SHADE := 24               # a lamp shade: pleated linen, glowing when the lamp is on
+const RADIO_FRONT := 25         # a radio's front: the speaker grille and the dial
+const BEIGE := 26               # old beige plastic: a phone, a lamp's base
+const KEYPAD := 27              # a phone from above: the handset's cradle and the buttons
+const BRASS := 28               # a lamp's brass stem and foot
 
 ## Test harnesses on the software renderer set this: the shader then puts out its palette colours directly.
 static var raw_colors := false
@@ -281,6 +288,24 @@ static func mesh_of(kind: String, length := 0.0) -> ArrayMesh:
 			_box(st, at, Vector3(0, 0.048, 0), Vector3(length, 0.012, KINDS_RUG_D), WOOD, -1, RUG)   # (on a ground floor's boards, 4 cm up)
 		"curtain":
 			_box(st, at, Vector3(0, 0, 0), Vector3(length, 1.0, 0.03), CURTAIN)
+		# ---- appliances (appliance.gd: their sizes, what they do)
+		"television":
+			_box(st, at, Vector3(0, 0.24, 0.07), Vector3(0.56, 0.48, 0.42), PLASTIC, TV_FRONT)
+			_box(st, at, Vector3(0, 0.22, -0.21), Vector3(0.36, 0.34, 0.14), PLASTIC)                     # the tube's back
+		"floor_lamp":
+			_box(st, at, Vector3(0, 0.02, 0), Vector3(0.28, 0.04, 0.28), BRASS)
+			_box(st, at, Vector3(0, 0.66, 0), Vector3(0.04, 1.26, 0.04), BRASS)
+			_box(st, at, Vector3(0, 1.45, 0), Vector3(0.4, 0.32, 0.4), SHADE)
+		"table_lamp":
+			_box(st, at, Vector3(0, 0.11, 0), Vector3(0.15, 0.22, 0.15), BEIGE)
+			_box(st, at, Vector3(0, 0.27, 0), Vector3(0.03, 0.12, 0.03), BRASS)
+			_box(st, at, Vector3(0, 0.43, 0), Vector3(0.3, 0.24, 0.3), SHADE)
+		"radio":
+			_box(st, at, Vector3(0, 0.1, 0), Vector3(0.36, 0.2, 0.12), PLASTIC, RADIO_FRONT)
+			_box(st, at, Vector3(0, 0.21, 0), Vector3(0.26, 0.02, 0.04), PLASTIC)                         # the handle
+		"telephone":
+			_box(st, at, Vector3(0, 0.04, 0), Vector3(0.22, 0.08, 0.2), BEIGE, -1, KEYPAD)
+			_box(st, at, Vector3(0, 0.095, -0.04), Vector3(0.22, 0.03, 0.07), BEIGE)                      # the handset
 	var m := st.commit()
 	_meshes[key] = m
 	return m
@@ -308,6 +333,19 @@ func curtains(near: Vector3, inside: Vector3) -> WindowCurtains:
 	if best.is_empty() or wear >= 2:
 		return null
 	return WindowCurtains.hang(level, best, inside, fabric, true, near.y - 1.4)
+
+## An appliance (appliance.gd) in this kit's wear and colours: `at` where its middle stands (y the surface: a
+## floor, or the top of `on` if it stands on a piece), switched off (somebody left). If the piece under it
+## breaks, it falls to the floor.
+func appliance(kind: String, at: Vector3, facing := "S", on: Breakable = null) -> Appliance:
+	var floor_at := on.floor_y if on != null else at.y
+	var a := Appliance.put(level, kind, at, facing, wear, false, floor_at, {}, stain, fabric)
+	if on != null:
+		on.broke.connect(func(_by: Node) -> void:
+			if is_instance_valid(a):
+				a.fall_to(floor_at))
+	return a
+
 
 ## Put a piece down: `at` is where its middle stands (y is the floor's height), `facing` ("N", "E", "S",
 ## "W") the way its front looks. Returns its Breakable (null for a kind there isn't).
@@ -418,17 +456,24 @@ static func furnish(in_level: Node, origin: Vector3, storeys := 1, worn := 0, wo
 	f.put("fireplace", o + Vector3(3.0, 0, 5.775), "N")
 	f.rug(o + Vector3(3.0, 0, 4.75), Vector2(1.8, 1.0), 0)
 	f.put("couch", o + Vector3(0.5, 0, 4.6), "E")
-	f.put("coffee_table", o + Vector3(1.65, 0, 4.6), "E")
-	f.put("end_table", o + Vector3(0.35, 0, 5.8), "E")
+	var coffee := f.put("coffee_table", o + Vector3(1.65, 0, 4.6), "E")
+	var side := f.put("end_table", o + Vector3(0.35, 0, 5.8), "E")
 	f.put("armchair", o + Vector3(3.0, 0, 4.0), "S")
+	# Its appliances (appliance.gd): a lamp on the side table and one standing in the corner by the door, the
+	# radio on the coffee table.
+	f.appliance("table_lamp", o + Vector3(0.35, 0.6, 5.8), "E", side)
+	f.appliance("floor_lamp", o + Vector3(5.7, 0, 5.68), "N")
+	f.appliance("radio", o + Vector3(1.65, 0.45, 4.42), "E", coffee)
 	f.put("bookshelf", o + Vector3(3.46, 0, 3.28), "S")
 	f.put("display_cabinet", o + Vector3(5.55, 0, 3.25), "S")
 	f.curtains(o + Vector3(1.5, 1.4, 6.0), o + Vector3(1.5, 1.4, 5.0))
 	f.curtains(o + Vector3(0.0, 1.4, 4.5), o + Vector3(1.0, 1.4, 4.5))
 	# The den (the back room): x 3..6, z 0..3, a window in its north wall at x 4.5.
 	f.put("piano", o + Vector3(4.5, 0, 0.33), "S")
-	f.put("tv_stand", o + Vector3(5.75, 0, 0.95), "W")
-	f.put("dresser", o + Vector3(5.77, 0, 2.3), "W")
+	var stand := f.put("tv_stand", o + Vector3(5.75, 0, 0.95), "W")
+	var dresser := f.put("dresser", o + Vector3(5.77, 0, 2.3), "W")
+	f.appliance("television", o + Vector3(5.72, 0.55, 0.95), "W", stand)
+	f.appliance("telephone", o + Vector3(5.77, 0.85, 2.48), "W", dresser)
 	f.rug(o + Vector3(4.4, 0, 1.75), Vector2(1.8, 1.2), 0)
 	f.curtains(o + Vector3(4.5, 1.4, 0.0), o + Vector3(4.5, 1.4, 1.0))
 	# The kitchen: x 6..9, z 0..6, its doorway in the west wall at z 4.5.

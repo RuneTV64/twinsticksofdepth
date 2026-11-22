@@ -62,7 +62,12 @@ slots come from clothes and everyone starts dressed ("every player will start in
 living room's cloth. Not seen by the owner. Then the fit table per body and men's clothes that hang like cloth
 (see Clothes). All of it on `main` since 21 Nov 2026 (the owner said to push it).
 The theme's furniture (session 2) was built on 21 Nov 2026, not seen by the owner, on `main` since 22 Nov 2026
-(the owner said to push it; see The furniture kit, The living room). Next in the theme: appliances, then everything else.
+(the owner said to push it; see The furniture kit, The living room). The owner then named the next theme, a
+middle-class kitchen (22 Nov 2026), and straight after said to finish the living room first: its appliances
+were built on 22 Nov 2026 (see The living room's appliances), not seen by the owner, on the session branch
+only. Next in the theme: its miscellaneous session (books, music, movies, toys, trophies...); then the kitchen,
+starting with its clothes session (its cloth and wearables: an apron, oven mitts, a tea towel, a shopping bag
+were on Claude's list, nothing built).
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -1100,6 +1105,54 @@ The owner: "make some furniture for the home you designed". Everything is in
   one size of each; `furnish` only knows the 3 by 2 house and leaves the basement empty; worn all over,
   not where hit.
 
+## The living room's appliances (built 22 Nov 2026, in review; not seen by the owner)
+
+The theme's third session. The owner: "We should do living room appliances yet." Every number is Claude's
+first guess. Test `tools/appliance_test.gd`; sheet `assets/buildings/furniture/preview/appliances.png`; the
+furniture README has the table.
+
+- Five, each with a use (rule 2), each a `Solid.box` that breaks (rule 1), drawn with the furniture kit's mesh
+  and shader (parts 22 to 28: screen, plastic, shade, radio front, beige, keypad, brass; ramps `SCREEN`,
+  `BEIGE`). `appliance.gd` (`Appliance`, a child of the box; `Appliance.put(...)`, `FurnitureKit.appliance()`):
+  - Television (on the TV cabinet): mains. On, its screen lights whoever is in front of it (a `Daylight` lamp,
+    3 m, and a blue `OmniLight3D`) and it talks, a noise heard 12 m off every 5 s for as long as there is
+    power: a lure left running. The prompt reads the emergency broadcast. Shift+click cuts its cord off.
+  - Table lamp (on the side table) and floor lamp (by the front door): mains. Light (3.5 m, 4.5 m) to see by
+    in a dark room and to be seen by through a window. Shift+click picks one up as an item (a club: the table
+    lamp breaks on its first blow into glass and its cord, the floor lamp is two-handed and lasts three);
+    used from your things it is stood where you are (`Player.set_down_appliance`).
+  - Portable radio (on the coffee table; also found in living rooms, kitchens and garages): batteries (`uses`
+    1200 s, as a torch's). Set down from your things it comes down playing: heard 20 m off every 3 s until
+    the batteries go or it is smashed. The decoy that works anywhere. Batteries load into it or the torch,
+    whichever is flatter.
+  - Telephone (on the den's dresser): the line is live while the power is. Now and then with you within
+    25 m it rings (`RING_CHANCE` 0.04 every 20 s, about once in eight minutes): six rings heard 15 m off.
+    Click answers it (a line from `ANSWERS`); Shift+click pulls its cord out for good.
+- Power (`power.gd`, `Power`): a stand-in for the grid. On at the start; Shift+N cuts it and brings it back.
+  A socket is anywhere inside a building's footprint (`Cutaway.building_at`); outdoors nothing plugged in
+  works. Street lamps now go dark with it (`StreetKit._lamp_power`) and come back. Things that care call
+  `Power.watch()`; nothing runs between changes.
+- Zombies smash what is making the noise (owner, 20 Nov 2026: they tear at "whatever little catches their
+  attention"). `Earshot.make(..., thing)` passes the thing to `Enemy.hear_noise`; a zombie that gets within
+  1 m of it while it is still sounding (`still_sounding()`) stops and beats on it every `smash_every`
+  (`take_blow_from()`) until it stops. Raiders' `hear_noise` takes the argument and ignores it.
+- If the table under a lamp or the television breaks, it falls to the floor (`fall_to`), and a lamp or a set
+  may shatter. A worn-out house's appliances are dead, and stay dead when carried off (`item.dead`).
+- New item: electric cord (from a lamp taken apart, a phone or a television): a weapon strap like the
+  curtain tie-back, and it ties a limb off for an amputation (`treatment_screen.gd`). Taken apart with a
+  blade: scrap metal and plastic (the copper).
+- Cloud run: the television was heard 11 m off, not 14; at night someone in front of it is seen from 0.94 of
+  the daytime distance (0.36 with it off); a zombie across the den smashed it 2.5 s after it came on. Power
+  off: the set and the four street lamps went out (8 lamps to 3) and came back. A floor lamp stood again in
+  the living room worked, in the yard "No power". A radio in the open drew three zombies from 16 m and was
+  smashed in 15 to 23 s. The phone rang about once in 7 to 10 minutes; answered it stopped, its cord pulled
+  it never rang again. All the other level tests still pass (502 breakable things).
+- Not built: sounds (the voice and the ringing are only noise and a prompt line); a light switch or ceiling
+  light; warmth (no space heater until the warmth need); throwing a playing radio, or carrying one playing;
+  carrying the television; raiders using any of it; lamp light stops at no wall or floor (the daylight's
+  lamps are flat circles); power per house or per street; poses for switching. Seen only on the software
+  renderer.
+
 ## Themed item batches (owner, 21 Nov 2026; nothing built yet)
 
 The owner will name a theme (a room: a boy's room, a girl's room, a bathroom, electronics...) and give a
@@ -1695,7 +1748,7 @@ changes, update both, and keep them the same files.
 - The UI can be hidden (owner, 20 Nov 2026: "I can't see the game anymore"): F2 steps `Hud.ui_level`: 0
   everything, 1 only what you need to play (bars, ammo, prompts, conditions, the stance line), 2 nothing. The
   long help text now starts closed (F1 opens it), with a one-line hint in its place.
-- Debug keys: H treat wounds, J a test wound, F1 help, F2 hide the UI, C character page, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
+- Debug keys: Shift+N cuts the power and brings it back (power.gd). H treat wounds, J a test wound, F1 help, F2 hide the UI, C character page, F3 input check, F5/F6/F7 crowd test, L all zombies on the low model. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera's rest point over the player

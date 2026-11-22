@@ -40,6 +40,8 @@ Seasons  M steps the season (spring, summer, autumn, winter); K turns the rain o
   B swaps the new ground for the old plain one.
 Light and dark  N steps the time of day (day, dusk, night, dawn). In the dark you are seen from less far and see
   less far; a fire or lamp lights whoever stands in it; a gunshot shows you up for a moment.
+Appliances  Click a lamp, the television or a radio to switch it; Shift+click picks a lamp or radio up (use it
+  to stand it down again). A radio set down plays until its batteries go: a decoy. Shift+N cuts the power.
 Torch  E steps through the hand torch (a beam where you face), the burning torch (light all round, burns away)
        and none. Both are in the tool box. You see by them, and they show you.
 Crouch  Ctrl (again to stand)      Prone  X (again to get up)

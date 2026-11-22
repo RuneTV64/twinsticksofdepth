@@ -23,6 +23,8 @@ RAMPS = [
     ("BRASS",   ["#f6e2a0", "#d8b660", "#a6843e", "#6c5430", "#3a2e26"], "knobs and handles"),
     ("BRICK",   ["#e0a088", "#b8664e", "#8c4636", "#5c2e2a", "#2e1a1c"], "a fireplace's brick"),
     ("LACQUER", ["#8a7466", "#54423c", "#33282a", "#1e1820", "#0e0c14"], "a piano's black lacquer"),
+    ("SCREEN",  ["#eef6ff", "#a6c4e2", "#5a7896", "#2a3a4c", "#0e141c"], "a television's glass, dark or lit"),
+    ("BEIGE",   ["#f2e8d0", "#d4c6a2", "#a69676", "#6a604e", "#34302c"], "old beige plastic: a phone, a lamp base"),
 ]
 FIRST = 16
 

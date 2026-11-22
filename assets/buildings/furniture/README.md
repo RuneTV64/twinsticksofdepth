@@ -29,7 +29,7 @@ Every object has to do something to the player (the owner's rule). Measured in t
 |---|---|---|---|---|---|---|
 | Coffee table | 0.45 m | low | 3 | 1 | wood | get down behind it, vault it; a shelf underneath to search |
 | Side table | 0.6 m | low | 2 | 1 | wood | a drawer to search |
-| TV cabinet | 0.55 m | low | 3 | 1 | wood | a cabinet to search (the television comes with the appliances) |
+| TV cabinet | 0.55 m | low | 3 | 1 | wood | a cabinet to search; the television stands on it (below) |
 | Display cabinet | 1.85 m | high | 8 | 2 | wood, **glass** | stops sight; glass shelves and a cupboard to search; smashed, it is broken glass to pick up |
 | Fireplace | 1.15 m (the chimney breast to 2.55) | low | about 1,000 | 54 | brick, metal | brick: 9 sledgehammer blows. **A fire**: lay wood in it, light it with a match, and it lights the room (full at 1.5 m, a quarter at 4 m: you see by it and are seen in it) and boils water in a pot |
 | Piano | 1.25 m | low | 14 | 3 | wood, metal | **played, it is heard 28 m off** (a gunshot is 30): a lure. Play it and leave by the back |
@@ -47,6 +47,36 @@ In the furnished kit house: hunkered in front of the couch you are hidden from a
 side of the fridge is not seen, someone the far side of the table is; a zombie with a chair or the kitchen
 table between it and you climbed over in under 3 s; a bottle of water put on the kitchen stove, once it had wood, a
 match and a pot, had boiled 20 s later.
+
+### The living room's appliances (22 Nov 2026: the theme's third session)
+
+Drawn by this kit (its meshes and shader: parts 22 to 28, ramps `SCREEN` and `BEIGE`), but each is an
+appliance with a script of its own (`appliance.gd`, in the game's root): a `Solid.box` it breaks with, and a
+switch. Mains power is a stand-in (`power.gd`, `Power`): on at the start, Shift+N cuts it and brings it back.
+Outdoors there is no socket. A worn-out house's appliances (wear 2) are dead.
+
+| Appliance | Stands on | Zombie blows | Fists | Runs on | What it does now |
+|---|---|---|---|---|---|
+| Television | the TV cabinet | 2 | 4 | mains | **a lit screen and a voice**: lights whoever is in front of it (at night you are seen from 0.94 of the daytime distance standing in front of it, 0.36 with it off), and talks, heard 12 m off, every 5 s, for as long as there is power: a lure left running. The prompt reads out the emergency broadcast. Shift+click cuts its cord off (an "Electric cord") |
+| Table lamp | the side table | 1 | 1 | mains | light (3.5 m) to see by, and to be seen by. Shift+click picks it up: an item, a club that breaks on the first blow into glass and its cord; used from your things it stands where you are |
+| Floor lamp | the floor, by the front door | 1 | 1 | mains | light (4.5 m). Picked up, a two-handed club that lasts three blows |
+| Radio | the coffee table | 1 | 2 | batteries | **a decoy that works anywhere**: set down playing (use it from your things), heard 20 m off every 3 s until the batteries go (20 minutes on a fresh set) or something smashes it. Batteries go into it as into a torch |
+| Telephone | the den's dresser | 1 | 1 | the line (with the power) | **rings now and then while you are near** (about once in eight minutes), six rings heard 15 m off. Click answers it (somebody, or nobody, on the line); Shift+click pulls its cord out for good and keeps the cord |
+
+Whatever is making a noise that goes on (the television, the radio, a ringing phone) is found by the zombies
+it brings, and they beat on it until it stops (`Enemy.hear_noise` with the thing; `still_sounding`,
+`take_blow_from`). If the table under a lamp or the television breaks, it falls to the floor (a lamp or a
+set may shatter). The electric cord is a weapon strap (slings something long across your back) and ties a
+limb off for an amputation.
+
+Cloud run (`tools/appliance_test.gd`): the television on, a zombie 11 m off heard it and one 14 m off did
+not; a zombie across the den reached it in 1 s and had smashed it 1.5 s later. The power cut put out the
+television and the four street lamps (lamps the daylight knows of: 8 to 3), and they all came back with it.
+A floor lamp picked up and stood again in the living room worked; stood in the yard, "No power". A radio set
+down in the open with three zombies 16 m off was smashed after 15 to 23 s. One with 3 s of batteries left
+stopped by itself. The phone rang 7 to 10 times in 200 looks (about once in 7 to 10 minutes), a zombie 13 m
+off heard it; answered, it stopped; its cord pulled, it never rang again. The side table broken under the
+lamp: the lamp fell to the floor (in an earlier run it shattered).
 
 What each is meant to do once the system it waits for exists (`FurnitureKit.LATER`; none of it is built): the
 fridge, wardrobe, dresser and counter are containers to search; the bed is for sleep; the couch and chairs for
@@ -104,14 +134,17 @@ f.curtains(window_point, a_point_inside)                  # at the nearest windo
 |---|---|
 | `furniture_kit.gd` | `FurnitureKit`: builds the pieces, puts them down, furnishes a house |
 | `furniture.gdshader` | Paints every part of every piece, at every stage of wear |
-| `furniture_ramps.gdshaderinc` | Cloth, linen, cast iron, enamel, embers and brass: their 8-shade ramps (generated) |
+| `furniture_ramps.gdshaderinc` | Cloth, linen, cast iron, enamel, embers, brass, brick, lacquer, a screen's glass and beige plastic: their 8-shade ramps (generated) |
 | `source/gen_furniture_ramps.py` | Makes the ramps from colour stops |
 | `preview/furniture_pieces.png` | Every piece, from the front, the side and behind |
 | `preview/furniture_wear.png` | The three stages of wear, and the damp |
 | `preview/furniture_colours.png` | The three woods and the three cloths |
 | `preview/furniture_house.png` | The kit house furnished: the living room round its fireplace, the den, the kitchen |
 | `preview/living_room.png` | The living room's pieces, sound (the fire lit, one window's curtains drawn and one open) and worn out |
+| `preview/appliances.png` | The appliances off and on, by day and at night |
 | `../../../rug.gd`, `window_curtains.gd`, `piano.gd` | (in the game's root) the rug, curtains at a window, a piano's keys |
+| `../../../appliance.gd`, `power.gd` | (in the game's root) the appliances and what they do; mains power |
+| `source/appliance_test.gd` | The headless test of the appliances (in the repository: `tools/appliance_test.gd`) |
 | `source/living_test.gd` | The headless test of the living room's pieces (in the repository: `tools/living_test.gd`) |
 | `source/furniture_preview.gd` | The harness that renders the sheets (in the repository: `tools/furniture_preview.gd`) |
 | `source/furniture_test.gd` | The headless test of what each piece does in play (in the repository: `tools/furniture_test.gd`) |
@@ -124,7 +157,12 @@ f.curtains(window_point, a_point_inside)                  # at the nearest windo
   window.
 - The stove is cold until wood is laid on it and lit with a match, and burns the wood down (campfire.gd); its door glows while it burns. It gives no light or warmth. The fireplace does give light; neither gives warmth (there is no warmth need yet), and there is no smoke.
 - There is no bathroom (bath, sink, toilet): those wait for water from taps and for the hygiene and toilet
-  needs. No lamps, pictures or a television yet (the appliances session).
+  needs. No pictures. The living room's appliances exist (above); there is no light switch on a wall or a
+  light in a ceiling, and a lamp's light goes through walls and floors (the daylight's lamps are flat circles).
+- Appliances: no sound of their own (there are no sounds: the voice is only a noise and a line in the
+  prompt); no warmth (no space heater until there is a warmth need); a radio can't be thrown or carried
+  playing; the television can't be carried; no pose for switching things; raiders don't use or come to them
+  any differently from other noise; power is one switch for the whole map.
 - The piano's tune is only a noise (there are no sounds yet); playing it has no pose. Curtains don't burn or
   tear, and a broken window leaves them hanging. A rug does nothing to glass on it, and laid on stairs it
   floats. The fireplace's chimney breast is only drawn (what you walk into is the fireplace's box).

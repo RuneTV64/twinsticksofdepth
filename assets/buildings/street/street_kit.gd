@@ -275,6 +275,17 @@ func _worn(b: Breakable) -> Breakable:
 	return b
 
 
+## The power to a lamp has gone off or come back (power.gd).
+static func _lamp_power(now: bool, br: Breakable, l: OmniLight3D, mesh: MeshInstance3D, looks: Array, spot: Vector3) -> void:
+	if not is_instance_valid(br) or not br.alive():
+		return
+	l.visible = now
+	mesh.material_override = looks[1 if now else 0]
+	Daylight.remove_lamp(spot)
+	if now:
+		Daylight.add_lamp(spot, LAMP_LIGHT)
+
+
 ## A street lamp at a spot on the ground (x, z): a steel post with a glass lantern on top. `on`: it is lit
 ## (left out: as the street's `lit` says; one put up worn out is dark whatever).
 ##
@@ -314,13 +325,19 @@ func lamp(p: Vector2, on := true) -> Breakable:
 	_worn(br)
 	var spot := Vector3(p.x, origin.y, p.y)
 	if burning:
-		Daylight.add_lamp(spot, LAMP_LIGHT)
+		# It burns while there is power (power.gd): when the grid goes, the street goes dark, and comes back with it.
 		var l := OmniLight3D.new()
 		l.omni_range = LAMP_LIGHT + 1.5
 		l.light_color = Color(1.0, 0.86, 0.6)
 		l.light_energy = 1.5
 		l.shadow_enabled = false
 		head.add_child(l)
+		var looks := [prop_mat({"part": 1, "size": LANTERN, "lit": false, "ground_y": origin.y}, wear, season),
+			prop_mat({"part": 1, "size": LANTERN, "lit": true, "ground_y": origin.y}, wear, season)]
+		# (A static function: the kit itself is gone once the level is built.)
+		var shine := StreetKit._lamp_power.bind(br, l, mesh, looks, spot)
+		shine.call(Power.on)
+		Power.watch(shine)
 		br.broke.connect(func(_by: Node) -> void: Daylight.remove_lamp(spot))
 	# The post going takes the lantern with it.
 	post_br.broke.connect(func(by: Node) -> void:

@@ -367,8 +367,8 @@ func _hold(delta: float) -> void:
 	if _amp:
 		# Tying it off: wind round the limb on the line.
 		c = Vector2(_cut_x(), c.y)
-		# (A strip of cloth ties it off as well as a rag does, if you have no rag or bandage.)
-		var tie := tool if _has(tool) else ("cloth_strip" if player.inv.has("cloth_strip") else "")
+		# (A strip of cloth, or an electric cord, ties it off as well as a rag does, if you have no rag or bandage.)
+		var tie := tool if _has(tool) else ("cloth_strip" if player.inv.has("cloth_strip") else ("electric_cord" if player.inv.has("electric_cord") else ""))
 		if (tool == "bandage" or tool == "clean_rag") and tie != "" and not _amp_tied and _at.distance_to(c) > 50.0:
 			var ang2 := (_at - c).angle()
 			if _wrap_on:

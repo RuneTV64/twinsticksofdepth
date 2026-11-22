@@ -48,6 +48,7 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	Cover.clear()
 	Solid.reset()
+	Power.reset()
 	HouseKit.reset()
 	FenceKit.reset()
 	StreetKit.reset()
@@ -165,8 +166,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_B:   # the new ground / the old plain one
 				var gm := Ground.it.mesh
 				gm.material_override = _plain_ground if gm.material_override == Ground.it.material else Ground.it.material
-			KEY_N:   # the time of day, by hand until there is a clock: day, dusk, night, dawn
-				player.show_status("%s." % Daylight.next_time(), 1.5)
+			KEY_N:   # the time of day, by hand until there is a clock: day, dusk, night, dawn; Shift: the power
+				if event.shift_pressed:
+					Power.set_on(not Power.on)
+					player.show_status("The power is back on." if Power.on else "The power goes off: every house and street goes dark.", 2.0)
+				else:
+					player.show_status("%s." % Daylight.next_time(), 1.5)
 			KEY_Z:   # the horde readout: zombies out of play / in play / warmth, area by area
 				if _zone_label == null:
 					_zone_label = Label.new()

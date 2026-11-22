@@ -8,7 +8,8 @@ extends SceneTree
 ## MODE: pieces (every piece on a floor, fronts to the camera), backs (the same turned round), house (a kit
 ##       house furnished, opened as the game opens it round someone indoors; FLOOR=1 for upstairs), living (the
 ##       living room's pieces against a wall with two windows: curtains drawn at one and open at the other, the
-##       fire lit; FIRE=0 leaves it cold).
+##       fire lit; FIRE=0 leaves it cold), appliances (appliance.gd: each on what it stands on, switched off in
+##       the back row and on in the front; NIGHT=1 turns the daylight down).
 ## WEAR 0..2, STAIN 0..2 (pine, oak, walnut), FABRIC 0..2 (brick red, olive, blue), WEATHER 0..5 (the damp
 ## only shows on worn furniture), DIST the camera's distance, LOOK "x,y,z".
 ## Test-only patch for the software renderer: it skips the linear->sRGB step, so the shaders output their
@@ -131,6 +132,41 @@ func _build() -> void:
 				(fire as Campfire).changed.emit(true)
 		look_at = Vector3(-0.8, 0.8, -3.0)
 		dist = 9.0
+	elif mode == "appliances":
+		# Each appliance on what it stands on: off at the back, on at the front. A building round it all, so the
+		# mains are there (power.gd).
+		Cutaway.add_building(Rect2(-12, -12, 24, 24), -1.0, 3.0)
+		var k := HouseKit.new(world, Vector3(-7.5, 0, -4.5), 0, 0)
+		k.floor(Rect2i(0, 0, 5, 3), 0)
+		var f := FurnitureKit.new(world, wear, stain, fabric)
+		for row in 2:
+			var z := -3.4 + row * 2.4
+			var on := row == 1
+			var tv := Appliance.put(world, "television", Vector3(-4.0, 0.55, z), "S", wear, on, 0.0)
+			f.put("tv_stand", Vector3(-4.0, 0, z), "S")
+			f.put("end_table", Vector3(-2.2, 0, z), "S")
+			var tl := Appliance.put(world, "table_lamp", Vector3(-2.2, 0.6, z), "S", wear, on, 0.0)
+			var fl := Appliance.put(world, "floor_lamp", Vector3(-1.0, 0, z), "S", wear, on, 0.0)
+			f.put("coffee_table", Vector3(0.6, 0, z), "S")
+			var rd := Appliance.put(world, "radio", Vector3(0.6, 0.45, z), "S", wear, on, 0.0)
+			f.put("dresser", Vector3(2.5, 0, z), "S")
+			var ph := Appliance.put(world, "telephone", Vector3(2.5, 0.85, z), "S", wear, on, 0.0)
+			for a in [tv, tl, fl, rd, ph]:
+				a.set_process(false)
+			var l := Label3D.new()
+			l.text = "on" if on else "off"
+			l.font_size = 40
+			l.outline_size = 10
+			l.pixel_size = 0.01
+			l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			l.no_depth_test = true
+			l.position = Vector3(-6.0, 1.0, z)
+			world.add_child(l)
+		if _env("NIGHT", 0) == 1:
+			sun.light_energy = 0.12
+			env.environment.ambient_light_energy = 0.12
+		look_at = Vector3(-0.8, 0.5, -2.2)
+		dist = 9.5
 	else:
 		# Every piece, on a floor of the house's boards.
 		var k := HouseKit.new(world, Vector3(-7.5, 0, -4.5), 0, 0)

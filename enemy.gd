@@ -247,6 +247,7 @@ var _seen_flash_t := 0.0         # s left of the outline's "just come into view"
 var _out_t := 0.0                # s since it left the player's view
 var _noise_pos := Vector3.ZERO   # where the last noise it heard came from
 var _noise_t := 0.0              # > 0 while it is still drawn to that spot
+var _noise_thing: Node = null    # what is making that noise, if it goes on making it (a radio): found, it is beaten on
 var _bite_cd := 0.0
 var _bit := false
 var _down_t := 0.0
@@ -391,10 +392,11 @@ func take_headshot(dir: Vector3, knock: float) -> void:
 
 ## A loud noise (a gunshot) went off at pos. Shamblers walk to where it came from; once you are
 ## inside aggro_range they chase you as usual. Each new shot refreshes the spot and the timer.
-func hear_noise(pos: Vector3, _by_player := true) -> void:
+func hear_noise(pos: Vector3, _by_player := true, thing: Node = null) -> void:
 	if dead or kind != "shambler":
 		return
 	_noise_pos = pos
+	_noise_thing = thing
 	_noise_t = investigate_time
 	# It turns that way, and will go on that way long after it has passed the spot.
 	var to := pos - global_position
@@ -1671,7 +1673,18 @@ func _think(delta: float) -> Vector3:
 				goal = _noise_pos - global_position
 				goal.y = 0.0
 				_noise_t -= delta
-				if goal.length() < 1.5:
+				var sounding: bool = _noise_thing != null and is_instance_valid(_noise_thing) and _noise_thing.call("still_sounding")
+				if sounding and goal.length() < 1.0:
+					# Got there, and there is the thing making the noise: it beats on it until it stops.
+					_noise_t = maxf(_noise_t, 1.0)
+					facing = facing.slerp(goal.normalized() if goal.length() > 0.05 else facing, 1.0 - exp(-6.0 * delta)).normalized()
+					_smash_t -= delta
+					if _smash_t <= 0.0:
+						_smash_t = smash_every * randf_range(0.8, 1.3) * (1.0 + body.stiff)
+						_noise_thing.call("take_blow_from", self, smash_force * body.walk_mult)
+					return Vector3.ZERO
+				elif goal.length() < 1.5 and not sounding:
+					_noise_thing = null
 					_noise_t = 0.0   # got there, nothing to find: it keeps going the same way
 				else:
 					_heading = goal.normalized()

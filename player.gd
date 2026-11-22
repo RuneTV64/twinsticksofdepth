@@ -1048,6 +1048,8 @@ func use_item(key: String) -> void:
 			lay_glass()
 		"rolled_rug":
 			lay_rug(key)
+		"table_lamp", "floor_lamp", "radio":
+			set_down_appliance(key)
 		"cloth_scrap":
 			wash_cloth()
 		"plank", "nails", "hammer", "crowbar":
@@ -1125,17 +1127,43 @@ func eat() -> void:
 	show_status("You eat it cold from the tin." if whole else "You hack the tin open. Half of it ends up on the ground.", 2.2)
 
 
-## Fresh batteries into the torch.
+## Fresh batteries into the torch or the radio you carry: whichever is flatter.
 func load_battery() -> void:
-	var tk := inv.find("torch")
+	var tk := ""
+	var low := 2.0
+	for id: String in ["torch", "radio"]:
+		var k := inv.find(id)
+		if k != "":
+			var left := float(inv.slots[k].get("uses", 0)) / float(Items.DEFS[id]["uses"])
+			if left < low:
+				low = left
+				tk = k
 	if tk == "":
-		show_status("You have no torch to put them in.", 1.6)
+		show_status("You have nothing to put them in.", 1.6)
 		return
 	if not inv.use("battery"):
 		show_status("You have no batteries.", 1.6)
 		return
-	inv.slots[tk]["uses"] = int(Items.DEFS["torch"]["uses"])
-	show_status("Fresh batteries in the torch.", 1.6)
+	var id: String = inv.slots[tk]["id"]
+	inv.slots[tk]["uses"] = int(Items.DEFS[id]["uses"])
+	show_status("Fresh batteries in the %s." % Items.name_of(id).to_lower(), 1.6)
+
+
+## Stand a lamp or a radio you carry on the floor in front of you (appliance.gd). A radio comes down playing.
+func set_down_appliance(key: String) -> void:
+	var it = inv.slots.get(key)
+	if it == null:
+		return
+	inv.slots.erase(key)
+	recompute_stats()
+	var spot := global_position + facing * 0.55
+	var a := Appliance.set_down(get_parent(), it, Vector3(spot.x, global_position.y, spot.z), facing)
+	_body.reach()
+	if a.kind == "radio":
+		show_status("You set the radio down, turned up. It will play until the batteries go." if a.working()
+			else ("You set the radio down. It is broken: it won't play." if a.wear >= 2 else "You set the radio down. Its batteries are flat."), 2.0)
+	else:
+		show_status("You stand the %s up. Click it to switch it on." % Appliance.KINDS[a.kind]["what"], 1.8)
 
 
 ## Wash torn cloth into a clean rag: a wash of your water for each, and only water clean enough to wash a wound.

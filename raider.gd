@@ -633,7 +633,7 @@ func _exit_tree() -> void:
 
 ## A sound. On watch it comes to look; in a fight where it has lost you, a sound you made tells it where you
 ## are. Sounds you didn't make (another raider's shots) bring it over, but don't change where it thinks you are.
-func hear_noise(pos: Vector3, by_player := true) -> void:
+func hear_noise(pos: Vector3, by_player := true, _thing: Node = null) -> void:
 	if dead:
 		return
 	if mode == "fight":
