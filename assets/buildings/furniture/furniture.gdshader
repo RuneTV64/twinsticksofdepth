@@ -34,6 +34,8 @@ shader_type spatial;
 //   29 sink top      a worktop with a steel basin let into it, the plughole, the tap behind it
 //   30 steel         brushed steel: a pedal bin, a tap
 //   31 tall doors    a pantry's pair of tall doors, panelled, with knobs at handle height
+//   32 micro front   a microwave's door: a dark window (lit warm inside while it runs) and the keypad
+//   33 dish front    a dishwasher's front: brushed steel, a control strip along the top, the handle
 //
 // The mesh tells it which: UV is the spot on the face in metres, UV2 the face's size, COLOR.r the part, COLOR.g
 // a number of the face's own (so two faces don't wear alike).
@@ -356,6 +358,18 @@ void fragment() {
 		}
 	} else if (role == 30) {
 		s = surf(F_STEEL, 0.6 + (mod(tv, 3.0) < 1.0 ? -0.06 : 0.04) + (edge ? 0.1 : 0.0));
+	} else if (role == 32) {
+		s = surf(F_ENAMEL, 0.8 + (edge ? -0.1 : 0.0));
+		if (tu >= 1.0 && tu <= tw - 4.0 && tv >= 1.0 && tv <= th - 2.0) {
+			glow = burning;
+			s = burning ? surf(F_EMBER, 0.72 + 0.1 * gh1(vec2(floor(TIME * 4.0), tu))) : surf(F_SCREEN, 0.1);
+		} else if (tu > tw - 3.0 && tv >= 1.0 && tv <= th - 2.0) {
+			s = surf(F_IRON, mod(tv, 2.0) < 1.0 ? 0.3 : 0.5);                    // the keypad
+		}
+	} else if (role == 33) {
+		s = surf(F_STEEL, 0.58 + (mod(tv, 3.0) < 1.0 ? -0.04 : 0.03));
+		if (tv >= th - 2.0) s = surf(F_IRON, 0.35 + (mod(tu, 3.0) < 1.0 ? 0.25 : 0.0));     // the control strip
+		if (tv == th - 3.0 && mu > 1.0) s = surf(F_STEEL, 0.85);                            // the handle
 	} else if (role == 31) {
 		// Two tall panelled doors with knobs at handle height.
 		float half = floor(tw * 0.5);

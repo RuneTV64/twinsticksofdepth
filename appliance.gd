@@ -16,6 +16,12 @@ extends Node3D
 ##               lit again, picked up and carried. Burned down, it is gone.
 ##   toy robot   batteries: set down, it marches off the way you were facing, clanking, turning at walls: a
 ##               decoy that leads the zombies after it, until its batteries go or one catches it.
+##   kettle      mains: pour your bottle in, it boils it in 30 s (the bugs die, the mud stays), clicks off, and you
+##               pour it back. No wood, no fire. Picked up and carried, it works at any socket.
+##   microwave   mains: set it running and it hums for 20 s, then dings, loud: a timed lure, set and walk away.
+##               With something metal in it (Shift+click: a tin, scrap metal) it sparks and goes with a bang
+##               heard much further, and is wrecked.
+##   dishwasher  mains: racks to search, and a 90 s wash cycle heard 9 m off the whole time: a lure that lasts.
 ##   telephone   the line is live while the power is: now and then it rings, and every zombie near hears it.
 ##               Answer it, or pull its cord out of the wall to shut it up for good (and keep the cord).
 ##
@@ -46,6 +52,16 @@ const KINDS := {
 	"toy_robot": {"what": "toy robot", "w": 0.14, "h": 0.22, "d": 0.12, "stuff": "plastic",
 		"parts": {"plastic": 0.6, "metal": 0.4}, "thin": 1.0, "power": "battery", "light": 0.0,
 		"glow_y": 0.12, "tint": Color.WHITE, "noise": 10.0, "every": 1.6, "item": "toy_robot"},
+	# The kitchen's (22 Nov 2026: the second theme's appliances). `cycle`: s it runs once started, then stops.
+	"kettle": {"what": "kettle", "w": 0.2, "h": 0.25, "d": 0.16, "stuff": "plastic",
+		"parts": {"plastic": 0.7, "metal": 0.3}, "thin": 1.0, "power": "mains", "light": 0.0,
+		"glow_y": 0.12, "tint": Color.WHITE, "noise": 4.0, "every": 3.0, "item": "kettle", "cycle": 30.0},
+	"microwave": {"what": "microwave", "w": 0.5, "h": 0.3, "d": 0.38, "stuff": "plastic",
+		"parts": {"metal": 0.5, "glass": 0.15, "plastic": 0.35}, "thin": 0.8, "power": "mains", "light": 0.0,
+		"glow_y": 0.15, "tint": Color.WHITE, "noise": 3.0, "every": 4.0, "item": "", "cycle": 20.0},
+	"dishwasher": {"what": "dishwasher", "w": 0.6, "h": 0.85, "d": 0.6, "stuff": "plastic",
+		"parts": {"metal": 0.5, "plastic": 0.5}, "thin": 0.5, "power": "mains", "light": 0.0,
+		"glow_y": 0.4, "tint": Color.WHITE, "noise": 9.0, "every": 4.0, "item": "", "cycle": 90.0},
 	"telephone": {"what": "telephone", "w": 0.22, "h": 0.1, "d": 0.2, "stuff": "plastic",
 		"parts": {}, "thin": 0.5, "power": "line", "light": 0.0,
 		"glow_y": 0.05, "tint": Color.WHITE, "noise": 15.0, "every": 3.0, "item": ""},
@@ -71,6 +87,8 @@ const RING_CHECK := 20.0       # s between looks at whether the phone rings
 const RING_CHANCE := 0.04      # ... the chance it does then, while you are near (about once in eight minutes)
 const RING_NEAR := 25.0        # m: it only rings with you this near (a stand-in for calls that matter to you)
 const RINGS := 6               # rings before the caller gives up, `every` s apart
+const DING := 16.0              # m: a microwave's ding
+const ZAP := 26.0               # m: the bang when something metal in it sparks
 const ROBOT_SPEED := 0.25      # m/s: a toy robot's march (a wandering zombie is about 0.4)
 
 var kind := "television"
@@ -93,6 +111,10 @@ var _ring_t := 0.0
 var _said := 0
 var _look_t := 0.0             # a toy robot: s until it looks ahead for a wall again
 var _grid_t := 0.0             # ... until its place in Breakable's grid is brought up to date
+var _run_t := 0.0              # what runs a cycle (kettle, microwave, dishwasher): s left of it
+var water := {}                # the kettle: the water in it, as a bottle's ({"uses", "dirt", "bugs"}), {} empty
+var boiled := false            # ... and whether it has come to the boil
+var metal := false             # the microwave: something metal has been put in it
 
 
 ## Put one down: `at` is where its middle stands (y the surface it stands on: a floor, a table top), `facing`
@@ -131,6 +153,14 @@ static func put(level: Node, what_kind: String, at: Vector3, facing := "S", worn
 	a.position = Vector3(0.0, -h * 0.5, 0.0)
 	a.rotation.y = turns * PI * 0.5
 	body.add_child(a)
+	# Somewhere things are kept (stash.gd): a dishwasher's racks. Searched through the appliance (its click).
+	var stash := Stash.for_piece(what_kind, str(k["what"]), wood, worn)
+	if stash != null:
+		body.add_child(stash)
+		stash.remove_from_group("interactables")
+		a.br.broke.connect(func(_by: Node) -> void:
+			if is_instance_valid(stash):
+				stash.spill())
 	return a
 
 
@@ -151,13 +181,17 @@ func _ready() -> void:
 	br.on_stage = func(_stage: int) -> void: _show()
 	br.broke.connect(func(_by: Node) -> void: _dark())
 	if KINDS[kind]["power"] != "battery":
-		Power.watch(func(_on: bool) -> void: _show())
+		Power.watch(_on_power)            # a method, not a lambda: it stops being valid when this is freed
 	_ring_t = randf_range(0.0, RING_CHECK)
 	_show()
 
 
 func _exit_tree() -> void:
 	_dark()
+
+
+func _on_power(_now: bool) -> void:
+	_show()
 
 
 ## Does it do what it does now?
@@ -236,6 +270,11 @@ func _process(delta: float) -> void:
 				return
 	if kind == "toy_robot":
 		_walk(delta)
+	if k.has("cycle"):
+		_run_t -= delta
+		if _run_t <= 0.0:
+			_cycle_done()
+			return
 	if float(k["noise"]) <= 0.0:
 		return
 	_t -= delta
@@ -243,6 +282,34 @@ func _process(delta: float) -> void:
 		_t = float(k["every"]) * randf_range(0.85, 1.15)
 		_said = (_said + 1) % BROADCAST.size()
 		Earshot.make(global_position + Vector3(0.0, 0.3, 0.0), float(k["noise"]), get_tree(), null, false, self)
+
+
+## A cycle has run its course: the kettle has boiled, the microwave dings (or bangs), the wash is done.
+func _cycle_done() -> void:
+	switched = false
+	match kind:
+		"kettle":
+			if not water.is_empty():
+				Water.boil(water)
+				boiled = true
+			Earshot.make(global_position, 3.0, get_tree(), null, false)     # it clicks off
+		"microwave":
+			if metal:
+				Earshot.make(global_position, ZAP, get_tree(), null, false)
+				metal = false
+				_show()
+				br.give_way(null)                    # sparks, a bang, smoke: it is finished
+				return
+			Earshot.make(global_position, DING, get_tree(), null, false, self)
+	_show()
+
+
+## Start a cycle.
+func _start() -> void:
+	switched = true
+	_run_t = float(KINDS[kind]["cycle"])
+	_t = 0.0
+	_show()
 
 
 ## The toy robot marches on the way it faces; at a wall (or anything solid) it turns, and goes on.
@@ -356,6 +423,20 @@ func prompt_text(_p: Player) -> String:
 			return ("Switch the toy robot off" if switched else "Switch the toy robot on (it walks off, clanking)") + lift
 		"candle":
 			return ("Blow the candle out" if switched else "Light the candle (a match)") + "   (Shift+click: pick it up)"
+		"kettle":
+			if switched:
+				return "The kettle is coming to the boil" + (" (no power: it has stopped)" if not Power.at(global_position) else "")
+			if not water.is_empty():
+				return "Pour the %s water back into your bottle%s" % ["boiled" if boiled else "unboiled", lift]
+			return "Pour your water in and boil it (30 s)" + lift
+		"microwave":
+			if switched:
+				return "The microwave is humming: it will ding in %d s" % ceili(_run_t)
+			return "Set the microwave running (it dings in 20 s, loud)   (Shift+click: put a tin or scrap metal in it first)"
+		"dishwasher":
+			if switched:
+				return "The dishwasher is churning (%d s left)" % ceili(_run_t)
+			return "Look in the dishwasher   (Shift+click: run it: 90 s, heard 9 m off)"
 	return ("Switch the %s off" % what if switched else "Switch the %s on" % what) + lift
 
 
@@ -380,6 +461,9 @@ func interact(p: Player) -> void:
 		return
 	if wear >= 2 or cut:
 		p.show_status("It is dead.", 1.4)
+		return
+	if KINDS[kind].has("cycle"):
+		_use_cycle(p, shift)
 		return
 	match kind:
 		"telephone":
@@ -414,6 +498,77 @@ func interact(p: Player) -> void:
 		p.show_status("It whirrs and clanks off.", 1.4)
 	else:
 		p.show_status("Off." if not switched else "On.", 1.0)
+
+
+## The kettle, the microwave, the dishwasher.
+func _use_cycle(p: Player, shift: bool) -> void:
+	if switched:
+		p.show_status("Leave it to finish.", 1.2)
+		return
+	if not Power.at(global_position):
+		p.show_status("Nothing. No power.", 1.4)
+		return
+	match kind:
+		"kettle":
+			var wk := p.inv.find("water")
+			if not water.is_empty():
+				if wk == "":
+					p.show_status("You have no bottle to pour it into.", 1.6)
+					return
+				var b: Dictionary = p.inv.slots[wk]
+				for f in ["uses", "dirt", "bugs", "done"]:
+					if water.has(f):
+						b[f] = water[f]
+					else:
+						b.erase(f)
+				water = {}
+				boiled = false
+				p.show_status("You pour it back into your bottle. It looks %s." % Water.look(b), 1.8)
+				return
+			if wk == "" or int(p.inv.slots[wk].get("uses", 0)) <= 0:
+				p.show_status("You have no water to boil.", 1.6)
+				return
+			var bottle: Dictionary = p.inv.slots[wk]
+			water = {"uses": bottle["uses"], "dirt": Water.dirt(bottle), "bugs": Water.bugs(bottle)}
+			if bottle.has("done"):
+				water["done"] = bottle["done"]
+			bottle["uses"] = 0
+			_start()
+			p.show_status("You pour your water into the kettle and switch it on.", 1.8)
+		"microwave":
+			if shift:
+				var mk := ""
+				for id: String in ["empty_tin", "scrap_metal", "canned_food"]:
+					if mk == "" and p.inv.has(id):
+						mk = id
+				if mk == "":
+					p.show_status("You have nothing metal to put in it.", 1.6)
+					return
+				p.inv.use(mk)
+				p.recompute_stats()
+				metal = true
+				_start()
+				p.show_status("You shut the %s in it and set it running. Get clear." % Items.name_of(mk).to_lower(), 2.2)
+				return
+			_start()
+			p.show_status("It hums. In 20 s it will ding, loud.", 1.8)
+		"dishwasher":
+			if shift:
+				_start()
+				p.show_status("It fills and starts to churn: a minute and a half of noise.", 2.0)
+				return
+			var st := _stash()
+			if st != null:
+				st.interact(p)
+
+
+func _stash() -> Stash:
+	if br == null or br.host == null:
+		return null
+	for c in br.host.get_children():
+		if c is Stash:
+			return c
+	return null
 
 
 ## Pick it up: it goes into your things as the item it is (a lamp, a radio with its batteries).

@@ -1048,7 +1048,7 @@ func use_item(key: String) -> void:
 			lay_glass()
 		"rolled_rug":
 			lay_rug(key)
-		"table_lamp", "floor_lamp", "radio", "toy_robot":
+		"table_lamp", "floor_lamp", "radio", "toy_robot", "kettle":
 			set_down_appliance(key)
 		"candle":
 			if not inv.use("matches"):

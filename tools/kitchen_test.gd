@@ -68,6 +68,8 @@ func _run() -> void:
 		await _cloth()
 	if _part(2):
 		await _furniture()
+	if _part(3):
+		await _appliances()
 	quit()
 
 
@@ -210,4 +212,88 @@ func _furniture() -> void:
 	_say("  mains off: '%s'" % tap.prompt_text(p))
 	tap.interact(p)
 	_say("  '%s'" % p.status_text)
+	Power.set_on(true)
+
+
+# ---------------------------------------------------------------------------------------- 3: appliances
+func _app(kind: String) -> Appliance:
+	for n in get_nodes_in_group("interactables"):
+		if n is Appliance and n.kind == kind and is_instance_valid(n):
+			return n
+	return null
+
+
+func _appliances() -> void:
+	for kind in ["kettle", "microwave", "dishwasher"]:
+		var a := _app(kind)
+		if a == null:
+			# The dishwasher is searched through itself: its Stash is out of the interactables.
+			for b in get_nodes_in_group("destructible"):
+				if b is Breakable and b.host != null and str(b.host.get_meta("appliance", "")) == kind:
+					for c in b.host.get_children():
+						if c is Appliance:
+							a = c
+		if a == null:
+			_say("%s: not in the level" % kind)
+			continue
+		_say("%-10s zombie blows %d, fists %d; it says '%s'" % [kind, ceili(a.br.hits_left(12.0, "blunt")), ceili(a.br.hits_left(6.0, "blunt")), a.prompt_text(p)])
+	# The kettle boils pond water.
+	var k := _app("kettle")
+	_empty()
+	var bottle := Items.make("water")
+	bottle["dirt"] = 0.7
+	bottle["bugs"] = 0.9
+	p.inv.slots["hand_l"] = bottle
+	p.global_position = Vector3(k.global_position.x, 0, k.global_position.z + 0.7)
+	var ear := _zombie(k.global_position + Vector3(0, -k.global_position.y, 3.5))
+	ear._noise_t = 0.0
+	k.interact(p)
+	_say("kettle: '%s'; bottle left %d washes; kettle says '%s'" % [p.status_text, int(bottle["uses"]), k.prompt_text(p)])
+	await _wait(31.0)
+	_say("  31 s later: '%s'; a zombie 3.5 m off heard it %s" % [k.prompt_text(p), ear._noise_t > 0.0])
+	ear.queue_free()
+	k.interact(p)
+	_say("  poured back: '%s' (dirt %.2f, bugs %.2f, %d washes)" % [p.status_text, Water.dirt(bottle), Water.bugs(bottle), int(bottle["uses"])])
+	# The microwave: a timed ding, and a bang with a tin in it.
+	var m := _app("microwave")
+	var near := _zombie(m.global_position + Vector3(0, -m.global_position.y, 14.0))
+	var far := _zombie(m.global_position + Vector3(0, -m.global_position.y, 19.0))
+	near._noise_t = 0.0
+	far._noise_t = 0.0
+	m.interact(p)
+	_say("microwave: '%s'" % p.status_text)
+	await _wait(19.0)
+	_say("  19 s: '%s'; heard by a zombie 14 m off yet: %s" % [m.prompt_text(p), near._noise_t > 0.0])
+	await _wait(1.5)
+	_say("  it dinged: a zombie 14 m off heard it %s, one 19 m off %s" % [near._noise_t > 0.0, far._noise_t > 0.0])
+	near._noise_t = 0.0
+	far._noise_t = 0.0
+	p.inv.slots["hand_r"] = Items.make("scrap_metal")
+	_shift(true)
+	m.interact(p)
+	_shift(false)
+	_say("  with scrap metal: '%s'" % p.status_text)
+	await _wait(21.0)
+	_say("  20 s later the microwave is %s; the zombie 19 m off heard the bang %s" % ["gone" if not is_instance_valid(m) or not m.br.alive() else "still there", far._noise_t > 0.0])
+	near.queue_free()
+	far.queue_free()
+	# The dishwasher: searched, and run.
+	var d: Appliance = null
+	for b in get_nodes_in_group("destructible"):
+		if b is Breakable and b.host != null and str(b.host.get_meta("appliance", "")) == "dishwasher":
+			for c in b.host.get_children():
+				if c is Appliance:
+					d = c
+	var st := d._stash()
+	_say("dishwasher: racks %s; it says '%s'" % [st.parts.map(func(pt): return pt["name"]), d.prompt_text(p)])
+	var dz := _zombie(d.global_position + Vector3(8.0, -d.global_position.y, 0))
+	dz._noise_t = 0.0
+	_shift(true)
+	d.interact(p)
+	_shift(false)
+	await _wait(10.0)
+	_say("  run: '%s'; 10 s on, a zombie 8 m off heard it %s; it says '%s'" % [p.status_text, dz._noise_t > 0.0, d.prompt_text(p)])
+	dz.queue_free()
+	Power.set_on(false)
+	_say("  mains off: working %s" % d.working())
 	Power.set_on(true)

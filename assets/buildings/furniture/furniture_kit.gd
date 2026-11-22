@@ -124,6 +124,8 @@ const BRASS := 28               # a lamp's brass stem and foot
 const SINK_TOP := 29            # a worktop with a steel basin let into it, and the tap
 const STEEL := 30               # brushed steel: a pedal bin
 const TALL_DOORS := 31          # a pantry's tall pair of doors
+const MICRO_FRONT := 32         # a microwave's door and keypad; lit inside while it runs
+const DISH_FRONT := 33          # a dishwasher's front: steel, a control strip and a handle
 
 ## Test harnesses on the software renderer set this: the shader then puts out its palette colours directly.
 static var raw_colors := false
@@ -336,6 +338,14 @@ static func mesh_of(kind: String, length := 0.0) -> ArrayMesh:
 				_box(st, at, Vector3(sx * 0.035, 0.035, 0), Vector3(0.04, 0.07, 0.05), PLASTIC)          # legs
 			_box(st, at, Vector3(0, 0.115, 0), Vector3(0.12, 0.09, 0.09), BRASS, RADIO_FRONT)           # tin body
 			_box(st, at, Vector3(0, 0.19, 0), Vector3(0.08, 0.06, 0.07), BEIGE)                           # head
+		"kettle":
+			_box(st, at, Vector3(0, 0.015, 0), Vector3(0.18, 0.03, 0.16), PLASTIC)                       # its base
+			_box(st, at, Vector3(0, 0.13, 0.01), Vector3(0.15, 0.2, 0.14), ENAMEL)
+			_box(st, at, Vector3(0, 0.15, -0.08), Vector3(0.04, 0.16, 0.03), PLASTIC)                     # the handle
+		"microwave":
+			_box(st, at, Vector3(0, 0.15, 0), Vector3(0.5, 0.3, 0.38), ENAMEL, MICRO_FRONT)
+		"dishwasher":
+			_box(st, at, Vector3(0, 0.425, 0), Vector3(0.6, 0.85, 0.6), STEEL, DISH_FRONT)
 		"telephone":
 			_box(st, at, Vector3(0, 0.04, 0), Vector3(0.22, 0.08, 0.2), BEIGE, -1, KEYPAD)
 			_box(st, at, Vector3(0, 0.095, -0.04), Vector3(0.22, 0.03, 0.07), BEIGE)                      # the handset
@@ -537,12 +547,16 @@ static func furnish(in_level: Node, origin: Vector3, storeys := 1, worn := 0, wo
 	f.rug(o + Vector3(4.4, 0, 1.75), Vector2(1.8, 1.2), 0)
 	f.curtains(o + Vector3(4.5, 1.4, 0.0), o + Vector3(4.5, 1.4, 1.0))
 	# The kitchen: x 6..9, z 0..6, its doorway in the west wall at z 4.5.
-	f.counter(Vector2(o.x + 6.2, o.z + 0.46), Vector2(o.x + 7.0, o.z + 0.46), o.y, "S")
+	var worktop := f.counter(Vector2(o.x + 6.2, o.z + 0.46), Vector2(o.x + 7.0, o.z + 0.46), o.y, "S")
 	f.put("sink", o + Vector3(7.45, 0, 0.46), "S")                 # under the north window
 	f.put("stove", o + Vector3(8.42, 0, 0.46), "S")
 	f.put("wall_cabinet", o + Vector3(6.6, 0, 0.33), "S")           # over the counter
 	f.put("pantry", o + Vector3(8.6, 0, 5.72), "N")
 	f.put("kitchen_bin", o + Vector3(6.3, 0, 5.7), "E")
+	# Its appliances (appliance.gd): the kettle and the microwave on the counter, the dishwasher by the fridge.
+	f.appliance("kettle", o + Vector3(6.32, 0.9, 0.5), "S", worktop)
+	f.appliance("microwave", o + Vector3(6.74, 0.9, 0.44), "S", worktop)
+	f.appliance("dishwasher", o + Vector3(6.32, 0, 2.45), "E")
 	f.put("fridge", o + Vector3(6.46, 0, 1.62), "E")
 	f.put("table", o + Vector3(7.75, 0, 3.0), "E")
 	f.put("chair", o + Vector3(6.98, 0, 3.0), "E")

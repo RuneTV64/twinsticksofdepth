@@ -18,7 +18,8 @@ static func reset() -> void:
 	_watchers.clear()
 
 
-## Tell `c` (a func(bool)) whenever the power goes off or comes back. It is dropped once its object is gone.
+## Tell `c` (a func(bool)) whenever the power goes off or comes back. It is dropped once its object is gone:
+## pass a method (or a static function), not a lambda.
 static func watch(c: Callable) -> void:
 	_watchers.append(c)
 
@@ -29,7 +30,7 @@ static func set_on(v: bool) -> void:
 	on = v
 	var keep: Array[Callable] = []
 	for c in _watchers:
-		if c.is_valid():
+		if c.is_valid():          # (pass a method or a static function: a lambda outlives its object here)
 			keep.append(c)
 			c.call(v)
 	_watchers = keep
