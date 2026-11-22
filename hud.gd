@@ -28,6 +28,9 @@ var treat: TreatmentScreen     # seeing to wounds (H)
 var loot: LootScreen           # going through a drawer, a cupboard, or what you carry (interact, I)
 var _wheel: Control
 var _wheel_labels: Array[Label] = []
+var _menu: Control             # the context menu (context_menu.gd) and the ring that fills while you hold for it
+var _menu_corner := Vector2.ZERO   # where on the screen the open menu's list starts
+var _menu_was_open := false
 
 const HELP_KEYS := """CONTROLS
 Move  WASD
@@ -40,7 +43,11 @@ Seasons  M steps the season (spring, summer, autumn, winter); K turns the rain o
   B swaps the new ground for the old plain one.
 Light and dark  N steps the time of day (day, dusk, night, dawn). In the dark you are seen from less far and see
   less far; a fire or lamp lights whoever stands in it; a gunshot shows you up for a moment.
-Appliances  Click a lamp, the television or a radio to switch it; Shift+click picks a lamp or radio up (use it
+Context menu (HOLD)  Left-click with the weapon away, held: a list of what you can do here and with yourself.
+  Slide down to one and let go, or let go and click it (1-9 pick too). Esc, Ready or a click off it shuts it.
+  A plain click still does what the prompt says. Boarding windows, shoes, laying glass, treating water and
+  picking things up are in it.
+Appliances  Click a lamp, the television or a radio to switch it; in the menu, pick a lamp or radio up (use it
   to stand it down again). A radio set down plays until its batteries go: a decoy. Shift+N cuts the power.
   From your things (I): a toy robot walks off clanking, marbles scatter (they trip whoever walks on them), a
   candle is lit and set down (a match), two magazines and a strip of cloth make a guard for a forearm.
@@ -91,7 +98,7 @@ Breaking things: everything breaks. Ready, crosshair on it, close by, left-click
   sledgehammer (brick, pavement) if you carry one; a gun shoots it. Zombies beat on what is in their way, weakest
   first. What is left can be picked through, and rusts and rots away. Broken glass crunches underfoot.
   Water: fill a bottle at a barrel or trough. It may be dirty, and clear water can still be bad. Boil it on a
-  fire (interact with a cooking pot, stay by it), or Shift+I filters it and then treats it with tablets. Right-click the bottle among your things to drink.
+  fire (interact with a cooking pot, stay by it), or the menu's "Treat your water" filters it and then treats it with tablets. Right-click the bottle among your things to drink.
   Dirty water fouls a wound washed with it and can make you ill. A stove is a fire too: lay wood on it, light it
   with a match, feed it or it burns out.
   Searching: interact with a dresser, a wardrobe, a kitchen counter, a fridge or a bookshelf. The drawer is dark
@@ -101,16 +108,16 @@ Breaking things: everything breaks. Ready, crosshair on it, close by, left-click
   Things you carry: C opens the character page; PgUp PgDn pick a thing, Enter uses it (eat a tin, put on boots,
   take a pill, fresh batteries in the torch, wash cloth into a rag), Shift+Enter takes it apart, Delete puts it down.
   Whatever is in your hand is your weapon on the Hands slot (a hatchet, a plank, a bottle); it wears out as you hit. Food and water run down.
-  Y lays the broken glass you carry: a trap for bare feet, an alarm under boots. It stays until picked up.
-  Barefoot, glass goes into your feet (U puts boots on and off, if you have a pair). A cut foot takes in what you
+  The menu scatters the broken glass you carry: a trap for bare feet, an alarm under boots. It stays until picked up.
+  Barefoot, glass goes into your feet (the menu puts boots on and off, if you have a pair; Shift+U is a test switch). A cut foot takes in what you
   walk through: wash and dress it. A helmet takes most of a blow to the head.
   Floors: stairs, upstairs and basements can be walked. Cover works on the floor you are on. A shot is a straight
   line: from an upstairs window the ground near the wall is hidden unless you take cover at the sill and pop up
   (Ready) to lean out; from below, only what shows over a sill can be hit. A drop of over 2 m bruises your legs.
   The crosshair hits what it covers: put it over an upstairs window, a wall or a roof and a shot or a thrown rock
   goes there. Glass breaks; a rock through an upstairs window lands, and is heard, upstairs.
-  P at a window by the crosshair: boards it up (a hammer, 4 nails, 2 planks; it takes a while and is heard), or
-  with a crowbar prises the boards off again. Shift+P boards it for nothing (a test key).
+  At a window, crosshair on it, the menu boards it up (a hammer, 4 nails, 2 planks; it takes a while and is heard),
+  or with a crowbar prises the boards off again. Shift+P boards it for nothing (a test key).
   O breaks what the crosshair is on   Shift+O ten minutes of rust and rot
 Cutaway: walls between the camera and you open up; indoors the whole building opens (windows stay, faint); Ready, it opens to the crosshair too. V switches it off and on.
 Cover test: G test gunner at the crosshair   Shift+G remove them
@@ -133,7 +140,7 @@ func _ready() -> void:
 	_help.visible = false          # it has grown long: it opens on F1 and stays out of the way otherwise
 	_hint = _label(root, 16)
 	_hint.position = Vector2(20, 56)
-	_hint.text = "F1 help     F2 hide the UI"
+	_hint.text = "F1 help     F2 hide the UI     Hold left-click (weapon away): what you can do"
 	_hint.modulate = Color(1, 1, 1, 0.6)
 
 	_status = _label(root, 26)
@@ -254,8 +261,76 @@ func _ready() -> void:
 		l.size = Vector2(160, 30)
 		_wheel_labels.append(l)
 
+	# The context menu: over everything, even with the UI hidden (it is how you do things, not clutter).
+	_menu = Control.new()
+	_menu.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_menu.draw.connect(_draw_menu)
+	add_child(_menu)
+	if player != null:
+		player.hud = self
+
 
 const WHEEL_RADIUS := 150.0
+const MENU_FONT := 18
+const MENU_HEAD_FONT := 13
+
+
+func _screen_of(p: Vector3) -> Vector2:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null or cam.is_position_behind(p):
+		return get_viewport().get_visible_rect().size * 0.5
+	return cam.unproject_position(p)
+
+
+func _menu_width() -> float:
+	var f := ThemeDB.fallback_font
+	var w := 200.0
+	for r in player.menu_rows:
+		if not r.has("head"):
+			w = maxf(w, f.get_string_size(str(r["label"]), HORIZONTAL_ALIGNMENT_LEFT, -1, MENU_FONT).x)
+	return w + 96.0
+
+
+func _draw_menu() -> void:
+	var f := ThemeDB.fallback_font
+	if not player.menu_open:
+		# Holding the button: a ring fills round the crosshair until the menu opens. (Not for a plain click.)
+		var k := player.menu_hold_frac()
+		if k > 0.3:
+			var c := _screen_of(player._reticle.global_position) if player._reticle != null else _menu.size * 0.5
+			_menu.draw_arc(c, 20.0, 0.0, TAU, 32, Color(0, 0, 0, 0.5), 5.0, true)
+			_menu.draw_arc(c, 20.0, -PI * 0.5, -PI * 0.5 + TAU * (k - 0.3) / 0.7, 32, Color(1.0, 0.85, 0.5, 0.95), 3.0, true)
+		return
+	var rows: Array = player.menu_rows
+	var w := _menu_width()
+	var h := rows.size() * Player.MENU_ROW_H
+	var o := _menu_corner
+	_menu.draw_rect(Rect2(o - Vector2(6, 6), Vector2(w + 12, h + 12)), Color(0.05, 0.05, 0.06, 0.86))
+	_menu.draw_rect(Rect2(o - Vector2(6, 6), Vector2(w + 12, h + 12)), Color(1, 1, 1, 0.18), false, 1.0)
+	var n := 0
+	for i in rows.size():
+		var r: Dictionary = rows[i]
+		var y := o.y + i * Player.MENU_ROW_H
+		if r.has("head"):
+			_menu.draw_string(f, Vector2(o.x + 8, y + Player.MENU_ROW_H - 9), str(r["head"]), HORIZONTAL_ALIGNMENT_LEFT, -1, MENU_HEAD_FONT, Color(0.6, 0.62, 0.66))
+			continue
+		n += 1
+		var on := i == player.menu_choice
+		if on:
+			_menu.draw_rect(Rect2(Vector2(o.x, y + 1), Vector2(w, Player.MENU_ROW_H - 2)), Color(0.85, 0.6, 0.2, 0.35))
+		var base := y + Player.MENU_ROW_H - 8
+		if n <= 9:
+			_menu.draw_string(f, Vector2(o.x + 8, base), str(n), HORIZONTAL_ALIGNMENT_LEFT, -1, MENU_HEAD_FONT, Color(0.55, 0.55, 0.55))
+		_menu.draw_string(f, Vector2(o.x + 28, base), str(r["label"]), HORIZONTAL_ALIGNMENT_LEFT, -1, MENU_FONT,
+			Color(1.0, 0.85, 0.5) if on else Color(0.93, 0.93, 0.93))
+		var key := str(r.get("key", ""))
+		if key != "":
+			_menu.draw_string(f, Vector2(o.x + w - 8, base), key, HORIZONTAL_ALIGNMENT_RIGHT, 56, MENU_HEAD_FONT, Color(0.55, 0.55, 0.55))
+	# The pointer: the mouse moves this, not the crosshair, while the menu is open.
+	var pt := o + Vector2(14, 0) + player.menu_vec
+	_menu.draw_colored_polygon(PackedVector2Array([pt, pt + Vector2(0, 16), pt + Vector2(4.5, 12), pt + Vector2(11, 12)]), Color.WHITE)
+	_menu.draw_polyline(PackedVector2Array([pt, pt + Vector2(0, 16), pt + Vector2(4.5, 12), pt + Vector2(11, 12), pt]), Color.BLACK, 1.0)
 
 func _draw_wheel() -> void:
 	var c := _wheel.size * 0.5
@@ -601,6 +676,15 @@ func _process(delta: float) -> void:
 	else:
 		_ammo.text = "FISTS" if player.is_melee() else "%d / %d" % [player.mag, player.reserve]
 	_ammo.modulate = Color(1, 1, 1, 1.0 if player.armed else 0.45)
+
+	if player.menu_open and not _menu_was_open:
+		# Pinned on the screen where it opened, just off the crosshair, kept inside the window.
+		var vp := get_viewport().get_visible_rect().size
+		var at := _screen_of(player.menu_at) + Vector2(22, 6)
+		var mh := player.menu_rows.size() * Player.MENU_ROW_H
+		_menu_corner = Vector2(clampf(at.x, 12.0, maxf(12.0, vp.x - _menu_width() - 12.0)), clampf(at.y, 12.0, maxf(12.0, vp.y - mh - 12.0)))
+	_menu_was_open = player.menu_open
+	_menu.queue_redraw()
 
 	_wheel.visible = player.wheel_open
 	if _wheel.visible:

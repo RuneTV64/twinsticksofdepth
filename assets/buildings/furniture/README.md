@@ -34,7 +34,7 @@ Every object has to do something to the player (the owner's rule). Measured in t
 | Fireplace | 1.15 m (the chimney breast to 2.55) | low | about 1,000 | 54 | brick, metal | brick: 9 sledgehammer blows. **A fire**: lay wood in it, light it with a match, and it lights the room (full at 1.5 m, a quarter at 4 m: you see by it and are seen in it) and boils water in a pot |
 | Piano | 1.25 m | low | 14 | 3 | wood, metal | **played, it is heard 28 m off** (a gunshot is 30): a lure. Play it and leave by the back |
 | Rug | flat | none | not a solid thing | | | **footsteps on it are heard half as far** (walking 4.5 m to 2.25). Rolled up (nothing standing on it) it is an item, "Rolled-up rug" (6 kg, two hands, a poor club, cut up for cloth), laid again wherever you stand |
-| Curtains at a window | | | not a solid thing | | | **drawn, nobody sees in or out**: they stop sight both ways but not shots, thrown things or anyone climbing through. Click to draw or open; Shift+click takes them down: the "Curtains" item (a cloak) |
+| Curtains at a window | | | not a solid thing | | | **drawn, nobody sees in or out**: they stop sight both ways but not shots, thrown things or anyone climbing through. Click to draw or open; the context menu (hold the click) takes them down: the "Curtains" item (a cloak) |
 
 Cloud run (`tools/living_test.gd`): a raider 7 m outside the living room's south window, the player 1 m in:
 curtains drawn, neither saw the other; open, both did; drawn, a shot's line to him was still clear. The piano
@@ -57,11 +57,11 @@ Outdoors there is no socket. A worn-out house's appliances (wear 2) are dead.
 
 | Appliance | Stands on | Zombie blows | Fists | Runs on | What it does now |
 |---|---|---|---|---|---|
-| Television | the TV cabinet | 2 | 4 | mains | **a lit screen and a voice**: lights whoever is in front of it (at night you are seen from 0.94 of the daytime distance standing in front of it, 0.36 with it off), and talks, heard 12 m off, every 5 s, for as long as there is power: a lure left running. The prompt reads out the emergency broadcast. Shift+click cuts its cord off (an "Electric cord") |
-| Table lamp | the side table | 1 | 1 | mains | light (3.5 m) to see by, and to be seen by. Shift+click picks it up: an item, a club that breaks on the first blow into glass and its cord; used from your things it stands where you are |
+| Television | the TV cabinet | 2 | 4 | mains | **a lit screen and a voice**: lights whoever is in front of it (at night you are seen from 0.94 of the daytime distance standing in front of it, 0.36 with it off), and talks, heard 12 m off, every 5 s, for as long as there is power: a lure left running. The prompt reads out the emergency broadcast. The context menu (hold the click) cuts its cord off (an "Electric cord") |
+| Table lamp | the side table | 1 | 1 | mains | light (3.5 m) to see by, and to be seen by. The context menu (hold the click) picks it up: an item, a club that breaks on the first blow into glass and its cord; used from your things it stands where you are |
 | Floor lamp | the floor, by the front door | 1 | 1 | mains | light (4.5 m). Picked up, a two-handed club that lasts three blows |
 | Radio | the coffee table | 1 | 2 | batteries | **a decoy that works anywhere**: set down playing (use it from your things), heard 20 m off every 3 s until the batteries go (20 minutes on a fresh set) or something smashes it. Batteries go into it as into a torch |
-| Telephone | the den's dresser | 1 | 1 | the line (with the power) | **rings now and then while you are near** (about once in eight minutes), six rings heard 15 m off. Click answers it (somebody, or nobody, on the line); Shift+click pulls its cord out for good and keeps the cord |
+| Telephone | the den's dresser | 1 | 1 | the line (with the power) | **rings now and then while you are near** (about once in eight minutes), six rings heard 15 m off. Click answers it (somebody, or nobody, on the line); the context menu pulls its cord out for good and keeps the cord |
 
 Two more kinds came with the theme's miscellaneous session (22 Nov 2026), drawn by this kit as well: a
 **candle** (lit with a match, a dim light without power for half an hour, then gone; one on the coffee table)

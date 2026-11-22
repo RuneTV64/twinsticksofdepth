@@ -291,6 +291,18 @@ var _cam_carry := Vector3.ZERO     # camera offset left over from a stance chang
 var wheel_open := false            # quick weapon wheel is up (Tab held)
 var wheel_choice := -1             # slot highlighted on the wheel, -1 = none yet
 var _wheel_vec := Vector2.ZERO     # mouse travel since the wheel opened
+# The context menu (context_menu.gd): hold left-click with the weapon lowered.
+@export var menu_hold := 0.3       # seconds held before the menu opens (a shorter click interacts on release)
+const MENU_ROW_H := 30.0           # pixels a row: the HUD draws at this pitch and the pointer is read at it
+var menu_open := false
+var menu_rows: Array = []          # ContextMenu.build(): rows and section titles
+var menu_choice := -1              # row under the pointer, -1 = none
+var menu_at := Vector3.ZERO        # where it opened (the crosshair), for the HUD to pin it on the screen
+var menu_vec := Vector2.ZERO       # the pointer, from the top left of the list
+var _menu_press_t := -1.0         # seconds a lowered left-click has been held, -1 = none
+var _menu_release_picks := false   # opened by holding: letting go over a row picks it
+var _menu_moved := 0.0             # pointer travel since it opened
+var hud: Hud                       # set by the HUD itself (for the character page in the menu)
 var _swing_t := 0.0                # > 0 while a punch is under way (windup + recovery left)
 var _swing_total := 0.0            # full length of the current punch
 var _swing_windup := 0.0           # windup part of the current punch
@@ -806,6 +818,17 @@ func _update_wheel() -> void:
 
 # ======================================================================
 func _input(event: InputEvent) -> void:
+	if menu_open and event is InputEventKey and event.pressed and not event.echo:
+		var k: int = event.physical_keycode
+		if k == KEY_ESCAPE:
+			close_menu()
+			get_viewport().set_input_as_handled()
+		elif k >= KEY_1 and k <= KEY_9:
+			var i := _menu_nth(k - KEY_1)
+			if i >= 0:
+				menu_choice = i
+				_menu_pick()
+			get_viewport().set_input_as_handled()
 	if event is InputEventMouse:
 		# Every mouse event (motion too) carries which buttons are held. Some systems drop the
 		# second click while one button is already held, so track the mask ourselves.
@@ -816,7 +839,7 @@ func _input(event: InputEvent) -> void:
 		_lmb_event = l
 		_rmb_event = (mask & MOUSE_BUTTON_MASK_RIGHT) != 0
 	if event is InputEventMouseButton:
-		if event.pressed and camera_rig and not treating and not searching and not wheel_open \
+		if event.pressed and camera_rig and not treating and not searching and not wheel_open and not menu_open \
 				and (event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			camera_rig.zoom(-1 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1)
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -829,6 +852,12 @@ func _input(event: InputEvent) -> void:
 		if wheel_open:
 			# The mouse points at the wheel instead of moving the crosshair.
 			_wheel_vec = (_wheel_vec + event.relative).limit_length(WHEEL_MOUSE_RADIUS)
+		elif menu_open:
+			# ... and down the context menu's list.
+			menu_vec += event.relative
+			menu_vec.x = clampf(menu_vec.x, -40.0, 420.0)
+			menu_vec.y = clampf(menu_vec.y, -MENU_ROW_H, menu_rows.size() * MENU_ROW_H + 8.0)
+			_menu_moved += event.relative.length()
 		elif Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not dead and not treating and not searching:
 			var rel: Vector2 = event.relative
 			# The same hand movement covers the same share of the screen however far out the camera is.
@@ -841,6 +870,8 @@ func _input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
+	if menu_open and (dead or treating or searching):
+		close_menu()
 	if dead:
 		treating = false
 		stop_search()
@@ -1239,6 +1270,44 @@ func wash_cloth() -> void:
 ## Start work on the window the crosshair is by: board it up (a hammer, nails and planks), or, if it is
 ## boarded and you carry a crowbar, prise the boards off and keep the planks. It takes time, standing at the
 ## window; every hammer blow is heard. Moving off, being grabbed or being hit stops it and nothing is used.
+## What `work_window` would do at the window by the crosshair, in words, or "" if you are not at one.
+func window_job() -> String:
+	var win := Solid.window_near(global_position + reticle_offset, 2.5, global_position.y)
+	if win.is_empty():
+		return ""
+	var at: Vector3 = win["pos"]
+	if _xz(at).distance_to(_xz(global_position)) > 2.2 or absf(at.y - global_position.y - 1.45) > 1.2:
+		return ""
+	if win["boards"] != null and is_instance_valid(win["boards"]) and win["boards"].alive():
+		return "Prise the boards off (a crowbar)"
+	return "Board it up (a hammer, %d nails, %d planks; it is heard)" % [board_nails, board_planks]
+
+
+## Shoes on or off, in words, or "" if you have none to put on or take off.
+func shoes_job() -> String:
+	if inv.worn.has("feet"):
+		return "Take off the %s" % Items.name_of(inv.worn["feet"]["id"]).to_lower()
+	var k := _shoes_key()
+	return "" if k == "" else "Put on the %s" % Items.name_of(inv.slots[k]["id"]).to_lower()
+
+
+func _shoes_key() -> String:
+	for sl in inv.slot_list():
+		var it = inv.slots.get(sl[0])
+		if it != null and str(Items.DEFS[it["id"]].get("wear", "")) == "feet":
+			return sl[0]
+	return ""
+
+
+func toggle_shoes() -> void:
+	if inv.worn.has("feet"):
+		use_item("worn:feet")
+	elif _shoes_key() != "":
+		use_item(_shoes_key())
+	else:
+		show_status("You have nothing to put on your feet.", 1.5)
+
+
 func work_window() -> void:
 	if dead or _work != "":
 		return
@@ -2688,9 +2757,14 @@ func _update_combat() -> void:
 	attack_tapped = Input.is_action_just_pressed("attack") or _lmb_edge or (held and not _attack_was_held)
 	_attack_was_held = held
 	_lmb_edge = false
+	var pressing := _menu_press_t        # kept only while the lowered click below goes on looking at it
+	_menu_press_t = -1.0
 	# A punch already under way lands when its windup runs out, whatever else is going on.
 	if _swing_t > 0.0 and not _swing_landed and _swing_total - _swing_t >= _swing_windup:
 		_land_punch()
+	if menu_open:
+		_update_menu(held)
+		return
 	if wheel_open:
 		return
 	# A finishing blow under way lands when its windup runs out; a new one starts on the attack button when the
@@ -2714,6 +2788,11 @@ func _update_combat() -> void:
 	# A quiet take-down: behind someone who doesn't know you are there.
 	if attack_tapped and takedown_target != null and _fire_cd <= 0.0 and _stagger <= 0.0:
 		_takedown()
+		return
+	if not armed and (not in_cover or weapon == "fists"):
+		# Weapon lowered (and not a gun or a throw held in cover, where the button fires blind or throws):
+		# a click does the one thing the prompt names; held, it opens the context menu.
+		_lowered_click(held, pressing)
 		return
 	if weapon == "throw":
 		# Something to throw: Ready and click, or from behind cover without showing yourself.
@@ -2752,10 +2831,114 @@ func _update_combat() -> void:
 				_start_reload()
 			elif attack_tapped:
 				_bash()
-	elif attack_tapped and interact_target != null:
-		# Weapon away: the attack button only ever interacts. Punching needs Ready.
-		interact_target.call("interact", self)
+
+
+## Weapon lowered: the left button goes down, and either comes up again before `menu_hold` (it interacts with
+## what the prompt names, as a click always did) or is held, and the context menu opens at the crosshair.
+func _lowered_click(held: bool, pressing: float) -> void:
+	if attack_tapped and _stagger <= 0.0:
+		pressing = 0.0
+	elif pressing >= 0.0:
+		pressing += get_physics_process_delta_time()
+	if pressing < 0.0:
+		return
+	if not held:
+		if interact_target != null:
+			interact_target.call("interact", self)
+			_body.reach()
+		return
+	if pressing >= menu_hold:
+		open_menu()
+		_menu_release_picks = true
+		return
+	_menu_press_t = pressing
+
+
+## How far the hold has got toward opening the menu, 0 to 1 (the HUD draws it filling round the crosshair).
+func menu_hold_frac() -> float:
+	if _menu_press_t < 0.0 or menu_open:
+		return 0.0
+	return clampf(_menu_press_t / menu_hold, 0.0, 1.0)
+
+
+func open_menu() -> void:
+	menu_rows = ContextMenu.build(self)
+	menu_open = true
+	menu_choice = -1
+	menu_vec = Vector2(0.0, -MENU_ROW_H * 0.5)
+	_menu_moved = 0.0
+	_menu_release_picks = false
+	menu_at = _reticle.global_position if _reticle != null else global_position
+
+
+func close_menu() -> void:
+	menu_open = false
+	menu_rows = []
+	menu_choice = -1
+	_menu_release_picks = false
+
+
+func _update_menu(held: bool) -> void:
+	# Raising the weapon drops it, as it drops every interaction; so does anything that takes your hands.
+	if armed or dead or treating or searching or wheel_open or not held_by.is_empty() or _roll_t > 0.0:
+		close_menu()
+		return
+	var r := floori(menu_vec.y / MENU_ROW_H)
+	menu_choice = r if r >= 0 and r < menu_rows.size() and not menu_rows[r].has("head") and menu_vec.x < 400.0 else -1
+	if _menu_release_picks:
+		if not held:
+			_menu_release_picks = false
+			if menu_choice >= 0 and _menu_moved > 6.0:
+				_menu_pick()      # held, slid down to it, let go
+		return                    # let go without moving: it stays open for a click
+	if attack_tapped:
+		if menu_choice >= 0:
+			_menu_pick()
+		else:
+			close_menu()
+
+
+## The n-th row that can be picked (keys 1 to 9), or -1.
+func _menu_nth(n: int) -> int:
+	var seen := 0
+	for i in menu_rows.size():
+		if menu_rows[i].has("head"):
+			continue
+		if seen == n:
+			return i
+		seen += 1
+	return -1
+
+
+func _menu_pick() -> void:
+	if menu_choice < 0 or menu_choice >= menu_rows.size():
+		return
+	var row: Dictionary = menu_rows[menu_choice]
+	close_menu()
+	var c: Callable = row["do"]
+	if c.is_valid():
+		c.call()
+
+
+## A row for the thing in front of you: it has to be there still, and still in reach (you may have walked off).
+func _menu_reaches(t: Node) -> bool:
+	if t == null or not is_instance_valid(t) or not t.call("can_interact", self):
+		return false
+	if _xz(t.call("interact_point") - global_position).length() > interact_range + 0.4:
+		show_status("You have moved away from it.", 1.2)
+		return false
+	return true
+
+
+func menu_interact(t: Node) -> void:
+	if _menu_reaches(t):
+		t.call("interact", self)
 		_body.reach()
+
+
+func menu_thing(t: Node, id: String) -> void:
+	if _menu_reaches(t):
+		t.call("context_do", self, id)
 
 
 func _start_reload() -> void:
@@ -3174,12 +3357,13 @@ func interact_prompt() -> String:
 			return "[Left-click]  Break the %s with %s (%s: %s)" % [b.title, tool[2], made, b.feel(tool[0], tool[1])]
 		if not is_melee() and mag > 0 and not b.surface:
 			return "The %s (%s): shooting it, %s" % [b.title, made, b.feel(shot_damage, "pierce")]
-	if interact_target == null:
+	if interact_target == null or menu_open:
 		return ""
 	var txt: String = interact_target.call("prompt_text", self)
 	if armed:
 		return "%s  (lower your weapon)" % txt
-	return "[Left-click]  %s" % txt
+	var more := interact_target.has_method("context_actions") and not (interact_target.call("context_actions", self) as Array).is_empty()
+	return "[Left-click]  %s%s" % [txt, "      [Hold]  more" if more else ""]
 
 
 # ---------------------------------------------------------------- health

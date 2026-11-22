@@ -79,6 +79,9 @@ snaps to the nearest enemy, a nudge of the mouse picks the part, a firm move bre
 spread ring in place of the hidden hit roll. What to watch for in play: can a head be picked without
 zooming in, do misses feel like your own fault, does aiming near a house ever pick the wrong thing.
 
+The owner asked on 22 Nov 2026 for a context menu in place of ever more keys (hold left-click, weapon
+lowered): built the same day on the session branch, not seen by the owner (see The context menu).
+
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
 with more meat than bone; spawning and horde migration; modular buildings; the clean-up lore. A session on a
@@ -96,6 +99,40 @@ say what a picture can't show).
 - Approved assets (pills say Approved): ask before changing them. MaleBody_Muscular is approved and locked;
   MaleBody_Muscular_Skins and ShamblerMale_Muscular were approved on 15 Nov 2026.
 - The owner reviews by looking at renders. Show before/after sheets, and say plainly what a render can't show.
+
+## The context menu (built 22 Nov 2026, in review; not seen by the owner)
+
+The owner: "Every time I have you work on the player controller ... you add new functionality to a key. Lets
+create a context menu and put some of this functionality inside there instead. Its reached by holding down
+left click with your weapon lowered", which may move later.
+
+- **The rule from now on: a new thing the player does goes in the menu, not on a new key.** Something done
+  to the thing in front of you is a row from that interactable: `context_actions(p)` returns `[[label, id],
+  ...]` and `context_do(p, id)` does it (`appliance.gd` and `window_curtains.gd` are the examples). Something
+  done to yourself or with what you carry is a row in `context_menu.gd` (`ContextMenu.build`), listed only
+  when it can be done. Keys stay for what has to be instant in a fight or while moving (Ready, cover,
+  crouch, prone, the torch, reload, the wheel) and for debug.
+- How it works (`player.gd`, "The context menu" vars, `_lowered_click`, `_update_menu`; drawn by `hud.gd`
+  `_draw_menu`): weapon lowered, left button down. Let go within `menu_hold` 0.3 s and it interacts with what
+  the prompt names, as a click always did (now on the release rather than the press: about a tenth of a
+  second later). Held, a ring fills round the crosshair and the menu opens there, pinned on the screen: a
+  list in sections (HERE: the thing's own action and its others; THE WINDOW; YOU). While it is open the mouse
+  moves a pointer down the list, not the crosshair. Slide to a row and let go, or let go first and click a
+  row; keys 1 to 9 pick too. Esc, raising the weapon (as for every interaction), a click off the list, being
+  grabbed, a roll or dying shut it. You can walk with it open; a row for a thing you have walked away from
+  says so and does nothing. The prompt adds "[Hold] more" when the thing has rows of its own.
+- Not in it with a gun or a throw in hand in cover: there the button fires blind or throws, as before (a tap
+  still interacts with something beside you). Fists in cover, it works.
+- Moved off keys into it: P (board up a window or prise its boards off), U (shoes on and off), Y (scatter
+  broken glass), Shift+I (treat your water), and the Shift+clicks: picking up a lamp, a radio, a robot or a
+  candle, cutting a television's or a phone's cord, taking curtains down. Also listed (their keys still
+  work, and show greyed in the row): your things (I), seeing to your wounds (H), the character page (C);
+  and drinking from your bottle (otherwise only a right-click in your things). The test keys Shift+P and
+  Shift+U stay.
+- Test: `tools/menu_test.gd` (real mouse events in the real level). Not built: a picture of it (the HUD
+  is 2D, but the level renders black in the cloud); rows for items you carry beyond water, shoes and glass
+  (laying a rug, setting a radio down, a bracer: still from your things); submenus; anything greyed out
+  with a reason.
 
 ## Camera
 
@@ -568,15 +605,15 @@ wounds can infect you. Stepping on anything with untreated, uncovered foot wound
 ordinary infection, which can kill you but won't turn you. Old blood or anything particularly gross almost
 always infects unless treated and cleaned at once. Every number here is Claude's first guess.
 
-- Barefoot (`Player.barefoot`: true until you put boots on; U puts them on and off, Shift+U is the old test
-  switch). A
+- Barefoot (`Player.barefoot`: true until you put boots on; the context menu puts them on and off, Shift+U is
+  the old test switch). A
   bare foot landing on broken glass takes a shard half the time (`Wreck.BARE_CUT`): a cut "on the sole of the
   foot" on that leg (a leg wound with `where` "foot"), with the glass in it, and that shard is gone from the
   ground. A broken window (3 shards) was used up in about 5 barefoot footfalls; in boots it never goes.
   More shards in the same foot make the one wound worse. It is quieter than in boots (3 m).
 - Glass as a trap (owner, 21 Nov 2026: stepping on glass must not remove it unless it sticks in a foot; it
   must be cleaned up by hand; and it can be laid as a trap for raiders and other players).
-  `Player.lay_glass()` (Y for now) scatters one slot of the broken glass you carry just in front of you: a
+  `Player.lay_glass()` (the context menu's "Scatter your broken glass" since 22 Nov 2026; it was Y) scatters one slot of the broken glass you carry just in front of you: a
   glass `Wreck` like any other, with as many shards as you laid. It cuts you too. Raiders are barefoot like
   everyone: one treading on glass takes a shard half the time (`Raider.cut_foot()`): 5 health, a limp at
   0.55 speed for 25 s, and he cries out (you are told within 14 m). He doesn't learn where you are from it.
@@ -665,7 +702,7 @@ with heat, fire, chemicals or a water filter, all to be added. Every number is C
     wound causes, so it can kill and never turns you. Drinking adds 25 to the water need (which doesn't
     run down yet).
 - Keys: right-click the bottle among your things to drink (I opens them; it was the drink key until 21 Nov
-  2026); Shift+I treats the water you carry with what you carry, the filter first and then a tablet.
+  2026); the context menu's "Treat your water" (Shift+I until 22 Nov 2026) treats it with what you carry, the filter first and then a tablet.
 - Cloud run (`tools/water_test.gd`), drinking made ill out of 400 and whether a wash leaves a wound clean:
 
   | Water | Nothing | Boiled | Tablet | Filtered | Filter + tablet or boil |
@@ -1443,8 +1480,9 @@ that switch on what was already built or promised and was waiting for an item. O
   drinks, wears, takes a pill, loads batteries, washes cloth, lays glass), Delete puts it down at your feet
   as a small pickup. A stand-in until the loot screen. Sheet: `tools/preview/items_page.png`
   (`tools/items_preview.gd`; the page only: the level behind it is black in the cloud).
-- Keys: P boards or prises (Shift+P the old free boarding); U boots on and off (Shift+U the old test
-  switch); I is now your things (see Searching and the grid), Shift+I treats water as before.
+- Keys: boarding or prising, boots on and off and treating water are in the context menu since 22 Nov 2026
+  (see The context menu; Shift+P and Shift+U are still the old test keys); I is your things (see Searching
+  and the grid).
 - In the test level: a "Carpenter's box" (hammer, nails, 4 planks, crowbar) and "Boots and a helmet" by the
   spawn; batteries in the tool box; antibiotics in every first-aid box; "Kitchen things" (pot, matches, 3
   tins, tin opener) by the kit house's stove.

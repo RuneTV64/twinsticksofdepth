@@ -8,7 +8,7 @@ extends Node3D
 ##               running in an empty house. What it says is the emergency broadcast.
 ##   floor lamp, table lamp
 ##               plugged in: light to see by in a dark room, and light that shows you to anyone looking in.
-##               Shift+click picks one up (a lamp is an item: a club that breaks at once into glass and cord);
+##               the context menu picks one up (a lamp is an item: a club that breaks at once into glass and cord);
 ##               used from your things it is stood where you are, and works wherever there is a socket.
 ##   radio       batteries, not the mains: set down playing, it carries on by itself until they are flat or
 ##               something smashes it. The decoy that works anywhere.
@@ -330,43 +330,50 @@ func can_interact(p: Player) -> bool:
 func prompt_text(_p: Player) -> String:
 	var k: Dictionary = KINDS[kind]
 	var what: String = k["what"]
-	var lift := "   (Shift+click: pick it up)" if k["item"] != "" else ""
 	if wear >= 2:
-		return "The %s is dead%s" % [what, lift if k["item"] != "" else ""]
+		return "The %s is dead" % what
 	match kind:
 		"telephone":
 			if cut:
 				return "The phone, its cord pulled out"
 			if _rings > 0:
-				return "Answer the phone   (Shift+click: pull the cord out)"
-			return "Pick up the phone   (Shift+click: pull the cord out)"
+				return "Answer the phone"
+			return "Pick up the phone"
 		"television":
 			if cut:
 				return "The television, its plug cut off"
 			if working():
-				return "Switch the television off   %s   (Shift+click: cut its cord off)" % BROADCAST[_said]
-			return "Switch the television on (it will be heard)   (Shift+click: cut its cord off)"
+				return "Switch the television off   %s" % BROADCAST[_said]
+			return "Switch the television on (it will be heard)"
 		"radio":
 			if int(item.get("uses", 0)) <= 0:
-				return "The radio's batteries are flat%s" % lift
-			return ("Switch the radio off" if switched else "Switch the radio on (it will be heard)") + lift
+				return "The radio's batteries are flat"
+			return "Switch the radio off" if switched else "Switch the radio on (it will be heard)"
 		"toy_robot":
 			if int(item.get("uses", 0)) <= 0:
-				return "The toy robot's batteries are flat%s" % lift
-			return ("Switch the toy robot off" if switched else "Switch the toy robot on (it walks off, clanking)") + lift
+				return "The toy robot's batteries are flat"
+			return "Switch the toy robot off" if switched else "Switch the toy robot on (it walks off, clanking)"
 		"candle":
-			return ("Blow the candle out" if switched else "Light the candle (a match)") + "   (Shift+click: pick it up)"
-	return ("Switch the %s off" % what if switched else "Switch the %s on" % what) + lift
+			return "Blow the candle out" if switched else "Light the candle (a match)"
+	return "Switch the %s off" % what if switched else "Switch the %s on" % what
 
 
-func interact(p: Player) -> void:
-	var k: Dictionary = KINDS[kind]
+## What else can be done with it, for the context menu (hold left-click, weapon away): [label, id] pairs,
+## done by `context_do`.
+func context_actions(_p: Player) -> Array:
+	var out: Array = []
+	if KINDS[kind]["item"] != "":
+		out.append(["Pick up the %s" % KINDS[kind]["what"], "pick_up"])
+	if (kind == "telephone" or kind == "television") and not cut:
+		out.append(["Pull the phone's cord out of the wall" if kind == "telephone" else "Cut the television's cord off", "cord"])
+	return out
+
+
+func context_do(p: Player, id: String) -> void:
 	p._body.reach()
-	var shift := Input.is_key_pressed(KEY_SHIFT)
-	if shift and k["item"] != "":
+	if id == "pick_up" and KINDS[kind]["item"] != "":
 		pick_up(p)
-		return
-	if shift and (kind == "telephone" or kind == "television") and not cut:
+	elif id == "cord" and (kind == "telephone" or kind == "television") and not cut:
 		cut = true
 		_rings = 0
 		var cord := Items.make("electric_cord")
@@ -377,7 +384,11 @@ func interact(p: Player) -> void:
 		_show()
 		p.show_status(("You yank the cord out of the wall. It won't ring again." if kind == "telephone"
 			else "You cut the cord off the back of the set.") + ("" if rest.is_empty() else " It is at your feet."), 2.0)
-		return
+
+
+func interact(p: Player) -> void:
+	var k: Dictionary = KINDS[kind]
+	p._body.reach()
 	if wear >= 2 or cut:
 		p.show_status("It is dead.", 1.4)
 		return

@@ -184,40 +184,21 @@ func _unhandled_input(event: InputEvent) -> void:
 					hud.add_child(_zone_label)
 				_zone_label.visible = not _zone_label.visible
 				_zone_t = 0.0
-			KEY_P:   # board up the window by the crosshair (hammer, nails, planks), or prise its boards off (crowbar)
+			# Boarding and prising a window, laying glass, shoes on and off and treating water are in the context
+			# menu now (hold left-click, weapon away: context_menu.gd), not on keys. The Shift test keys stay.
+			KEY_P:   # Shift+P: board up the window by the crosshair at once, for nothing (a test key)
 				if event.shift_pressed:
-					# The old stand-in, for testing: boarded at once, for nothing.
 					var win := Solid.window_near(player.global_position + player.reticle_offset, 2.5, player.global_position.y)
 					if win.is_empty():
 						player.show_status("No window by the crosshair.", 1.5)
 					else:
 						player.show_status("Boarded up (for nothing: a test key)." if Solid.board(win) else "It is boarded already.", 1.5)
-				else:
-					player.work_window()
-			KEY_Y:   # lay the broken glass you carry, as an alarm or a trap
-				player.lay_glass()
-			KEY_I:   # what you carry, as slots and a bag's grid (loot_screen.gd); Shift+I: filter or treat your water
-				if event.shift_pressed:
-					player.purify_water()
-				else:
-					player.toggle_things()
-			KEY_U:   # shoes on and off, if you have any. Shift+U: the old test switch, shod or not
+			KEY_I:   # what you carry, as slots and a bag's grid (loot_screen.gd)
+				player.toggle_things()
+			KEY_U:   # Shift+U: the old test switch, shod or not (a test key)
 				if event.shift_pressed:
 					player.barefoot = not player.barefoot
 					player.show_status("Barefoot." if player.barefoot else "Shod (a test key: no shoes needed).", 1.5)
-				elif player.inv.worn.has("feet"):
-					player.use_item("worn:feet")
-				else:
-					var shoe := ""
-					for sl in player.inv.slot_list():
-						var it = player.inv.slots.get(sl[0])
-						if it != null and str(Items.DEFS[it["id"]].get("wear", "")) == "feet":
-							shoe = sl[0]
-							break
-					if shoe != "":
-						player.use_item(shoe)
-					else:
-						player.show_status("You have nothing to put on your feet.", 1.5)
 			KEY_O:   # break what the crosshair is on; Shift+O: ten minutes of rust and rot
 				if event.shift_pressed:
 					for w in get_tree().get_nodes_in_group("weathering"):
@@ -530,7 +511,7 @@ func _build_level() -> void:
 	kit.position = Vector3(-7, 0, 4)
 	kit.contents = [Items.make("purify_tabs"), Items.make("water_filter")]
 	add_child(kit)
-	_sign(Vector3(-9, 2.2, 6), "Water: fill a bottle here. Boil it on the fire (with a pot), or Shift+I treats it. I: your things; right-click the bottle to drink")
+	_sign(Vector3(-9, 2.2, 6), "Water: fill a bottle here. Boil it on the fire (with a pot), or treat it from the menu (hold left-click). I: your things; right-click the bottle to drink")
 	_sign(Vector3(0, 2.6, 5), "Break things: Ready, crosshair on it, left-click. P boards a window: hammer, nails, planks")
 
 	# Houses from the kit (assets/buildings/house): a sound two-storey one, and a small derelict one beside

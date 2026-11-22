@@ -3,7 +3,7 @@ extends Node3D
 ## Curtains at a window (owner, 21 Nov 2026: the living room's furniture). Drawn, nobody sees in or out: they
 ## stop sight both ways (a body on Solid.SIGHT_LAYER, which only sight looks for: your view, raiders' eyes,
 ## zombies noticing you), but not shots, thrown things or anyone climbing through. Open, they hang at the sides.
-## Click to draw or open them, weapon away; Shift+click takes them down: the "Curtains" item (a cloak, cloth).
+## Click to draw or open them, weapon away; the context menu (hold the click) takes them down: the "Curtains" item (a cloak, cloth).
 ## The way to watch a street from a dark room, or to hide that someone is in it.
 
 const INSET := 0.12            # m in from the glass, on the room's side
@@ -87,12 +87,17 @@ func can_interact(p: Player) -> bool:
 
 
 func prompt_text(_p: Player) -> String:
-	return ("Open the curtains" if drawn else "Draw the curtains") + "   (Shift+click: take them down)"
+	return "Open the curtains" if drawn else "Draw the curtains"
 
 
-func interact(p: Player) -> void:
-	p._body.reach()
-	if Input.is_key_pressed(KEY_SHIFT):
+## For the context menu (hold left-click, weapon away).
+func context_actions(_p: Player) -> Array:
+	return [["Take the curtains down", "down"]]
+
+
+func context_do(p: Player, id: String) -> void:
+	if id == "down":
+		p._body.reach()
 		var item := Items.make("curtains")
 		var rest := p.inv.add(item)
 		if not rest.is_empty():
@@ -100,6 +105,9 @@ func interact(p: Player) -> void:
 		p.recompute_stats()
 		p.show_status("You pull the curtains down, rail and all." + ("" if rest.is_empty() else " They are at your feet."), 2.0)
 		queue_free()
-		return
+
+
+func interact(p: Player) -> void:
+	p._body.reach()
 	set_drawn(not drawn)
 	p.show_status("You draw the curtains. Nobody can see in, or out." if drawn else "You open the curtains.", 1.6)

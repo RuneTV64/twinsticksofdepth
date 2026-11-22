@@ -158,12 +158,10 @@ func _run() -> void:
 		p.inv.slots.erase(k)
 	fl.interact(p)
 	_say("floor lamp switched on: working %s, light 1 m off %.2f, 4 m %.2f" % [fl.working(), Daylight.lamp_light(fp + Vector3(-1, 0, 0)), Daylight.lamp_light(fp + Vector3(-4, 0, 0))])
-	_shift(true)
-	fl.interact(p)
-	_shift(false)
+	fl.context_do(p, "pick_up")   # the context menu's row (it was Shift+click)
 	await _wait(0.1)
 	var lk := p.inv.find("floor_lamp")
-	_say("  Shift+click: '%s'; carrying it in %s; light where it stood %.2f" % [p.status_text, lk, Daylight.lamp_light(fp + Vector3(-1, 0, 0))])
+	_say("  from the menu: '%s'; carrying it in %s; light where it stood %.2f" % [p.status_text, lk, Daylight.lamp_light(fp + Vector3(-1, 0, 0))])
 	_say("  as a weapon: %s" % Items.about("floor_lamp"))
 	p.global_position = o + Vector3(4.5, 0, 4.3)
 	p.facing = Vector3(1, 0, 0)
@@ -173,9 +171,7 @@ func _run() -> void:
 	_say("  used: '%s'; it stands at %s" % [p.status_text, fl2.global_position - o])
 	fl2.interact(p)
 	_say("  switched on there: working %s" % fl2.working())
-	_shift(true)
-	fl2.interact(p)
-	_shift(false)
+	fl2.context_do(p, "pick_up")   # the context menu's row (it was Shift+click)
 	await _wait(0.1)
 	p.global_position = o + Vector3(4.5, 0, 12.0)            # out in the yard
 	p.use_item(p.inv.find("floor_lamp"))
@@ -187,9 +183,7 @@ func _run() -> void:
 	# ---- the radio: a decoy on batteries
 	var rd: Appliance = _all("radio")[0]
 	p.global_position = rd.global_position + Vector3(0, -rd.global_position.y, 0.7)
-	_shift(true)
-	rd.interact(p)
-	_shift(false)
+	rd.context_do(p, "pick_up")   # the context menu's row (it was Shift+click)
 	var rk := p.inv.find("radio")
 	_say("radio picked up from the coffee table: %s (%d s of batteries)" % [Items.label(p.inv.slots[rk]), int(p.inv.slots[rk]["uses"])])
 	p.inv.slots[rk]["uses"] = 40
@@ -252,11 +246,9 @@ func _run() -> void:
 			rings += 1
 	_say("  left alone with you near: it rang %d times in 200 chances (%.0f s each: about once in %.1f minutes)" % [rings, Appliance.RING_CHECK, 200.0 * Appliance.RING_CHECK / maxf(rings, 1) / 60.0])
 	ph._rings = 0
-	_shift(true)
-	ph.interact(p)
-	_shift(false)
+	ph.context_do(p, "cord")   # the context menu's row (it was Shift+click)
 	ph.ring()
-	_say("  Shift+click: '%s'; carrying a cord %s; rung again: ringing %s; says '%s'" % [p.status_text, p.inv.find("electric_cord") != "", ph.ringing(), ph.prompt_text(p)])
+	_say("  from the menu: '%s'; carrying a cord %s; rung again: ringing %s; says '%s'" % [p.status_text, p.inv.find("electric_cord") != "", ph.ringing(), ph.prompt_text(p)])
 	_say("  the cord: %s" % Items.about("electric_cord"))
 
 	# ---- the table lamp falls when its table goes
@@ -274,9 +266,7 @@ func _run() -> void:
 	# ---- a worn-out house's appliance is dead, and stays dead carried
 	var dead := Appliance.put(main, "radio", Vector3(-8, 0, 30), "S", 2)
 	p.global_position = Vector3(-8, 0, 30.7)
-	_shift(true)
-	dead.interact(p)
-	_shift(false)
+	dead.context_do(p, "pick_up")   # the context menu's row (it was Shift+click)
 	var dk := p.inv.find("radio")
 	p.use_item(dk)
 	await _wait(0.1)
