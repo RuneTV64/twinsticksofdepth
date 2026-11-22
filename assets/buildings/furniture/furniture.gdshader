@@ -31,6 +31,9 @@ shader_type spatial;
 //   26 beige         old beige plastic: a phone, a lamp's base
 //   27 keypad        a phone's top: the buttons
 //   28 brass         a lamp's stem and foot
+//   29 sink top      a worktop with a steel basin let into it, the plughole, the tap behind it
+//   30 steel         brushed steel: a pedal bin, a tap
+//   31 tall doors    a pantry's pair of tall doors, panelled, with knobs at handle height
 //
 // The mesh tells it which: UV is the spot on the face in metres, UV2 the face's size, COLOR.r the part, COLOR.g
 // a number of the face's own (so two faces don't wear alike).
@@ -341,11 +344,30 @@ void fragment() {
 		}
 	} else if (role == 28) {
 		s = surf(F_BRASS, 0.55 + (edge ? 0.12 : 0.0));
+	} else if (role == 29) {
+		// The worktop, with the basin: a steel rim, the dark bowl, the plughole in its middle.
+		s = surf(H_FLOOR, 0.58 + (gnoise(p * 4.0) - 0.5) * 0.06);
+		float bx = abs((tu + 0.5) / tw - 0.5) * UV2.x;
+		float by = abs((tv + 0.5) / th - 0.5) * UV2.y;
+		if (bx < 0.3 && by < 0.21) {
+			s = surf(F_STEEL, (bx > 0.25 || by > 0.16) ? 0.75 : 0.42 + (gnoise(p * 9.0) - 0.5) * 0.08);
+			if (bx < 0.04 && by < 0.04) s = surf(F_STEEL, 0.12);
+			if (e.wet > 0.0 && w > 0.4 && by < 0.1) s = surf(F_STEEL, 0.3);       // grime in a worn one
+		}
+	} else if (role == 30) {
+		s = surf(F_STEEL, 0.6 + (mod(tv, 3.0) < 1.0 ? -0.06 : 0.04) + (edge ? 0.1 : 0.0));
+	} else if (role == 31) {
+		// Two tall panelled doors with knobs at handle height.
+		float half = floor(tw * 0.5);
+		float du = mod(tu, half);
+		bool frame = du < 1.0 || du >= half - 1.0 || mv < 1.0 || abs(tv - th * 0.55) < 1.0;
+		s.v -= frame ? 0.06 : 0.0;
+		if (abs(tu - half) < 1.5 && abs(tv - th * 0.5) < 1.0) s = surf(F_BRASS, 0.6);
 	}
 	if (role >= 22 && gfbm(p * 5.0 + 3.0) < w * 0.45 - 0.1) {
 		s.v -= 0.1;                                             // knocks, grime, sun-fade
 	}
-	if (role <= 3 || role == 13 || role == 14 || role == 15) {
+	if (role <= 3 || role == 13 || role == 14 || role == 15 || role == 31) {
 		s.v -= edge ? 0.1 : 0.0;                                // every wooden part has its outline
 		// Scuffs and knocks.
 		if (gfbm(p * 5.0 + 2.0) < w * 0.5 - 0.1) {

@@ -25,6 +25,7 @@ RAMPS = [
     ("LACQUER", ["#8a7466", "#54423c", "#33282a", "#1e1820", "#0e0c14"], "a piano's black lacquer"),
     ("SCREEN",  ["#eef6ff", "#a6c4e2", "#5a7896", "#2a3a4c", "#0e141c"], "a television's glass, dark or lit"),
     ("BEIGE",   ["#f2e8d0", "#d4c6a2", "#a69676", "#6a604e", "#34302c"], "old beige plastic: a phone, a lamp base"),
+    ("STEEL",   ["#eef0f2", "#c4c9ce", "#8f969e", "#5c626a", "#2c3036"], "stainless steel: a sink, a bin"),
 ]
 FIRST = 16
 

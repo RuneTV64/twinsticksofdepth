@@ -56,6 +56,11 @@ const KINDS := {
 	"display_cabinet": {"w": 0.9, "h": 1.85, "d": 0.42, "stuff": "wood", "parts": {"wood": 0.75, "glass": 0.25}, "thin": 0.45, "what": "display cabinet"},
 	"fireplace": {"w": 1.4, "h": 1.15, "d": 0.45, "stuff": "brick", "parts": {"brick": 0.92, "metal": 0.08}, "thin": 1.0, "what": "fireplace"},
 	"piano": {"w": 1.4, "h": 1.25, "d": 0.6, "stuff": "wood", "parts": {"wood": 0.75, "metal": 0.25}, "thin": 0.8, "what": "piano"},
+	# The kitchen (22 Nov 2026: the second theme's furniture). `lift`: it hangs this high off the floor.
+	"sink": {"w": 0.9, "h": 0.9, "d": 0.6, "stuff": "wood", "parts": {"wood": 0.7, "metal": 0.3}, "thin": 0.5, "what": "kitchen sink"},
+	"pantry": {"w": 0.8, "h": 2.0, "d": 0.5, "stuff": "wood", "parts": {}, "thin": 0.5, "what": "pantry cupboard"},
+	"wall_cabinet": {"w": 0.8, "h": 0.7, "d": 0.33, "stuff": "wood", "parts": {}, "thin": 0.5, "what": "wall cupboard", "lift": 1.45},
+	"kitchen_bin": {"w": 0.36, "h": 0.65, "d": 0.36, "stuff": "plastic", "parts": {"plastic": 0.7, "metal": 0.3}, "thin": 0.5, "what": "kitchen bin"},
 }
 ## What each will do when the system it waits for exists. Nothing here is built.
 const LATER := {
@@ -76,6 +81,10 @@ const LATER := {
 	"display_cabinet": "the good china, and whatever else was kept for best",
 	"fireplace": "warmth, when there is a warmth need; cooking",
 	"piano": "",
+	"sink": "(its tap runs while the mains do: water.gd; a cupboard under it)",
+	"pantry": "(shelves of food and the odds and ends kept with it)",
+	"wall_cabinet": "(plates and glasses)",
+	"kitchen_bin": "(what was thrown away: there is a use for all of it)",
 }
 ## How far a fire in a fireplace lights the room round it (m).
 const FIRE_LIGHT := 5.0
@@ -112,6 +121,9 @@ const RADIO_FRONT := 25         # a radio's front: the speaker grille and the di
 const BEIGE := 26               # old beige plastic: a phone, a lamp's base
 const KEYPAD := 27              # a phone from above: the handset's cradle and the buttons
 const BRASS := 28               # a lamp's brass stem and foot
+const SINK_TOP := 29            # a worktop with a steel basin let into it, and the tap
+const STEEL := 30               # brushed steel: a pedal bin
+const TALL_DOORS := 31          # a pantry's tall pair of doors
 
 ## Test harnesses on the software renderer set this: the shader then puts out its palette colours directly.
 static var raw_colors := false
@@ -288,6 +300,18 @@ static func mesh_of(kind: String, length := 0.0) -> ArrayMesh:
 			_box(st, at, Vector3(0, 0.048, 0), Vector3(length, 0.012, KINDS_RUG_D), WOOD, -1, RUG)   # (on a ground floor's boards, 4 cm up)
 		"curtain":
 			_box(st, at, Vector3(0, 0, 0), Vector3(length, 1.0, 0.03), CURTAIN)
+		"sink":
+			_box(st, at, Vector3(0, 0.42, -0.01), Vector3(0.9, 0.84, 0.56), WOOD, CUPBOARDS)
+			_box(st, at, Vector3(0, 0.87, 0), Vector3(0.9, 0.0625, 0.6), WORKTOP, -1, SINK_TOP)
+			_box(st, at, Vector3(0, 1.0, -0.24), Vector3(0.04, 0.2, 0.04), STEEL)                          # the tap
+		"pantry":
+			_box(st, at, Vector3(0, 1.0, 0), Vector3(0.8, 2.0, 0.5), WOOD, TALL_DOORS)
+		"wall_cabinet":
+			_box(st, at, Vector3(0, 0.35, 0), Vector3(0.8, 0.7, 0.33), WOOD, CUPBOARDS)
+		"kitchen_bin":
+			_box(st, at, Vector3(0, 0.3, 0), Vector3(0.34, 0.6, 0.34), STEEL)
+			_box(st, at, Vector3(0, 0.625, 0), Vector3(0.36, 0.05, 0.36), STEEL)                         # the lid
+			_box(st, at, Vector3(0, 0.03, 0.2), Vector3(0.14, 0.03, 0.06), PLASTIC)                       # the pedal
 		# ---- appliances (appliance.gd: their sizes, what they do)
 		"television":
 			_box(st, at, Vector3(0, 0.24, 0.07), Vector3(0.56, 0.48, 0.42), PLASTIC, TV_FRONT)
@@ -391,7 +415,8 @@ func _piece(kind: String, at: Vector3, facing: String, width: float, mesh: Array
 	var h: float = k["h"]
 	var d: float = k["d"]
 	var size := Vector3(width, h, d) if turns % 2 == 0 else Vector3(d, h, width)
-	var body := Solid.box(level, at + Vector3(0.0, h * 0.5, 0.0), size, Color(0.5, 0.4, 0.3), k["stuff"], k["what"],
+	var lift := float(k.get("lift", 0.0))
+	var body := Solid.box(level, at + Vector3(0.0, lift + h * 0.5, 0.0), size, Color(0.5, 0.4, 0.3), k["stuff"], k["what"],
 		k["parts"], 0.0, Callable(), at.y)
 	body.set_meta("furniture", kind)
 	# Solid's own plain box is the thing you walk into; what you see is the piece's mesh.
@@ -444,6 +469,14 @@ func _piece(kind: String, at: Vector3, facing: String, width: float, mesh: Array
 			br.broke.connect(func(_by: Node) -> void:
 				if is_instance_valid(fire) and fire.lit:
 					Daylight.remove_lamp(fire.global_position))
+	if kind == "sink" and wear < 2:
+		# The tap (water_source.gd): it runs while the mains do; a worn-out house's has long since run dry.
+		var tap := WaterSource.new()
+		tap.kind = "tap"
+		tap.mains = true
+		var front := Vector3(0, 0, 1).rotated(Vector3.UP, turns * PI * 0.5)
+		tap.position = front * (d * 0.5 + 0.3) + Vector3.UP * 0.4
+		body.add_child(tap)
 	if kind == "piano":
 		var keys := Piano.new()
 		var face := Vector3(0, 0, 1).rotated(Vector3.UP, turns * PI * 0.5)
@@ -504,8 +537,12 @@ static func furnish(in_level: Node, origin: Vector3, storeys := 1, worn := 0, wo
 	f.rug(o + Vector3(4.4, 0, 1.75), Vector2(1.8, 1.2), 0)
 	f.curtains(o + Vector3(4.5, 1.4, 0.0), o + Vector3(4.5, 1.4, 1.0))
 	# The kitchen: x 6..9, z 0..6, its doorway in the west wall at z 4.5.
-	f.counter(Vector2(o.x + 6.2, o.z + 0.46), Vector2(o.x + 7.9, o.z + 0.46), o.y, "S")
+	f.counter(Vector2(o.x + 6.2, o.z + 0.46), Vector2(o.x + 7.0, o.z + 0.46), o.y, "S")
+	f.put("sink", o + Vector3(7.45, 0, 0.46), "S")                 # under the north window
 	f.put("stove", o + Vector3(8.42, 0, 0.46), "S")
+	f.put("wall_cabinet", o + Vector3(6.6, 0, 0.33), "S")           # over the counter
+	f.put("pantry", o + Vector3(8.6, 0, 5.72), "N")
+	f.put("kitchen_bin", o + Vector3(6.3, 0, 5.7), "E")
 	f.put("fridge", o + Vector3(6.46, 0, 1.62), "E")
 	f.put("table", o + Vector3(7.75, 0, 3.0), "E")
 	f.put("chair", o + Vector3(6.98, 0, 3.0), "E")

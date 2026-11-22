@@ -66,6 +66,8 @@ func _run() -> void:
 	await _wait(0.2)
 	if _part(1):
 		await _cloth()
+	if _part(2):
+		await _furniture()
 	quit()
 
 
@@ -154,3 +156,58 @@ func _cloth() -> void:
 	p.sheet._rebuild()
 	_say("  then: '%s', stagger %.2f, pos %s" % [p.status_text, p._stagger, p.global_position])
 	_say("a tea towel torn in two: %s; aim back to %.2f with the mitts off" % [", ".join(p.inv.slots.values().map(func(it): return Items.label(it))), p.sheet.aim_mult])
+
+
+# ---------------------------------------------------------------------------------------- 2: furniture
+func _piece(kind: String) -> Breakable:
+	for b in get_nodes_in_group("destructible"):
+		if b is Breakable and b.host != null and is_instance_valid(b.host) and str(b.host.get_meta("furniture", "")) == kind:
+			return b
+	return null
+
+
+func _furniture() -> void:
+	for kind in ["sink", "pantry", "wall_cabinet", "kitchen_bin"]:
+		var b := _piece(kind)
+		if b == null:
+			_say("%s: not in the level" % kind)
+			continue
+		var c := Cover.box_of(b.host)
+		_say("%-13s zombie blows %d, fists %d, hatchet %d; cover: %s; stands %.2f to %.2f m" % [kind, ceili(b.hits_left(12.0, "blunt")),
+			ceili(b.hits_left(6.0, "blunt")), ceili(b.hits_left(30.0, "chop")), "none" if c == null else ("high" if c.top > 1.5 else "low"), b.foot, b.top])
+	for kind in ["sink", "pantry", "wall_cabinet", "kitchen_bin"]:
+		var tot := 0
+		var seen := {}
+		for i in 200:
+			var probe := Stash.for_piece(kind, kind, 1, 0)
+			main.add_child(probe)
+			for part in probe.parts:
+				probe._roll(part)
+				for t in part["grid"]["things"]:
+					tot += 1
+					var id: String = t["item"]["id"]
+					seen[id] = int(seen.get(id, 0)) + 1
+			probe.free()
+		var top: Array = seen.keys()
+		top.sort_custom(func(a, b): return seen[a] > seen[b])
+		_say("%s holds about %.1f things (200 rolls); most often: %s" % [kind, tot / 200.0, ", ".join(top.slice(0, 6).map(func(k): return "%s %d" % [k, seen[k]]))])
+	# The tap.
+	var tap: WaterSource = null
+	for n in get_nodes_in_group("interactables"):
+		if n is WaterSource and n.mains:
+			tap = n
+	_empty()
+	var bottle := Items.make("water")
+	bottle["dirt"] = 0.7
+	bottle["bugs"] = 0.9
+	bottle["uses"] = 0                     # drunk dry: what is left in it is the pond's
+	p.inv.slots["hand_l"] = bottle
+	p.global_position = Vector3(tap.global_position.x, 0, tap.global_position.z)
+	_say("at the tap: '%s'" % tap.prompt_text(p))
+	tap.interact(p)
+	_say("  filled a bottle of pond water at it: '%s' (dirt %.2f, bugs %.2f)" % [p.status_text, Water.dirt(bottle), Water.bugs(bottle)])
+	Power.set_on(false)
+	_say("  mains off: '%s'" % tap.prompt_text(p))
+	tap.interact(p)
+	_say("  '%s'" % p.status_text)
+	Power.set_on(true)

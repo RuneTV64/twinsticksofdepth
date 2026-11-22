@@ -5,6 +5,7 @@ extends Node3D
 ## that is broken the water goes with it.
 
 var kind := "rain"
+var mains := false       # a tap: it runs only while the mains do (power.gd stands in for the water as well)
 
 
 func _ready() -> void:
@@ -20,10 +21,15 @@ func interact_point() -> Vector3:
 
 
 func prompt_text(_p: Player) -> String:
+	if mains and not Power.on:
+		return "The tap is dry"
 	return "Fill your bottle from the %s" % Water.SOURCES[kind]["name"]
 
 
 func interact(p: Player) -> void:
+	if mains and not Power.on:
+		p.show_status("The tap coughs and spits air. The mains are off.", 2.0)
+		return
 	var item: Dictionary = p.inv.slots[p.inv.find("water")]
 	Water.fill(item, float(Water.SOURCES[kind]["dirt"]), float(Water.SOURCES[kind]["bugs"]))
 	p.show_status("Filled. It looks %s." % Water.look(item), 2.0)

@@ -16,6 +16,7 @@ const SEALED := {"dirt": 0.0, "bugs": 0.0}          # a bottle as found, never o
 const SOURCES := {
 	"rain": {"name": "rain barrel", "dirt": 0.15, "bugs": 0.45},
 	"pond": {"name": "standing water", "dirt": 0.7, "bugs": 0.9},
+	"tap": {"name": "tap", "dirt": 0.0, "bugs": 0.03},
 }
 const TAB_WAIT := 60.0        # s for tablets to work (a stand-in until the game has a clock)
 const BOIL_TIME := 20.0       # s on the fire

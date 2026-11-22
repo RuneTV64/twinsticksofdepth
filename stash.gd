@@ -25,6 +25,10 @@ const KINDS := {
 	"end_table": {"place": ["living room"], "parts": [["Drawer", "drawer", 3, 2]]},
 	"tv_stand": {"place": ["living room"], "parts": [["Cabinet", "cupboard", 6, 3]]},
 	"display_cabinet": {"place": ["living room", "kitchen"], "parts": [["Glass shelves", "shelf", 5, 4], ["Cupboard", "cupboard", 5, 2]]},
+	"sink": {"place": ["kitchen"], "parts": [["Under the sink", "cupboard", 5, 3]]},
+	"pantry": {"place": ["kitchen"], "only": ["food", "water", "matches", "candle", "battery", "bottle", "tea_towel"], "parts": [["Top shelves", "shelf", 5, 3], ["Bottom shelves", "shelf", 5, 3]]},
+	"wall_cabinet": {"place": ["kitchen"], "parts": [["Cupboard", "cupboard", 5, 3]]},
+	"kitchen_bin": {"place": ["bin"], "parts": [["Bin", "bag", 3, 4]]},
 }
 ## How much of what a sound piece would hold is left in one put down damaged, or worn out.
 const PLENTY := [1.0, 0.6, 0.3]
