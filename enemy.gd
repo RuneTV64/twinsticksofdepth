@@ -496,6 +496,8 @@ func _leave_tracks() -> void:
 	moved.y = 0.0
 	if moved.length() >= (0.25 if crawling else 0.75):
 		_step_from = global_position
+		if not Marbles.all.is_empty():
+			Marbles.step_on(global_position, self)      # marbles on any floor (marbles.gd)
 		if absf(global_position.y) > 0.5:
 			return       # indoors on another floor: no prints, no mud
 		_step_side = -_step_side

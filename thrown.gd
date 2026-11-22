@@ -1,11 +1,10 @@
 class_name Thrown
 extends Node3D
-## Something thrown (a rock, a bottle): it arcs from the hand to where it was aimed and makes a noise where it
+## Something thrown (a rock, a bottle, a book, a record): it arcs from the hand to where it was aimed and makes a noise where it
 ## lands. Zombies go to the noise; raiders go to look. A rock can be picked up again; a bottle breaks.
 
-const LOOK := {"rock": [Vector3(0.16, 0.12, 0.14), Color(0.5, 0.5, 0.48)], "bottle": [Vector3(0.08, 0.08, 0.26), Color(0.25, 0.5, 0.3)]}
-## How far the landing is heard (m).
-const NOISE := {"rock": 9.0, "bottle": 14.0}
+## What it is, how it looks and how loud it lands are the item's own `throw` record (items.gd): a rock and a book
+## lie where they land to be picked up again; a bottle breaks.
 
 var item := "rock"
 var from := Vector3.ZERO
@@ -25,12 +24,14 @@ var _pane_u := 0.0
 
 
 func _ready() -> void:
+	var look: Array = _rec().get("look", [[0.12, 0.1, 0.12], "stone"])
+	var sz: Array = look[0]
 	var m := MeshInstance3D.new()
 	var b := BoxMesh.new()
-	b.size = LOOK[item][0]
+	b.size = Vector3(sz[0], sz[1], sz[2])
 	m.mesh = b
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = LOOK[item][1]
+	mat.albedo_color = Clothes.ink(str(look[1]))
 	m.material_override = mat
 	add_child(m)
 	global_position = from
@@ -80,14 +81,19 @@ func _strike() -> void:
 	_t = 0.0
 
 
+func _rec() -> Dictionary:
+	return Items.DEFS[item].get("throw", {})
+
+
 func _land() -> void:
-	Earshot.make(to, float(NOISE[item]), get_tree(), thrower, true)
-	if item == "rock":
+	var rec := _rec()
+	Earshot.make(to, float(rec.get("noise", 9.0)), get_tree(), thrower, true)
+	if bool(rec.get("keep", false)):
 		var p := ItemPickup.new()
-		p.title = "Rock"
+		p.title = Items.name_of(item)
 		p.small = true
-		p.tint = LOOK["rock"][1]
-		p.contents = [Items.make("rock")]
+		p.tint = Clothes.ink(str((rec.get("look", [[], "stone"]) as Array)[1]))
+		p.contents = [Items.make(item)]
 		p.position = Vector3(to.x, to.y if _second else 0.0, to.z)      # (upstairs, if it went in at a window)
 		get_parent().add_child(p)
 	queue_free()

@@ -19,7 +19,7 @@ class Sheet extends Control:
 			var x := 30.0
 			var y := 40.0
 			var row_h := 0.0
-			var cats := ["medical", "tool", "material", "clothing", "food", "thrown", "scrap"]
+			var cats := ["medical", "tool", "material", "clothing", "food", "thrown", "misc", "scrap"]
 			for cat: String in cats:
 				draw_string(font, Vector2(x, y - 10.0), cat.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1.0, 0.75, 0.3))
 				for id: String in Items.DEFS:

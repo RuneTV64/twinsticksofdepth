@@ -33,7 +33,7 @@ const HELP_KEYS := """CONTROLS
 Move  WASD
 Look (weapon away)  Mouse moves the crosshair as far as you can see; the camera follows
 Camera in and out  Mouse wheel
-Throw  Pick up rocks and bottles, choose Throw on the Tab wheel, hold Ready, left-click: it lands at the crosshair
+Throw  Pick up rocks and bottles (indoors, books and records), choose Throw on the Tab wheel, hold Ready, left-click: it lands at the crosshair
   and the noise draws zombies and raiders. From behind cover a click throws without showing yourself.
 Take-down  Weapon raised, right behind a raider who hasn't noticed you, crosshair on him: left-click.
 Seasons  M steps the season (spring, summer, autumn, winter); K turns the rain on and off. The ground follows.
@@ -42,6 +42,8 @@ Light and dark  N steps the time of day (day, dusk, night, dawn). In the dark yo
   less far; a fire or lamp lights whoever stands in it; a gunshot shows you up for a moment.
 Appliances  Click a lamp, the television or a radio to switch it; Shift+click picks a lamp or radio up (use it
   to stand it down again). A radio set down plays until its batteries go: a decoy. Shift+N cuts the power.
+  From your things (I): a toy robot walks off clanking, marbles scatter (they trip whoever walks on them), a
+  candle is lit and set down (a match), two magazines and a strip of cloth make a guard for a forearm.
 Torch  E steps through the hand torch (a beam where you face), the burning torch (light all round, burns away)
        and none. Both are in the tool box. You see by them, and they show you.
 Crouch  Ctrl (again to stand)      Prone  X (again to get up)

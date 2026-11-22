@@ -9,7 +9,8 @@ extends SceneTree
 ##       house furnished, opened as the game opens it round someone indoors; FLOOR=1 for upstairs), living (the
 ##       living room's pieces against a wall with two windows: curtains drawn at one and open at the other, the
 ##       fire lit; FIRE=0 leaves it cold), appliances (appliance.gd: each on what it stands on, switched off in
-##       the back row and on in the front; NIGHT=1 turns the daylight down).
+##       the back row and on in the front; NIGHT=1 turns the daylight down), misc (the living room's odds and
+##       ends in the world: candles lit and out, a toy robot, marbles scattered; NIGHT=1).
 ## WEAR 0..2, STAIN 0..2 (pine, oak, walnut), FABRIC 0..2 (brick red, olive, blue), WEATHER 0..5 (the damp
 ## only shows on worn furniture), DIST the camera's distance, LOOK "x,y,z".
 ## Test-only patch for the software renderer: it skips the linear->sRGB step, so the shaders output their
@@ -167,6 +168,24 @@ func _build() -> void:
 			env.environment.ambient_light_energy = 0.12
 		look_at = Vector3(-0.8, 0.5, -2.2)
 		dist = 9.5
+	elif mode == "misc":
+		Cutaway.add_building(Rect2(-12, -12, 24, 24), -1.0, 3.0)
+		var k := HouseKit.new(world, Vector3(-7.5, 0, -4.5), 0, 0)
+		k.floor(Rect2i(0, 0, 5, 3), 0)
+		var f := FurnitureKit.new(world, wear, stain, fabric)
+		f.put("coffee_table", Vector3(-2.0, 0, -2.6), "S")
+		var lit := Appliance.put(world, "candle", Vector3(-2.3, 0.45, -2.6), "S", wear, true, 0.0)
+		var out := Appliance.put(world, "candle", Vector3(-1.7, 0.45, -2.6), "S", wear, false, 0.0)
+		var bot := Appliance.put(world, "toy_robot", Vector3(0.0, 0, -2.2), "E", wear, false, 0.0)
+		var floor_candle := Appliance.put(world, "candle", Vector3(1.4, 0, -1.2), "S", wear, true, 0.0)
+		for a in [lit, out, bot, floor_candle]:
+			a.set_process(false)
+		Marbles.lay(world, Vector3(1.6, 0, -2.8))
+		if _env("NIGHT", 0) == 1:
+			sun.light_energy = 0.12
+			env.environment.ambient_light_energy = 0.12
+		look_at = Vector3(-0.4, 0.3, -2.2)
+		dist = 4.6
 	else:
 		# Every piece, on a floor of the house's boards.
 		var k := HouseKit.new(world, Vector3(-7.5, 0, -4.5), 0, 0)

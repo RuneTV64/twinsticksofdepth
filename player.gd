@@ -260,7 +260,7 @@ const SIGHT_RAYS := 240                 # one every 1.5 degrees, all the way rou
 
 ## Weapons on the quick wheel, in slot order (slot 0 is at the left, going clockwise).
 const WEAPONS: Array[String] = ["fists", "gun", "throw"]
-const THROWABLES: Array[String] = ["bottle", "rock"]     # what "throw" throws, the first you have
+const THROWABLES: Array[String] = ["bottle", "rock", "vinyl_record", "book"]     # what "throw" throws, the first you have
 const WEAPON_NAMES := {"fists": "Unarmed", "gun": "Gun", "throw": "Throw"}
 const WHEEL_MOUSE_RADIUS := 90.0        # pixels of mouse travel from center to the wheel's rim
 
@@ -1048,8 +1048,17 @@ func use_item(key: String) -> void:
 			lay_glass()
 		"rolled_rug":
 			lay_rug(key)
-		"table_lamp", "floor_lamp", "radio":
+		"table_lamp", "floor_lamp", "radio", "toy_robot":
 			set_down_appliance(key)
+		"candle":
+			if not inv.use("matches"):
+				show_status("You need a match to light it.", 1.6)
+			else:
+				set_down_appliance(key)
+		"magazine":
+			make_bracer()
+		"marbles":
+			lay_marbles(key)
 		"cloth_scrap":
 			wash_cloth()
 		"plank", "nails", "hammer", "crowbar":
@@ -1131,7 +1140,7 @@ func eat() -> void:
 func load_battery() -> void:
 	var tk := ""
 	var low := 2.0
-	for id: String in ["torch", "radio"]:
+	for id: String in ["torch", "radio", "toy_robot"]:
 		var k := inv.find(id)
 		if k != "":
 			var left := float(inv.slots[k].get("uses", 0)) / float(Items.DEFS[id]["uses"])
@@ -1149,6 +1158,42 @@ func load_battery() -> void:
 	show_status("Fresh batteries in the %s." % Items.name_of(id).to_lower(), 1.6)
 
 
+## Two magazines rolled round a forearm and tied: a guard a bite struggles through (owner, 21 Nov 2026: the
+## living room's odds and ends must each do something). The left arm first, then the right; it is put on at once.
+func make_bracer() -> void:
+	var mk := inv.find("magazine")
+	if mk == "" or int(inv.slots[mk].get("n", 1)) < 2:
+		show_status("It takes two magazines to go round a forearm.", 1.8)
+		return
+	var tie := "cloth_strip" if inv.has("cloth_strip") else ("electric_cord" if inv.has("electric_cord") else "")
+	if tie == "":
+		show_status("You need something to tie them on: a strip of cloth, or a cord.", 2.0)
+		return
+	var id := "magazine_bracer" if not inv.worn.has("wrist_l") else ("magazine_bracer_r" if not inv.worn.has("wrist_r") else "")
+	if id == "":
+		show_status("There is something on both your wrists already.", 1.8)
+		return
+	inv.use("magazine")
+	inv.use("magazine")
+	inv.use(tie)
+	inv.don(Items.make(id))
+	_worn_changed()
+	_body.reach()
+	show_status("You roll two magazines round your %s forearm and tie them tight." % ("left" if id == "magazine_bracer" else "right"), 2.2)
+
+
+## Scatter the marbles you carry on the floor in front of you (marbles.gd).
+func lay_marbles(key: String) -> void:
+	var it = inv.slots.get(key)
+	if it == null or it["id"] != "marbles":
+		return
+	inv.slots.erase(key)
+	recompute_stats()
+	Marbles.lay(get_parent(), global_position + facing * 0.9)
+	_body.reach()
+	show_status("You scatter the marbles across the floor.", 1.6)
+
+
 ## Stand a lamp or a radio you carry on the floor in front of you (appliance.gd). A radio comes down playing.
 func set_down_appliance(key: String) -> void:
 	var it = inv.slots.get(key)
@@ -1162,6 +1207,10 @@ func set_down_appliance(key: String) -> void:
 	if a.kind == "radio":
 		show_status("You set the radio down, turned up. It will play until the batteries go." if a.working()
 			else ("You set the radio down. It is broken: it won't play." if a.wear >= 2 else "You set the radio down. Its batteries are flat."), 2.0)
+	elif a.kind == "toy_robot":
+		show_status("You wind it up and set it down. Off it clanks." if a.working() else "You set it down. Its batteries are flat.", 1.8)
+	elif a.kind == "candle":
+		show_status("You light the candle and set it down.", 1.6)
 	else:
 		show_status("You stand the %s up. Click it to switch it on." % Appliance.KINDS[a.kind]["what"], 1.8)
 
@@ -1193,7 +1242,7 @@ func wash_cloth() -> void:
 func work_window() -> void:
 	if dead or _work != "":
 		return
-	var win := Solid.window_near(global_position + reticle_offset, 2.5)
+	var win := Solid.window_near(global_position + reticle_offset, 2.5, global_position.y)
 	if win.is_empty():
 		show_status("No window by the crosshair.", 1.5)
 		return
@@ -1203,11 +1252,14 @@ func work_window() -> void:
 		return
 	var boarded: bool = win["boards"] != null and is_instance_valid(win["boards"]) and win["boards"].alive()
 	if boarded:
-		if not inv.has("crowbar"):
+		var bar := inv.tool_for("pry")
+		if bar == "":
 			show_status("It is boarded already. A crowbar would have the boards off.", 2.2)
 			return
-		_start_work("pry", win, pry_time)
-		show_status("You work the crowbar under a board...", pry_time)
+		var bar_id: String = inv.slots[bar]["id"]
+		var t := pry_time * float(Items.DEFS[bar_id].get("pry_mult", 1.0))
+		_start_work("pry", win, t)
+		show_status("You work the %s under a board..." % Items.name_of(bar_id).to_lower(), t)
 		return
 	var lack: Array[String] = []
 	if not inv.has("hammer"):
@@ -1445,6 +1497,8 @@ func _step_in_it() -> void:
 	# Broken glass: shod it crunches, less going carefully. Barefoot it goes into your foot. Crawling over it
 	# is a horrible idea (owner, 21 Nov 2026): it goes into your arms, your chest, your legs, boots or no boots.
 	var crawl := posture == 2
+	if not Marbles.all.is_empty():
+		Marbles.step_on(global_position, self)
 	var glass := Wreck.step_on(global_position, self, 0.5 if posture > 0 else 1.0, crawl or (barefoot and footed),
 		Wreck.CRAWL_CUT if crawl else Wreck.BARE_CUT)
 	if glass == 2 and not invulnerable and crawl:
@@ -3491,7 +3545,9 @@ func low_hidden_from(from: Vector3) -> bool:
 # ---------------------------------------------------------------- throwing
 ## How far you can throw: further the stronger you are.
 func throw_range() -> float:
-	return throw_base + throw_per_str * strength
+	var id := throw_item()
+	var far := float((Items.DEFS[id].get("throw", {}) as Dictionary).get("far", 1.0)) if id != "" else 1.0
+	return (throw_base + throw_per_str * strength) * far
 
 
 ## What you would throw now (the first of THROWABLES you carry), or "".
@@ -3508,7 +3564,7 @@ func throw_item() -> String:
 func _throw() -> void:
 	var id := throw_item()
 	if id == "":
-		show_status("Nothing to throw. Rocks and bottles lie about.", 1.2)
+		show_status("Nothing to throw. Rocks and bottles lie about; indoors, books and records.", 1.2)
 		_fire_cd = 0.3
 		return
 	var aim := reticle_offset.limit_length(throw_range())

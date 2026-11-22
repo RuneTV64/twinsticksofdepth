@@ -63,7 +63,14 @@ Outdoors there is no socket. A worn-out house's appliances (wear 2) are dead.
 | Radio | the coffee table | 1 | 2 | batteries | **a decoy that works anywhere**: set down playing (use it from your things), heard 20 m off every 3 s until the batteries go (20 minutes on a fresh set) or something smashes it. Batteries go into it as into a torch |
 | Telephone | the den's dresser | 1 | 1 | the line (with the power) | **rings now and then while you are near** (about once in eight minutes), six rings heard 15 m off. Click answers it (somebody, or nobody, on the line); Shift+click pulls its cord out for good and keeps the cord |
 
-Whatever is making a noise that goes on (the television, the radio, a ringing phone) is found by the zombies
+Two more kinds came with the theme's miscellaneous session (22 Nov 2026), drawn by this kit as well: a
+**candle** (lit with a match, a dim light without power for half an hour, then gone; one on the coffee table)
+and a **toy robot** (batteries: set down, it marches off the way you were facing, clanking, turning at walls:
+a decoy the zombies follow and smash). `FurnitureKit.lying(title, ids, at)` leaves things lying somewhere as
+an `ItemPickup`: the fire poker by the fireplace, a trophy and a candle on the mantelpiece. The game's
+CLAUDE.md ("The living room's odds and ends") has the rest of that session.
+
+Whatever is making a noise that goes on (the television, the radio, a ringing phone, the toy robot) is found by the zombies
 it brings, and they beat on it until it stops (`Enemy.hear_noise` with the thing; `still_sounding`,
 `take_blow_from`). If the table under a lamp or the television breaks, it falls to the floor (a lamp or a
 set may shatter). The electric cord is a weapon strap (slings something long across your back) and ties a
@@ -142,6 +149,7 @@ f.curtains(window_point, a_point_inside)                  # at the nearest windo
 | `preview/furniture_house.png` | The kit house furnished: the living room round its fireplace, the den, the kitchen |
 | `preview/living_room.png` | The living room's pieces, sound (the fire lit, one window's curtains drawn and one open) and worn out |
 | `preview/appliances.png` | The appliances off and on, by day and at night |
+| `../../../tools/preview/misc_living_room.png` | (in the repository's tools) candles, the toy robot and marbles in a room, by day and night |
 | `../../../rug.gd`, `window_curtains.gd`, `piano.gd` | (in the game's root) the rug, curtains at a window, a piano's keys |
 | `../../../appliance.gd`, `power.gd` | (in the game's root) the appliances and what they do; mains power |
 | `source/appliance_test.gd` | The headless test of the appliances (in the repository: `tools/appliance_test.gd`) |

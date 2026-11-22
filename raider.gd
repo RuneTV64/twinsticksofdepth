@@ -502,6 +502,16 @@ func spiked() -> void:
 		player.show_status("Someone cries out: caught on a fence.", 1.8)
 
 
+## Marbles rolled under his foot (marbles.gd): he stumbles, slowed for a moment, and swears.
+func slip() -> void:
+	if dead:
+		return
+	_glass_t = maxf(_glass_t, 2.5)
+	_knock += Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)) * 1.5
+	if player != null and not player.dead and global_position.distance_to(player.global_position) <= 14.0:
+		player.show_status("Someone stumbles and swears.", 1.6)
+
+
 func cut_foot() -> void:
 	if dead:
 		return

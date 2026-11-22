@@ -65,9 +65,11 @@ The theme's furniture (session 2) was built on 21 Nov 2026, not seen by the owne
 (the owner said to push it; see The furniture kit, The living room). The owner then named the next theme, a
 middle-class kitchen (22 Nov 2026), and straight after said to finish the living room first: its appliances
 were built on 22 Nov 2026 (see The living room's appliances), not seen by the owner, on `main` since 22 Nov
-2026 (the owner said to push it). Next in the theme: its miscellaneous session (books, music, movies, toys, trophies...); then the kitchen,
+2026 (the owner said to push it). Then its miscellaneous session (books, music, movies, toys, trophies...); then the kitchen,
 starting with its clothes session (its cloth and wearables: an apron, oven mitts, a tea towel, a shopping bag
-were on Claude's list, nothing built).
+were on Claude's list, nothing built). The living room's miscellaneous session (the owner: "Now do the living
+room misc") was built on 22 Nov 2026, not seen by the owner, on the session branch only (see The living room's
+odds and ends). That finishes the first theme; the kitchen is next.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -1153,6 +1155,59 @@ furniture README has the table.
   lamps are flat circles); power per house or per street; poses for switching. Seen only on the software
   renderer.
 
+## The living room's odds and ends (built 22 Nov 2026, in review; not seen by the owner)
+
+The theme's fourth session, misc: books, music, movies, toys, trophies. Each thing does something now (rule
+2); nothing is there only to be looked at. Every number is Claude's first guess. Test `tools/misc_test.gd`;
+sheets `tools/preview/misc_living_room.png` (the magazine guards worn, and the candle, robot and marbles in a
+room by day and night) and `tools/preview/loot_icons.png` (every item's picture, with a "misc" row now).
+
+- Throwing is any item with a `throw` record (`items.gd`: noise, keep, far, look; `Thrown` reads it, and
+  `Player.THROWABLES` is bottle, rock, record, book in that order). Rocks and bottles were given theirs.
+  - Hardback book: lands with a thud heard 8 m and lies there to pick up again: a throw for indoors, where
+    there are no rocks. Burns (`Items.FUEL` 150 s). A weak club.
+  - Vinyl record: sails half as far again as anything else (21 m at Strength 10 against 14), clatters 9 m,
+    and can be picked up again. One blow as a weapon and it is broken plastic.
+- Magazines (stack 6; burn 40 s): two of them and a strip of cloth or an electric cord, used from your things,
+  make a magazine guard on the left forearm, then the right (`Player.make_bracer`; items `magazine_bracer`,
+  `magazine_bracer_r`, worn on `wrist_l` and `wrist_r`; new cut `bracer`, wrist to elbow). Bite 0.75, cut 0.6,
+  blow 0.2. It tears with every bite it stops. Cloud run, 200 bites on the left arm: in a t-shirt 1 to 3
+  stopped, with the guard 40 to 57 (it covers the forearm only, about a third of the arm's bites).
+- Fire poker (lying by the fireplace in the kit house): a pierce weapon that lasts 40 blows, and a pry
+  (`does` "pry", `pry_mult` 1.7): it prises a boarded window in about 5 s (a crowbar 3). Prying now takes
+  whatever you carry that prises (`Inventory.tool_for("pry")`).
+- Trophy (on the mantelpiece): a heavy club (13, lasts 25); taken apart, scrap metal and a rock.
+- TV remote: taken apart, a set of batteries and broken plastic: batteries for the torch, radio or robot.
+- Bag of marbles (`marbles.gd`, `Marbles`): used from your things they scatter on the floor in front of you
+  (0.75 m round). Whoever walks on them sets them rattling (heard 5 m) and may slip: a zombie on its feet
+  goes down (`SLIP_ZOMBIE` 0.35), a raider stumbles and is slowed 2.5 s (`Raider.slip`, 0.3), you stagger
+  walking (0.15) and go flat running (0.55); crawlers and anyone crouched or prone never slip. Gathered up
+  again by hand. Called from the same footfalls as broken glass. Cloud run: 40 zombies stepped on them, 6 to
+  11 went down; a raider stumbled 15 to 17 times in 40; you slipped 13 to 15 times in 100 walking strides,
+  49 to 62 running, never crouched.
+- Candle (1800 s of burning in it): used from your things with a match, it is set down lit; an
+  `Appliance` of power "burn". A little light (1.8 m, dim) without power, for half an hour; click blows it
+  out (a match to light it again); Shift+click picks it up; burned down it is gone. One on the coffee table
+  and one on the mantelpiece.
+- Toy robot (`uses` 300 s of batteries): used from your things it is set down marching off the way you face
+  at `ROBOT_SPEED` 0.25 m/s (a wandering zombie is about 0.4), clanking every 1.6 s (heard 10 m), turning
+  at walls. Zombies come to the noise and follow it, and smash it when they catch it (the same rule as the
+  radio). A decoy that leads them off. Cloud runs, a zombie 7 m away: caught it after 2 m and 12 s, or after
+  9 m and 52 s. Batteries load into it.
+- Where they are: the poker by the fireplace and a trophy and a candle on the mantelpiece
+  (`FurnitureKit.lying`, an `ItemPickup`); the rest are in the living room's pool (`found`), so they turn up
+  searching its furniture. Over 500 searches of its five pieces: books, records, remotes, candles and
+  magazines 60 to 90 each, marbles 56 to 85, trophies 34 to 45, robots 22 to 32.
+- A fix found on the way: `Solid.window_near` only looked across the ground, so at a ground-floor window with
+  one straight above it, boarding or prising (P) could pick the window upstairs. It now takes the height of
+  your floor.
+- Not built: music (records play on nothing; there is no record player yet), movies (VHS tapes were left out:
+  nothing for them to do that a book doesn't); reading (skills), morale and boredom (board games, cards,
+  photo albums wait for those); a throw that hurts whoever it hits; marbles on stairs, in grass or outdoors
+  (they work anywhere for now) or scattering as they are walked through; a candle tipping over or setting
+  anything alight; the robot climbing, falling down stairs or being picked up while it walks (it can be,
+  with Shift+click); raiders thinking about any of it.
+
 ## Themed item batches (owner, 21 Nov 2026; nothing built yet)
 
 The owner will name a theme (a room: a boy's room, a girl's room, a bathroom, electronics...) and give a
@@ -2045,7 +2100,8 @@ raiders to look; hold Ready to ready it, left-click to throw; it can be used fro
 - Cloud run: a bottle thrown 12 m sent a zombie 6 m from the landing toward it and put a raider on watch 7 m
   away into a search of that exact spot, without it knowing where the player was.
 - Not built: hitting someone with it, the bottle's broken glass, a throwing pose (it uses the reach), an arc
-  shown before you throw, throwing other things. The hatchet and steroids moved to a "Tool box" by the spawn so
+  shown before you throw. (Other things can be thrown since 22 Nov 2026: an item with a `throw` record, see The
+  living room's odds and ends.) The hatchet and steroids moved to a "Tool box" by the spawn so
   the first-aid box leaves your hands free.
 
 ## Ground and grass (built overnight 20 Nov 2026, in review; never seen on Forward+)

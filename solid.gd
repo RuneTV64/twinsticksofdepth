@@ -166,11 +166,14 @@ static func pane(level: Node, pos: Vector3, size: Vector3) -> Breakable:
 	return br
 
 
-## The window opening nearest this spot, within `reach`, or an empty Dictionary.
-static func window_near(p: Vector3, reach: float) -> Dictionary:
+## The window opening nearest this spot, within `reach`, or an empty Dictionary. `feet`, if given, is the
+## height of the floor someone stands on: only windows on that storey count (one upstairs is straight above).
+static func window_near(p: Vector3, reach: float, feet := NAN) -> Dictionary:
 	var best := {}
 	var best_d := reach
 	for w in windows:
+		if not is_nan(feet) and absf(float(w["pos"].y) - feet - 1.45) > 1.2:
+			continue
 		var d := Vector2(p.x - w["pos"].x, p.z - w["pos"].z).length()
 		if d <= best_d:
 			best_d = d

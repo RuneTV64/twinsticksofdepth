@@ -303,6 +303,15 @@ static func mesh_of(kind: String, length := 0.0) -> ArrayMesh:
 		"radio":
 			_box(st, at, Vector3(0, 0.1, 0), Vector3(0.36, 0.2, 0.12), PLASTIC, RADIO_FRONT)
 			_box(st, at, Vector3(0, 0.21, 0), Vector3(0.26, 0.02, 0.04), PLASTIC)                         # the handle
+		"candle":
+			_box(st, at, Vector3(0, 0.008, 0), Vector3(0.09, 0.016, 0.09), BRASS)                        # its dish
+			_box(st, at, Vector3(0, 0.08, 0), Vector3(0.045, 0.13, 0.045), BEIGE)                         # the wax
+			_box(st, at, Vector3(0, 0.155, 0), Vector3(0.02, 0.03, 0.02), SHADE)                          # the flame
+		"toy_robot":
+			for sx: float in [-1.0, 1.0]:
+				_box(st, at, Vector3(sx * 0.035, 0.035, 0), Vector3(0.04, 0.07, 0.05), PLASTIC)          # legs
+			_box(st, at, Vector3(0, 0.115, 0), Vector3(0.12, 0.09, 0.09), BRASS, RADIO_FRONT)           # tin body
+			_box(st, at, Vector3(0, 0.19, 0), Vector3(0.08, 0.06, 0.07), BEIGE)                           # head
 		"telephone":
 			_box(st, at, Vector3(0, 0.04, 0), Vector3(0.22, 0.08, 0.2), BEIGE, -1, KEYPAD)
 			_box(st, at, Vector3(0, 0.095, -0.04), Vector3(0.22, 0.03, 0.07), BEIGE)                      # the handset
@@ -345,6 +354,19 @@ func appliance(kind: String, at: Vector3, facing := "S", on: Breakable = null) -
 			if is_instance_valid(a):
 				a.fall_to(floor_at))
 	return a
+
+
+## Things left lying somewhere (an ItemPickup): on a floor, on a mantel. `ids` are items as found.
+func lying(title: String, ids: Array, at: Vector3) -> ItemPickup:
+	var p := ItemPickup.new()
+	p.title = title
+	p.small = true
+	p.tint = Color(0.55, 0.5, 0.42)
+	for id: String in ids:
+		p.contents.append(Stash.found_item(id))
+	p.position = at
+	level.add_child(p)
+	return p
 
 
 ## Put a piece down: `at` is where its middle stands (y is the floor's height), `facing` ("N", "E", "S",
@@ -464,6 +486,11 @@ static func furnish(in_level: Node, origin: Vector3, storeys := 1, worn := 0, wo
 	f.appliance("table_lamp", o + Vector3(0.35, 0.6, 5.8), "E", side)
 	f.appliance("floor_lamp", o + Vector3(5.7, 0, 5.68), "N")
 	f.appliance("radio", o + Vector3(1.65, 0.45, 4.42), "E", coffee)
+	f.appliance("candle", o + Vector3(1.6, 0.45, 4.82), "E", coffee)
+	# Its odds and ends (items.gd: the misc session). The fire irons by the fireplace, a trophy on the mantel;
+	# books, magazines, records, the remote, toys turn up searching its furniture (the living room's things).
+	f.lying("By the fireplace", ["fire_poker"], o + Vector3(3.9, 0, 5.62))
+	f.lying("On the mantelpiece", ["trophy", "candle"], o + Vector3(3.45, 1.16, 5.85))
 	f.put("bookshelf", o + Vector3(3.46, 0, 3.28), "S")
 	f.put("display_cabinet", o + Vector3(5.55, 0, 3.25), "S")
 	f.curtains(o + Vector3(1.5, 1.4, 6.0), o + Vector3(1.5, 1.4, 5.0))

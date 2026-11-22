@@ -71,6 +71,8 @@ func _run() -> void:
 
 	# ---- what each takes to break
 	for k in Appliance.KINDS:
+		if _all(k).is_empty():
+			continue                                  # (a toy robot lies about only as an item)
 		var a: Appliance = _all(k)[0]
 		_say("%-11s zombie blows %d, fists %d, hatchet %d; it is %s" % [k, ceili(a.br.hits_left(12.0, "blunt")),
 			ceili(a.br.hits_left(4.0, "blunt")), ceili(a.br.hits_left(30.0, "chop")), a.br.feel(4.0, "blunt")])

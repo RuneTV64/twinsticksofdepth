@@ -187,7 +187,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_P:   # board up the window by the crosshair (hammer, nails, planks), or prise its boards off (crowbar)
 				if event.shift_pressed:
 					# The old stand-in, for testing: boarded at once, for nothing.
-					var win := Solid.window_near(player.global_position + player.reticle_offset, 2.5)
+					var win := Solid.window_near(player.global_position + player.reticle_offset, 2.5, player.global_position.y)
 					if win.is_empty():
 						player.show_status("No window by the crosshair.", 1.5)
 					else:
@@ -765,7 +765,7 @@ func _throwable(id: String, pos: Vector3) -> void:
 	var b := ItemPickup.new()
 	b.title = Items.name_of(id)
 	b.small = true
-	b.tint = Thrown.LOOK[id][1]
+	b.tint = Clothes.ink(str((Items.DEFS[id]["throw"]["look"] as Array)[1]))
 	b.position = pos
 	b.contents = [Items.make(id)]
 	add_child(b)

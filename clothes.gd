@@ -193,6 +193,7 @@ const CUTS := {
 	"gloves": {"hand": ["bottom", "top"], "arm": ["bottom", "wrist+0.035"]},
 	"belt": {"torso": ["waist-0.02", "waist+0.02"]},
 	"band": {"arm": ["wrist+0.006", "wrist+0.034"]},
+	"bracer": {"arm": ["wrist+0.012", "elbow-0.025"]},
 	"ring": {"hand": ["knuckles-0.022", "knuckles-0.012"]},
 	"beanie": {"head": ["brow+0.012", "top"]},
 	"cap": {"head": ["brow+0.02", "top"]},
