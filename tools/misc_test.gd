@@ -68,7 +68,7 @@ func _run() -> void:
 	for n in get_nodes_in_group("interactables"):
 		if n is ItemPickup and (n.title == "By the fireplace" or n.title == "On the mantelpiece"):
 			_say("%s: %s" % [n.title, ", ".join((n.contents as Array).map(func(it): return Items.label(it)))])
-	var mine := ["book", "vinyl_record", "magazine", "trophy", "tv_remote", "marbles", "candle", "toy_robot", "radio"]
+	var mine := ["book", "vinyl_record", "dvd", "magazine", "trophy", "tv_remote", "marbles", "candle", "toy_robot", "radio"]
 	var tally := {}
 	var rolls := 0
 	for kind in ["bookshelf", "coffee_table", "end_table", "tv_stand", "display_cabinet"]:
@@ -94,7 +94,10 @@ func _run() -> void:
 	p.inv.slots["hand_l"] = Items.make("vinyl_record")
 	var rec_reach := p.throw_range()
 	p.inv.slots["hand_l"] = Items.make("rock")
-	_say("throw reach at Strength %d: rock %.1f m, book %.1f m, record %.1f m" % [int(p.strength), p.throw_range(), book_reach, rec_reach])
+	p.inv.slots["hand_l"] = Items.make("dvd")
+	var dvd_reach := p.throw_range()
+	p.inv.slots["hand_l"] = Items.make("rock")
+	_say("throw reach at Strength %d: rock %.1f m, book %.1f m, record %.1f m, DVD %.1f m" % [int(p.strength), p.throw_range(), book_reach, rec_reach, dvd_reach])
 	_empty_hands()
 	p.inv.slots["hand_l"] = Items.make("book")
 	var ear := _zombie(Vector3(-6, 0, 33))
@@ -169,6 +172,20 @@ func _run() -> void:
 		not (win["boards"] != null and is_instance_valid(win["boards"]) and win["boards"].alive()), p.inv.has("plank")])
 	_say("  the poker: %s" % Items.about("fire_poker"))
 	_say("  the trophy: %s" % Items.about("trophy"))
+
+	# ---- a DVD snapped for an edge, and used to cut
+	_empty_hands()
+	p.inv.slots["hand_l"] = Items.make("dvd", 2)
+	p.take_apart("hand_l")
+	await _wait(1.5)
+	_say("a DVD snapped: %s" % ", ".join(p.inv.slots.values().map(func(it): return Items.label(it))))
+	for k in p.inv.slots.keys():
+		if p.inv.slots[k]["id"] != "dvd_shard":
+			p.inv.slots.erase(k)
+	p.inv.slots["hand_l"] = Items.make("plank")
+	p.take_apart("hand_l")
+	await _wait(6.5)
+	_say("  a plank cut up with the snapped DVD (no other blade): %s" % ", ".join(p.inv.slots.values().map(func(it): return Items.label(it))))
 
 	# ---- the remote's batteries
 	_empty_hands()

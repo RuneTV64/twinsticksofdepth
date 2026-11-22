@@ -1157,13 +1157,13 @@ furniture README has the table.
 
 ## The living room's odds and ends (built 22 Nov 2026, in review; not seen by the owner)
 
-The theme's fourth session, misc: books, music, movies, toys, trophies. Each thing does something now (rule
+The theme's fourth session, misc: books, music, films, toys, trophies. Each thing does something now (rule
 2); nothing is there only to be looked at. Every number is Claude's first guess. Test `tools/misc_test.gd`;
 sheets `tools/preview/misc_living_room.png` (the magazine guards worn, and the candle, robot and marbles in a
 room by day and night) and `tools/preview/loot_icons.png` (every item's picture, with a "misc" row now).
 
 - Throwing is any item with a `throw` record (`items.gd`: noise, keep, far, look; `Thrown` reads it, and
-  `Player.THROWABLES` is bottle, rock, record, book in that order). Rocks and bottles were given theirs.
+  `Player.THROWABLES` is bottle, rock, record, DVD, book in that order). Rocks and bottles were given theirs.
   - Hardback book: lands with a thud heard 8 m and lies there to pick up again: a throw for indoors, where
     there are no rocks. Burns (`Items.FUEL` 150 s). A weak club.
   - Vinyl record: sails half as far again as anything else (21 m at Strength 10 against 14), clatters 9 m,
@@ -1201,8 +1201,14 @@ room by day and night) and `tools/preview/loot_icons.png` (every item's picture,
 - A fix found on the way: `Solid.window_near` only looked across the ground, so at a ground-floor window with
   one straight above it, boarding or prising (P) could pick the window upstairs. It now takes the height of
   your floor.
-- Not built: music (records play on nothing; there is no record player yet), movies (VHS tapes were left out:
-  nothing for them to do that a book doesn't); reading (skills), morale and boredom (board games, cards,
+- DVD (owner, 22 Nov 2026: "Change the VHS to DVDs or something more modern. This game is set in the modern
+  era"; stack 5): thrown, it flies 1.3 times a rock's reach and lands quietly (5 m) to be picked up again.
+  Taken apart it snaps (heard 3 m): a "Snapped DVD", a blade (`does` "blade": it cuts anything that wants one
+  taken apart, jeans, a plank, a cord, where there is no knife) and a wretched stab (4, lasts 4).
+- The game is set in the modern era (owner, 22 Nov 2026): DVDs, not VHS. Keep the themed items to things a
+  home has now; old things only where people still keep them (a record collection, a wind-up toy).
+- Not built: music (records play on nothing; there is no record player yet), films (nothing plays a DVD until
+  the electronics theme); reading (skills), morale and boredom (board games, cards,
   photo albums wait for those); a throw that hurts whoever it hits; marbles on stairs, in grass or outdoors
   (they work anywhere for now) or scattering as they are walked through; a candle tipping over or setting
   anything alight; the robot climbing, falling down stairs or being picked up while it walks (it can be,

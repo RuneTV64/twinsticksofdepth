@@ -260,7 +260,7 @@ const SIGHT_RAYS := 240                 # one every 1.5 degrees, all the way rou
 
 ## Weapons on the quick wheel, in slot order (slot 0 is at the left, going clockwise).
 const WEAPONS: Array[String] = ["fists", "gun", "throw"]
-const THROWABLES: Array[String] = ["bottle", "rock", "vinyl_record", "book"]     # what "throw" throws, the first you have
+const THROWABLES: Array[String] = ["bottle", "rock", "vinyl_record", "dvd", "book"]     # what "throw" throws, the first you have
 const WEAPON_NAMES := {"fists": "Unarmed", "gun": "Gun", "throw": "Throw"}
 const WHEEL_MOUSE_RADIUS := 90.0        # pixels of mouse travel from center to the wheel's rim
 
@@ -3564,7 +3564,7 @@ func throw_item() -> String:
 func _throw() -> void:
 	var id := throw_item()
 	if id == "":
-		show_status("Nothing to throw. Rocks and bottles lie about; indoors, books and records.", 1.2)
+		show_status("Nothing to throw. Rocks and bottles lie about; indoors, books, records and DVDs.", 1.2)
 		_fire_cd = 0.3
 		return
 	var aim := reticle_offset.limit_length(throw_range())

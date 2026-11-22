@@ -33,7 +33,7 @@ const HELP_KEYS := """CONTROLS
 Move  WASD
 Look (weapon away)  Mouse moves the crosshair as far as you can see; the camera follows
 Camera in and out  Mouse wheel
-Throw  Pick up rocks and bottles (indoors, books and records), choose Throw on the Tab wheel, hold Ready, left-click: it lands at the crosshair
+Throw  Pick up rocks and bottles (indoors, books, records, DVDs), choose Throw on the Tab wheel, hold Ready, left-click: it lands at the crosshair
   and the noise draws zombies and raiders. From behind cover a click throws without showing yourself.
 Take-down  Weapon raised, right behind a raider who hasn't noticed you, crosshair on him: left-click.
 Seasons  M steps the season (spring, summer, autumn, winter); K turns the rain on and off. The ground follows.
