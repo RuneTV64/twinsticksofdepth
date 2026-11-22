@@ -8,12 +8,20 @@ extends RefCounted
 ##
 ## New things the player does go here, not on a key: an entry for the thing in front of you (an interactable's
 ## `context_actions(p) -> [[label, id], ...]`, done by its `context_do(p, id)`), or one for yourself below.
-## Each row: {"label", "do": Callable, "key": a key that does the same (shown greyed; "" for none)}; a section
-## title is {"head": text}. Only what can be done now (or what you'd want told you can't) is listed.
+## Each row: {"label", "do": Callable, "key": a key that does the same (shown greyed; "" for none), "stay": true
+## to keep the menu open (turning a page)}; a section title is {"head": text}. `page` "test" is the Testing
+## page: the level's test switches, which were all on letter keys until 22 Nov 2026 (main.gd `test_rows`).
+## Only what can be done now (or what you'd want told you can't) is listed.
 
 
-static func build(p: Player) -> Array:
+static func build(p: Player, page := "") -> Array:
 	var rows: Array = []
+	if page == "test":
+		# The level's test switches (main.gd `test_rows`): everything that was on a letter key for testing.
+		rows.append({"label": "< Back", "do": p.open_page.bind(""), "key": "", "stay": true})
+		if p.test_menu.is_valid():
+			rows.append_array(p.test_menu.call())
+		return rows
 	var t: Node = p.interact_target
 	if t != null and is_instance_valid(t):
 		var here: Array = []
@@ -47,4 +55,11 @@ static func build(p: Player) -> Array:
 		rows.append({"label": shoes, "do": p.toggle_shoes, "key": ""})
 	if p.inv.find("glass_shard") != "" or p.inv.find("bloody_glass") != "":
 		rows.append({"label": "Scatter your broken glass here (a trap, an alarm)", "do": p.lay_glass, "key": ""})
+	var torch := p.torch_job()
+	if torch != "":
+		rows.append({"label": torch, "do": p.toggle_torch, "key": "E"})
+
+	if p.test_menu.is_valid():
+		rows.append({"head": "TESTING"})
+		rows.append({"label": "Test switches (the season, rain, night, raiders...) >", "do": p.open_page.bind("test"), "key": "", "stay": true})
 	return rows

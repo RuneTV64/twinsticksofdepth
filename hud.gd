@@ -31,6 +31,7 @@ var _wheel_labels: Array[Label] = []
 var _menu: Control             # the context menu (context_menu.gd) and the ring that fills while you hold for it
 var _menu_corner := Vector2.ZERO   # where on the screen the open menu's list starts
 var _menu_was_open := false
+var _menu_rev := -1
 
 const HELP_KEYS := """CONTROLS
 Move  WASD
@@ -39,19 +40,18 @@ Camera in and out  Mouse wheel
 Throw  Pick up rocks and bottles (indoors, books, records, DVDs), choose Throw on the Tab wheel, hold Ready, left-click: it lands at the crosshair
   and the noise draws zombies and raiders. From behind cover a click throws without showing yourself.
 Take-down  Weapon raised, right behind a raider who hasn't noticed you, crosshair on him: left-click.
-Seasons  M steps the season (spring, summer, autumn, winter); K turns the rain on and off. The ground follows.
-  B swaps the new ground for the old plain one.
-Light and dark  N steps the time of day (day, dusk, night, dawn). In the dark you are seen from less far and see
+Seasons  The menu's Testing page steps the season and turns the rain on and off. The ground follows.
+Light and dark  The Testing page steps the time of day (day, dusk, night, dawn). In the dark you are seen from less far and see
   less far; a fire or lamp lights whoever stands in it; a gunshot shows you up for a moment.
 Context menu (HOLD)  Left-click with the weapon away, held: a list of what you can do here and with yourself.
   Slide down to one and let go, or let go and click it (1-9 pick too). Esc, Ready or a click off it shuts it.
   A plain click still does what the prompt says. Boarding windows, shoes, laying glass, treating water and
   picking things up are in it.
 Appliances  Click a lamp, the television or a radio to switch it; in the menu, pick a lamp or radio up (use it
-  to stand it down again). A radio set down plays until its batteries go: a decoy. Shift+N cuts the power.
+  to stand it down again). A radio set down plays until its batteries go: a decoy. The Testing page cuts the power.
   From your things (I): a toy robot walks off clanking, marbles scatter (they trip whoever walks on them), a
   candle is lit and set down (a match), two magazines and a strip of cloth make a guard for a forearm.
-Torch  E steps through the hand torch (a beam where you face), the burning torch (light all round, burns away)
+Torch  E (or the menu) steps through the hand torch (a beam where you face), the burning torch (light all round, burns away)
        and none. Both are in the tool box. You see by them, and they show you.
 Crouch  Ctrl (again to stand)      Prone  X (again to get up)
   Prone with a gun raised: you stay put and the crosshair reaches further. Aim behind you and you roll onto your back.
@@ -81,8 +81,10 @@ In cover: hunkered = hidden, safe from shots across it, but you see only a short
   Hold a move key toward low cover (or along it at an end) = peek: you see, they see you, small chance of a head hit.
   Ready = pop up or lean out to aim. Attack without Ready = blind fire. Hold the move key away from it = leave.
   Space while moving toward low cover = vault it.
-Stat test keys: 1/2 STR   3/4 END   5/6 WT   7/8 DEX
-Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt   L all on low model
+Test switches: hold left-click (weapon away), then "Test switches" at the bottom of the menu: season, rain, time
+  of day, power, the old ground, raiders and gunners at the crosshair, a test wound, free boarding, breaking what
+  the crosshair is on, rust and rot, the cutaway, the horde readout, the low models. Stats: the character page (C), -/=.
+Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt
 Finisher: weapon raised (Ready), crosshair on a downed zombie close by, then left-click. On its head it finishes
   it: fists Ready = stomp (blows by Strength), gun Ready = one shot, gun empty = rifle butt. Anywhere else on it
   only hurts it.
@@ -90,10 +92,10 @@ Corpse piles can be walked on: slow, bad footing, and what is still alive in the
 Character page: C. It shows attributes, needs, composure, your body, what you carry, and conditions.
 Wounds: H sits you down to treat them by hand with what you carry (a first-aid box is by the spawn).
   Your view closes in; hold ALT to look up. Moving puts it down. Keys 1-9 and 0 or a click pick a tool. Vodka or water washes a wound.
-  J gives you a test wound (a deep cut, a gunshot, a bite in turn).
+  The Testing page gives you a test wound (a deep cut, a gunshot, a bite in turn).
 Bites infect. Only taking the arm or leg off before it reaches the body can cure it (hatchet, in the treatment
   screen), and that takes luck. Steroids slow it. Run its course and you turn; your old self walks with your things.
-Horde: noise warms an area and draws zombies in from round about. Z shows the readout. Killed ones don't come back.
+Horde: noise warms an area and draws zombies in from round about. The Testing page shows the readout. Killed ones don't come back.
 Breaking things: everything breaks. Ready, crosshair on it, close by, left-click: fists, or the hatchet (wood) or
   sledgehammer (brick, pavement) if you carry one; a gun shoots it. Zombies beat on what is in their way, weakest
   first. What is left can be picked through, and rusts and rots away. Broken glass crunches underfoot.
@@ -109,7 +111,7 @@ Breaking things: everything breaks. Ready, crosshair on it, close by, left-click
   take a pill, fresh batteries in the torch, wash cloth into a rag), Shift+Enter takes it apart, Delete puts it down.
   Whatever is in your hand is your weapon on the Hands slot (a hatchet, a plank, a bottle); it wears out as you hit. Food and water run down.
   The menu scatters the broken glass you carry: a trap for bare feet, an alarm under boots. It stays until picked up.
-  Barefoot, glass goes into your feet (the menu puts boots on and off, if you have a pair; Shift+U is a test switch). A cut foot takes in what you
+  Barefoot, glass goes into your feet (the menu puts boots on and off, if you have a pair). A cut foot takes in what you
   walk through: wash and dress it. A helmet takes most of a blow to the head.
   Floors: stairs, upstairs and basements can be walked. Cover works on the floor you are on. A shot is a straight
   line: from an upstairs window the ground near the wall is hidden unless you take cover at the sill and pop up
@@ -117,11 +119,9 @@ Breaking things: everything breaks. Ready, crosshair on it, close by, left-click
   The crosshair hits what it covers: put it over an upstairs window, a wall or a roof and a shot or a thrown rock
   goes there. Glass breaks; a rock through an upstairs window lands, and is heard, upstairs.
   At a window, crosshair on it, the menu boards it up (a hammer, 4 nails, 2 planks; it takes a while and is heard),
-  or with a crowbar prises the boards off again. Shift+P boards it for nothing (a test key).
-  O breaks what the crosshair is on   Shift+O ten minutes of rust and rot
-Cutaway: walls between the camera and you open up; indoors the whole building opens (windows stay, faint); Ready, it opens to the crosshair too. V switches it off and on.
-Cover test: G test gunner at the crosshair   Shift+G remove them
-Raiders: a camp in the south-west of the yard.  T adds one at the crosshair   Shift+T removes those
+  or with a crowbar prises the boards off again.
+Cutaway: walls between the camera and you open up; indoors the whole building opens (windows stay, faint); Ready, it opens to the crosshair too. The Testing page switches it off and on.
+Raiders: a camp in the south-west of the yard. The Testing page adds one (or a test gunner) at the crosshair.
 F1 hide help    F2 hide the UI (once: the clutter; twice: all of it)    Esc free mouse"""
 
 
@@ -677,7 +677,8 @@ func _process(delta: float) -> void:
 		_ammo.text = "FISTS" if player.is_melee() else "%d / %d" % [player.mag, player.reserve]
 	_ammo.modulate = Color(1, 1, 1, 1.0 if player.armed else 0.45)
 
-	if player.menu_open and not _menu_was_open:
+	if player.menu_open and (not _menu_was_open or player.menu_rev != _menu_rev):
+		_menu_rev = player.menu_rev
 		# Pinned on the screen where it opened, just off the crosshair, kept inside the window.
 		var vp := get_viewport().get_visible_rect().size
 		var at := _screen_of(player.menu_at) + Vector2(22, 6)

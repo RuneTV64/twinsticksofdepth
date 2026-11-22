@@ -1,7 +1,7 @@
 class_name Power
 extends RefCounted
 ## Mains power: a stand-in until there is a grid to lose (owner, 21 Nov 2026: the living room's appliances). It
-## is on when the game starts and stays on; Shift+N cuts it, and brings it back, by hand until the clock and
+## is on when the game starts and stays on; the context menu's Testing page cuts it, and brings it back, by hand until the clock and
 ## the world decide when the grid goes down. The phone lines go with it.
 ##
 ## What runs on it: every building's sockets (an appliance plugged in indoors: appliance.gd), and the street

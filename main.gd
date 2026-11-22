@@ -35,7 +35,7 @@ var _zone_t := 0.0
 # Crowd test (F5 / F6 / F7): extra shamblers to find out how many the game can take, and where the time goes.
 const CROWD_STEP := 50
 var _crowd: Array[Enemy] = []
-var _raiders: Array[Raider] = []   # added with T
+var _raiders: Array[Raider] = []   # added from the menu's Testing page
 var _perf: Label
 var _perf_t := 0.0
 var _perf_frames := 0
@@ -99,12 +99,16 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.player = player
 	add_child(hud)
+	player.test_menu = test_rows
 	_make_perf_label()
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# What is left on keys: the screens (C, H, I; the character page's own keys while it is open), and the F
+	# keys. Everything else that was on a letter key is in the context menu (hold left-click, weapon away:
+	# context_menu.gd), the test switches on its Testing page (`test_rows` below). Owner, 22 Nov 2026.
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_ESCAPE:
@@ -117,11 +121,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				hud.toggle_debug()
 			KEY_C: hud.toggle_sheet()
 			KEY_H: player.toggle_treat()
-			KEY_J:   # a test wound, to try the treatment screen on
-				var tw: Array = [["deep cut", "ArmL", 30.0], ["gunshot", "Torso", 26.0], ["bite", "ArmR", 20.0]][_test_wound % 3]
-				_test_wound += 1
-				player._wound(tw[0], tw[2], tw[1])
-				player.show_status("Test wound: %s." % tw[0])
+			KEY_I:   # what you carry, as slots and a bag's grid (loot_screen.gd)
+				player.toggle_things()
 			KEY_PAGEUP: hud.sheet_select(-1)
 			KEY_PAGEDOWN: hud.sheet_select(1)
 			KEY_ENTER, KEY_KP_ENTER:
@@ -130,100 +131,172 @@ func _unhandled_input(event: InputEvent) -> void:
 				else:
 					hud.sheet_use()
 			KEY_DELETE, KEY_BACKSPACE: hud.sheet_drop()
-			KEY_MINUS: hud.sheet_adjust(-1)
+			KEY_MINUS: hud.sheet_adjust(-1)   # (the character page's -/= edit any stat: the old 1-8 keys are gone)
 			KEY_EQUAL: hud.sheet_adjust(1)
-			KEY_1: _stat("strength", -1)
-			KEY_2: _stat("strength", 1)
-			KEY_3: _stat("endurance", -1)
-			KEY_4: _stat("endurance", 1)
-			KEY_5: _stat("weight", -1)
-			KEY_6: _stat("weight", 1)
-			KEY_7: _stat("dexterity", -1)
-			KEY_8: _stat("dexterity", 1)
 			KEY_F5: _add_crowd(CROWD_STEP)
 			KEY_F6: _clear_crowd()
-			KEY_L:   # (not F8: that's the Godot editor's Stop Running Project)
-				ZombieBody.force_low = not ZombieBody.force_low
-				player.show_status("All zombies on the low model: %s" % ("ON" if ZombieBody.force_low else "OFF"), 1.5)
-			KEY_T:   # a raider at the crosshair; Shift+T removes the ones added this way
-				if event.shift_pressed:
-					for r in _raiders:
-						if is_instance_valid(r):
-							r.queue_free()
-					_raiders.clear()
-					player.show_status("Test raiders removed", 1.5)
-				else:
-					var at := player.global_position + player.reticle_offset
-					if player.reticle_offset.length() < 3.0:
-						at = player.global_position + player.facing * 10.0
-					_raiders.append(_raider(Vector3(at.x, 0.05, at.z)))
-					player.show_status("Raider added (Shift+T removes them)", 1.5)
-			KEY_M:   # the season, by hand until there is a clock
-				player.show_status("%s." % Seasons.it.next_season(), 1.5)
-			KEY_K:   # rain on and off
-				Seasons.it.set_rain(not Seasons.it.raining)
-				player.show_status("It is raining." if Seasons.it.raining else "The rain stops.", 1.5)
-			KEY_B:   # the new ground / the old plain one
-				var gm := Ground.it.mesh
-				gm.material_override = _plain_ground if gm.material_override == Ground.it.material else Ground.it.material
-			KEY_N:   # the time of day, by hand until there is a clock: day, dusk, night, dawn; Shift: the power
-				if event.shift_pressed:
-					Power.set_on(not Power.on)
-					player.show_status("The power is back on." if Power.on else "The power goes off: every house and street goes dark.", 2.0)
-				else:
-					player.show_status("%s." % Daylight.next_time(), 1.5)
-			KEY_Z:   # the horde readout: zombies out of play / in play / warmth, area by area
-				if _zone_label == null:
-					_zone_label = Label.new()
-					_zone_label.add_theme_font_size_override("font_size", 15)
-					_zone_label.add_theme_color_override("font_outline_color", Color.BLACK)
-					_zone_label.add_theme_constant_override("outline_size", 6)
-					_zone_label.add_theme_color_override("font_color", Color(0.75, 0.9, 1.0))
-					_zone_label.position = Vector2(20, 220)
-					_zone_label.visible = false
-					hud.add_child(_zone_label)
-				_zone_label.visible = not _zone_label.visible
-				_zone_t = 0.0
-			# Boarding and prising a window, laying glass, shoes on and off and treating water are in the context
-			# menu now (hold left-click, weapon away: context_menu.gd), not on keys. The Shift test keys stay.
-			KEY_P:   # Shift+P: board up the window by the crosshair at once, for nothing (a test key)
-				if event.shift_pressed:
-					var win := Solid.window_near(player.global_position + player.reticle_offset, 2.5, player.global_position.y)
-					if win.is_empty():
-						player.show_status("No window by the crosshair.", 1.5)
-					else:
-						player.show_status("Boarded up (for nothing: a test key)." if Solid.board(win) else "It is boarded already.", 1.5)
-			KEY_I:   # what you carry, as slots and a bag's grid (loot_screen.gd)
-				player.toggle_things()
-			KEY_U:   # Shift+U: the old test switch, shod or not (a test key)
-				if event.shift_pressed:
-					player.barefoot = not player.barefoot
-					player.show_status("Barefoot." if player.barefoot else "Shod (a test key: no shoes needed).", 1.5)
-			KEY_O:   # break what the crosshair is on; Shift+O: ten minutes of rust and rot
-				if event.shift_pressed:
-					for w in get_tree().get_nodes_in_group("weathering"):
-						(w as Wear).pass_time(600.0)
-					player.show_status("Ten minutes of rust and rot.", 1.5)
-				elif player.hover_breakable != null:
-					player.hover_breakable.hit(100000.0, "pound", player.global_position + player.reticle_offset, player)
-				else:
-					player.show_status("Ready, with the crosshair on something.", 1.5)
-			KEY_V:   # the cutaway on / off, to compare
-				cutaway.enabled = not cutaway.enabled
-				player.show_status("Cutaway: %s" % ("ON" if cutaway.enabled else "OFF"), 1.5)
-			KEY_G:   # cover test: something that shoots at you
-				if event.shift_pressed:
-					for g in get_tree().get_nodes_in_group("gunners"):
-						g.queue_free()
-					player.show_status("Test gunners removed", 1.5)
-				else:
-					_add_gunner()
-			KEY_F7:
-				player.invulnerable = not player.invulnerable
-				player.show_status("Can't be hurt: %s" % ("ON" if player.invulnerable else "OFF"), 1.5)
+			KEY_F7: _toggle_hurt()
 	elif event is InputEventMouseButton and event.pressed \
 			and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+# ------------------------------------------------------------------ the context menu's Testing page
+## The test switches that were on letter keys, as rows for the context menu's Testing page (ContextMenu.build
+## asks for them through `player.test_menu`). Each says what it will do now. Things "at the crosshair" use
+## where the crosshair was when the menu opened.
+func test_rows() -> Array:
+	var r := func(label: String, c: Callable, key := "") -> Dictionary:
+		return {"label": label, "do": c, "key": key}
+	var rain: bool = Seasons.it != null and Seasons.it.raining
+	var zones := _zone_label != null and _zone_label.visible
+	var plain := Ground.it != null and Ground.it.mesh.material_override == _plain_ground
+	return [
+		{"head": "THE WORLD"},
+		r.call("Next season", _next_season),
+		r.call("Stop the rain" if rain else "Make it rain", _toggle_rain),
+		r.call("Next time of day (%s now)" % Daylight.time_name(), _next_time),
+		r.call("Cut the power" if Power.on else "Bring the power back", _toggle_power),
+		r.call("The new ground" if plain else "The old plain ground", _swap_ground),
+		{"head": "PEOPLE"},
+		r.call("A raider at the crosshair", _add_test_raider),
+		r.call("Remove the test raiders (%d)" % _raiders.filter(func(x): return is_instance_valid(x)).size(), _clear_raiders),
+		r.call("A test gunner at the crosshair", _add_gunner),
+		r.call("Remove the test gunners", _clear_gunners),
+		r.call("%d more zombies" % CROWD_STEP, _add_crowd.bind(CROWD_STEP), "F5"),
+		r.call("Clear the crowd test's zombies", _clear_crowd, "F6"),
+		r.call(("Can be hurt again" if player.invulnerable else "Can't be hurt"), _toggle_hurt, "F7"),
+		{"head": "YOU AND THINGS"},
+		r.call("A test wound (%s)" % TEST_WOUNDS[_test_wound % TEST_WOUNDS.size()][0], _give_test_wound),
+		r.call("Shod, for free" if player.barefoot else "Barefoot, for free", _toggle_barefoot),
+		r.call("Board the window by the crosshair, for free", _free_board),
+		r.call("Break what the crosshair is on", _break_at_crosshair),
+		r.call("Ten minutes of rust and rot", _pass_rot),
+		{"head": "SHOW"},
+		r.call("Cutaway off" if cutaway.enabled else "Cutaway on", _toggle_cutaway),
+		r.call("Hide the horde readout" if zones else "The horde readout", _toggle_zones),
+		r.call("Zombies back to the usual models" if ZombieBody.force_low else "All zombies on the low model", _toggle_low),
+	]
+
+
+const TEST_WOUNDS := [["deep cut", "ArmL", 30.0], ["gunshot", "Torso", 26.0], ["bite", "ArmR", 20.0]]
+
+
+func _give_test_wound() -> void:
+	var tw: Array = TEST_WOUNDS[_test_wound % TEST_WOUNDS.size()]
+	_test_wound += 1
+	player._wound(tw[0], tw[2], tw[1])
+	player.show_status("Test wound: %s." % tw[0])
+
+
+func _toggle_hurt() -> void:
+	player.invulnerable = not player.invulnerable
+	player.show_status("Can't be hurt: %s" % ("ON" if player.invulnerable else "OFF"), 1.5)
+
+
+func _toggle_low() -> void:
+	ZombieBody.force_low = not ZombieBody.force_low
+	player.show_status("All zombies on the low model: %s" % ("ON" if ZombieBody.force_low else "OFF"), 1.5)
+
+
+func _crosshair_spot() -> Vector3:
+	var at := player.global_position + player.reticle_offset
+	if player.reticle_offset.length() < 3.0:
+		at = player.global_position + player.facing * 10.0
+	return at
+
+
+func _add_test_raider() -> void:
+	var at := _crosshair_spot()
+	_raiders.append(_raider(Vector3(at.x, 0.05, at.z)))
+	player.show_status("Raider added", 1.5)
+
+
+func _clear_raiders() -> void:
+	for r in _raiders:
+		if is_instance_valid(r):
+			r.queue_free()
+	_raiders.clear()
+	player.show_status("Test raiders removed", 1.5)
+
+
+func _clear_gunners() -> void:
+	for g in get_tree().get_nodes_in_group("gunners"):
+		g.queue_free()
+	player.show_status("Test gunners removed", 1.5)
+
+
+func _next_season() -> void:   # by hand until there is a clock
+	player.show_status("%s." % Seasons.it.next_season(), 1.5)
+
+
+func _toggle_rain() -> void:
+	Seasons.it.set_rain(not Seasons.it.raining)
+	player.show_status("It is raining." if Seasons.it.raining else "The rain stops.", 1.5)
+
+
+func _swap_ground() -> void:   # the new ground / the old plain one
+	var gm := Ground.it.mesh
+	gm.material_override = _plain_ground if gm.material_override == Ground.it.material else Ground.it.material
+
+
+func _next_time() -> void:     # day, dusk, night, dawn: by hand until there is a clock
+	player.show_status("%s." % Daylight.next_time(), 1.5)
+
+
+func _toggle_power() -> void:
+	Power.set_on(not Power.on)
+	player.show_status("The power is back on." if Power.on else "The power goes off: every house and street goes dark.", 2.0)
+
+
+func _toggle_zones() -> void:  # the horde readout: zombies out of play / in play / warmth, area by area
+	if _zone_label == null:
+		_zone_label = Label.new()
+		_zone_label.add_theme_font_size_override("font_size", 15)
+		_zone_label.add_theme_color_override("font_outline_color", Color.BLACK)
+		_zone_label.add_theme_constant_override("outline_size", 6)
+		_zone_label.add_theme_color_override("font_color", Color(0.75, 0.9, 1.0))
+		_zone_label.position = Vector2(20, 220)
+		_zone_label.visible = false
+		hud.add_child(_zone_label)
+	_zone_label.visible = not _zone_label.visible
+	_zone_t = 0.0
+
+
+func _free_board() -> void:    # the old stand-in: boarded at once, for nothing
+	var win := Solid.window_near(player.global_position + player.reticle_offset, 2.5, player.global_position.y)
+	if win.is_empty():
+		player.show_status("No window by the crosshair.", 1.5)
+	else:
+		player.show_status("Boarded up (for nothing: a test)." if Solid.board(win) else "It is boarded already.", 1.5)
+
+
+func _toggle_barefoot() -> void:  # the old test switch: shod or not, without any shoes
+	player.barefoot = not player.barefoot
+	player.show_status("Barefoot." if player.barefoot else "Shod (a test: no shoes needed).", 1.5)
+
+
+func _break_at_crosshair() -> void:
+	# The crosshair only picks things Ready; from the menu the weapon is down, so look under it directly.
+	var b: Breakable = player.hover_breakable
+	if b == null:
+		b = Breakable.under(Vector2(player.global_position.x + player.reticle_offset.x,
+			player.global_position.z + player.reticle_offset.z), 0.3, player.global_position.y)
+	if b == null:
+		player.show_status("Nothing to break under the crosshair.", 1.5)
+		return
+	b.hit(100000.0, "pound", player.global_position + player.reticle_offset, player)
+
+
+func _pass_rot() -> void:
+	for w in get_tree().get_nodes_in_group("weathering"):
+		(w as Wear).pass_time(600.0)
+	player.show_status("Ten minutes of rust and rot.", 1.5)
+
+
+func _toggle_cutaway() -> void:  # on / off, to compare
+	cutaway.enabled = not cutaway.enabled
+	player.show_status("Cutaway: %s" % ("ON" if cutaway.enabled else "OFF"), 1.5)
 
 
 # ------------------------------------------------------------------ crowd test
@@ -256,7 +329,7 @@ func _add_crowd(n: int) -> void:
 	player.show_status("Crowd: %d extra shamblers" % _crowd.size(), 1.5)
 
 
-## Cover test (G): a stand-in for a raider. It stands where the crosshair is and shoots at you whenever it can see
+## Cover test (the menu's Testing page): a stand-in for a raider. It stands where the crosshair is and shoots at you whenever it can see
 ## you, so the cover rules can be tried before raiders exist.
 func _add_gunner() -> void:
 	var at := player.global_position + player.reticle_offset
@@ -266,7 +339,7 @@ func _add_gunner() -> void:
 	g.position = Vector3(at.x, 0.0, at.z)
 	g.player = player
 	add_child(g)
-	player.show_status("Test gunner added (Shift+G removes them)", 1.5)
+	player.show_status("Test gunner added", 1.5)
 
 
 func _clear_crowd() -> void:
@@ -336,11 +409,6 @@ func _process(delta: float) -> void:
 		+ "zombie posing %.2f ms per frame   zombie AI+movement %.2f ms per tick\n" % [anim_ms, ai_ms] \
 		+ "draw calls %d   triangles %dk" % [Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
 			int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME) / 1000.0)]
-
-
-func _stat(stat: String, d: int) -> void:
-	player.set(stat, maxf(float(player.get(stat)) + d, 1.0))
-	player.recompute_stats()
 
 
 # ------------------------------------------------------------------ level

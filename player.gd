@@ -303,6 +303,9 @@ var _menu_press_t := -1.0         # seconds a lowered left-click has been held, 
 var _menu_release_picks := false   # opened by holding: letting go over a row picks it
 var _menu_moved := 0.0             # pointer travel since it opened
 var hud: Hud                       # set by the HUD itself (for the character page in the menu)
+var menu_page := ""                # "" the ordinary menu, "test" the Testing page
+var menu_rev := 0                  # goes up when the rows change while it is open (a page turned)
+var test_menu: Callable            # the level's test switches as rows (main.gd `test_rows`); none, no Testing page
 var _swing_t := 0.0                # > 0 while a punch is under way (windup + recovery left)
 var _swing_total := 0.0            # full length of the current punch
 var _swing_windup := 0.0           # windup part of the current punch
@@ -2862,6 +2865,7 @@ func menu_hold_frac() -> float:
 
 
 func open_menu() -> void:
+	menu_page = ""
 	menu_rows = ContextMenu.build(self)
 	menu_open = true
 	menu_choice = -1
@@ -2871,7 +2875,18 @@ func open_menu() -> void:
 	menu_at = _reticle.global_position if _reticle != null else global_position
 
 
+## Turn to another page of the open menu (the Testing page, and back): the menu stays open at the top.
+func open_page(page: String) -> void:
+	menu_page = page
+	menu_rows = ContextMenu.build(self, page)
+	menu_choice = -1
+	menu_vec = Vector2(0.0, -MENU_ROW_H * 0.5)
+	_menu_moved = 0.0
+	menu_rev += 1
+
+
 func close_menu() -> void:
+	menu_page = ""
 	menu_open = false
 	menu_rows = []
 	menu_choice = -1
@@ -2914,7 +2929,8 @@ func _menu_pick() -> void:
 	if menu_choice < 0 or menu_choice >= menu_rows.size():
 		return
 	var row: Dictionary = menu_rows[menu_choice]
-	close_menu()
+	if not bool(row.get("stay", false)):
+		close_menu()
 	var c: Callable = row["do"]
 	if c.is_valid():
 		c.call()
@@ -3622,21 +3638,42 @@ func light_on_you() -> float:
 
 
 ## The torch: E switches it on and off, if you carry one. Dying or losing it puts it out.
+## E (and the context menu) steps through what you carry: the hand torch, the burning one, nothing.
+func toggle_torch() -> void:
+	if dead:
+		return
+	var order: Array[String] = []
+	for id in ["torch", "fire_torch"]:
+		if inv.has(id):
+			order.append(id)
+	order.append("")
+	if order.size() == 1:
+		show_status("You have no torch.", 1.0)
+	else:
+		torch_kind = order[(order.find(torch_kind) + 1) % order.size()]
+		torch_on = torch_kind != ""
+		show_status({"": "Torch out.", "torch": "Torch on: you see by it, and it shows you.",
+			"fire_torch": "The torch burns: light all round you, and everyone sees it."}[torch_kind], 1.4)
+
+
+## What the torch row would do, in words, or "" with no torch.
+func torch_job() -> String:
+	var order: Array[String] = []
+	for id in ["torch", "fire_torch"]:
+		if inv.has(id):
+			order.append(id)
+	if order.is_empty():
+		return ""
+	order.append("")
+	var nxt: String = order[(order.find(torch_kind) + 1) % order.size()]
+	if nxt == "":
+		return "Put the torch out"
+	return "Switch the hand torch on" if nxt == "torch" else ("Light the burning torch" + (" (the hand torch goes off)" if torch_kind == "torch" else ""))
+
+
 func _update_torch() -> void:
 	if Input.is_action_just_pressed("torch") and not dead:
-		# E steps through what you carry: the hand torch, the burning one, nothing.
-		var order: Array[String] = []
-		for id in ["torch", "fire_torch"]:
-			if inv.has(id):
-				order.append(id)
-		order.append("")
-		if order.size() == 1:
-			show_status("You have no torch.", 1.0)
-		else:
-			torch_kind = order[(order.find(torch_kind) + 1) % order.size()]
-			torch_on = torch_kind != ""
-			show_status({"": "Torch out.", "torch": "Torch on: you see by it, and it shows you.",
-				"fire_torch": "The torch burns: light all round you, and everyone sees it."}[torch_kind], 1.4)
+		toggle_torch()
 	if torch_on and (dead or not inv.has(torch_kind)):
 		torch_on = false
 		torch_kind = ""
