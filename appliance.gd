@@ -22,6 +22,9 @@ extends Node3D
 ##               With something metal in it (Shift+click: a tin, scrap metal) it sparks and goes with a bang
 ##               heard much further, and is wrecked.
 ##   dishwasher  mains: racks to search, and a 90 s wash cycle heard 9 m off the whole time: a lure that lasts.
+##   kitchen timer
+##               wound by hand: set down, it ticks for 30 s and then rings, heard `RING` m off. A timed lure
+##               with no batteries and no power; picked up and wound again as often as you like.
 ##   telephone   the line is live while the power is: now and then it rings, and every zombie near hears it.
 ##               Answer it, or pull its cord out of the wall to shut it up for good (and keep the cord).
 ##
@@ -62,6 +65,9 @@ const KINDS := {
 	"dishwasher": {"what": "dishwasher", "w": 0.6, "h": 0.85, "d": 0.6, "stuff": "plastic",
 		"parts": {"metal": 0.5, "plastic": 0.5}, "thin": 0.5, "power": "mains", "light": 0.0,
 		"glow_y": 0.4, "tint": Color.WHITE, "noise": 9.0, "every": 4.0, "item": "", "cycle": 90.0},
+	"kitchen_timer": {"what": "kitchen timer", "w": 0.09, "h": 0.08, "d": 0.09, "stuff": "plastic",
+		"parts": {"plastic": 0.7, "metal": 0.3}, "thin": 1.0, "power": "wind", "light": 0.0,
+		"glow_y": 0.04, "tint": Color.WHITE, "noise": 2.0, "every": 2.0, "item": "kitchen_timer", "cycle": 30.0},
 	"telephone": {"what": "telephone", "w": 0.22, "h": 0.1, "d": 0.2, "stuff": "plastic",
 		"parts": {}, "thin": 0.5, "power": "line", "light": 0.0,
 		"glow_y": 0.05, "tint": Color.WHITE, "noise": 15.0, "every": 3.0, "item": ""},
@@ -88,6 +94,7 @@ const RING_CHANCE := 0.04      # ... the chance it does then, while you are near
 const RING_NEAR := 25.0        # m: it only rings with you this near (a stand-in for calls that matter to you)
 const RINGS := 6               # rings before the caller gives up, `every` s apart
 const DING := 16.0              # m: a microwave's ding
+const RING := 15.0              # m: a kitchen timer's bell
 const ZAP := 26.0               # m: the bang when something metal in it sparks
 const ROBOT_SPEED := 0.25      # m/s: a toy robot's march (a wandering zombie is about 0.4)
 
@@ -203,6 +210,8 @@ func working() -> bool:
 			return switched and Power.at(global_position)
 		"battery", "burn":
 			return switched and int(item.get("uses", 0)) > 0
+		"wind":
+			return switched
 		"line":
 			return Power.on
 	return false
@@ -301,6 +310,8 @@ func _cycle_done() -> void:
 				br.give_way(null)                    # sparks, a bang, smoke: it is finished
 				return
 			Earshot.make(global_position, DING, get_tree(), null, false, self)
+		"kitchen_timer":
+			Earshot.make(global_position, RING, get_tree(), null, false, self)
 	_show()
 
 
@@ -423,6 +434,8 @@ func prompt_text(_p: Player) -> String:
 			return ("Switch the toy robot off" if switched else "Switch the toy robot on (it walks off, clanking)") + lift
 		"candle":
 			return ("Blow the candle out" if switched else "Light the candle (a match)") + "   (Shift+click: pick it up)"
+		"kitchen_timer":
+			return ("The timer is ticking: %d s" % ceili(_run_t) if switched else "Wind the timer (it rings in 30 s)") + lift
 		"kettle":
 			if switched:
 				return "The kettle is coming to the boil" + (" (no power: it has stopped)" if not Power.at(global_position) else "")
@@ -461,6 +474,13 @@ func interact(p: Player) -> void:
 		return
 	if wear >= 2 or cut:
 		p.show_status("It is dead.", 1.4)
+		return
+	if kind == "kitchen_timer":
+		if switched:
+			p.show_status("It is ticking: %d s to go." % ceili(_run_t), 1.2)
+		else:
+			_start()
+			p.show_status("You wind it. Thirty seconds.", 1.4)
 		return
 	if KINDS[kind].has("cycle"):
 		_use_cycle(p, shift)
@@ -618,4 +638,7 @@ static func set_down(level: Node, it: Dictionary, at: Vector3, facing: Vector3) 
 		face = ["S", "E", "N", "W"][turns]
 	var dead := bool(it.get("dead", false))
 	var playing := what_kind in ["radio", "toy_robot", "candle"] and int(it.get("uses", 0)) > 0 and not dead
-	return Appliance.put(level, what_kind, at, face, 2 if dead else 0, playing, at.y, it)
+	var a := Appliance.put(level, what_kind, at, face, 2 if dead else 0, playing, at.y, it)
+	if what_kind == "kitchen_timer":
+		a._start()                             # set down wound
+	return a

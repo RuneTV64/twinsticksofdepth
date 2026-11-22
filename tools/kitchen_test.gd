@@ -70,6 +70,8 @@ func _run() -> void:
 		await _furniture()
 	if _part(3):
 		await _appliances()
+	if _part(4):
+		await _odds()
 	quit()
 
 
@@ -297,3 +299,114 @@ func _appliances() -> void:
 	Power.set_on(false)
 	_say("  mains off: working %s" % d.working())
 	Power.set_on(true)
+
+
+# ---------------------------------------------------------------------------------------- 4: odds and ends
+func _odds() -> void:
+	for n in get_nodes_in_group("interactables"):
+		if n is ItemPickup and (n.title == "Knife block" or n.title == "On the stove"):
+			_say("%s: %s" % [n.title, ", ".join((n.contents as Array).map(func(it): return Items.label(it)))])
+	for id in ["kitchen_knife", "meat_cleaver", "frying_pan", "rolling_pin", "plate"]:
+		_say("  %s: %s" % [id, Items.about(id)])
+	# Blows to put a fresh zombie down, aimed at the head (the same reckoning as melee_test).
+	for id in ["kitchen_knife", "meat_cleaver", "frying_pan", "rolling_pin"]:
+		var h: Dictionary = Items.hit_of(id)
+		var z := _zombie(Vector3(-20, 0, 24))
+		var blows := 0
+		while not z.dead and blows < 40:
+			z.take_blow("Head", float(h["force"]) * p.melee_mult, str(h["kind"]), Vector3(0, 0, 1))
+			blows += 1
+		_say("  %s: a fresh zombie down in %d blows to the head (it lasts %d blows, %.2f s a swing)" % [id, blows, int(h["lasts"]), float(h["time"])])
+		z.queue_free()
+	# A knife opens a tin, and the tin is kept.
+	_empty()
+	p.inv.slots["hand_l"] = Items.make("canned_food", 2)
+	p.inv.slots["hand_r"] = Items.make("kitchen_knife")
+	p.sheet.set_need("food", 30.0)
+	p.eat()
+	_say("a tin and a knife, no opener: '%s'; food %.0f; carrying %s" % [p.status_text, float(p.sheet.needs["food"]), ", ".join(p.inv.slots.values().map(func(it): return Items.label(it)))])
+	# A pan boils water on a fire.
+	var fire: Campfire = null
+	for c in get_nodes_in_group("interactables"):
+		if c is Campfire and (c as Campfire).kept:
+			fire = c
+	_empty()
+	var bottle := Items.make("water")
+	bottle["bugs"] = 0.6
+	p.inv.slots["hand_l"] = bottle
+	p.inv.slots["hand_r"] = Items.make("frying_pan")
+	p.global_position = fire.global_position + Vector3(0.8, 0, 0)
+	_say("at a fire with a frying pan and no pot: '%s'" % fire.prompt_text(p))
+	fire.interact(p)
+	await _wait(21.0)
+	_say("  21 s later: bugs %.2f ('%s')" % [Water.bugs(bottle), Water.look(bottle)])
+	# Bleach in water.
+	_empty()
+	var b2 := Items.make("water")
+	b2["bugs"] = 0.6
+	p.inv.slots["hand_l"] = b2
+	p.inv.slots["hand_r"] = Items.make("bleach")
+	p.use_item("hand_r")
+	_say("bleach in a bottle: '%s'" % p.status_text)
+	await _wait(61.0)
+	_say("  a minute later: bugs %.2f; bleach left %d" % [Water.bugs(b2), int(p.inv.slots["hand_r"]["uses"])])
+	# A plate thrown: a smash, and glass where it landed.
+	_empty()
+	p.global_position = Vector3(-6, 0, 20)
+	p.facing = Vector3(0, 0, 1)
+	p.inv.slots["hand_l"] = Items.make("plate", 2)
+	var ear := _zombie(Vector3(-6, 0, 40))
+	ear._noise_t = 0.0
+	p.weapon = "throw"
+	p.armed = true
+	p.reticle_offset = Vector3(0, 0, 9)
+	p._throw()
+	await _wait(1.6)
+	p.armed = false
+	var glass := 0
+	for w in Wreck.all:
+		if is_instance_valid(w) and w.global_position.distance_to(Vector3(-6, 0, 29)) < 1.5 and w.lot.has("glass"):
+			glass = w.left("glass")
+	_say("a plate thrown 9 m: glass lying where it landed %d; a zombie 11 m from there heard it %s" % [glass, ear._noise_t > 0.0])
+	ear.queue_free()
+	# The kitchen timer: set down, it rings 30 s later.
+	_empty()
+	p.inv.slots["hand_l"] = Items.make("kitchen_timer")
+	p.global_position = Vector3(-10, 0, 26)
+	p.use_item("hand_l")
+	var tm: Appliance = null
+	for n in get_nodes_in_group("interactables"):
+		if n is Appliance and n.kind == "kitchen_timer":
+			tm = n
+	var near := _zombie(tm.global_position + Vector3(13.0, 0, 0))
+	var far := _zombie(tm.global_position + Vector3(18.0, 0, 0))
+	near._noise_t = 0.0
+	far._noise_t = 0.0
+	p.global_position = Vector3(-40, 0, 40)
+	_say("kitchen timer set down: '%s'; it says '%s'" % [p.status_text, tm.prompt_text(p)])
+	await _wait(25.0)
+	var early := near._noise_t > 0.0
+	await _wait(6.0)
+	_say("  rang at 30 s: heard at 13 m %s (not before: %s), at 18 m %s; it says '%s'" % [near._noise_t > 0.0, not early, far._noise_t > 0.0, tm.prompt_text(p)])
+	near.queue_free()
+	far.queue_free()
+	# Tins strung across a doorway.
+	_empty()
+	p.global_position = Vector3(-14, 0, 22)
+	p.facing = Vector3(1, 0, 0)
+	p.inv.slots["hand_l"] = Items.make("empty_tin", 3)
+	p.inv.slots["hand_r"] = Items.make("cloth_strip")
+	p.use_item("hand_l")
+	_say("tins strung: '%s'; alarms %d" % [p.status_text, TinAlarm.all.size()])
+	var ta: TinAlarm = TinAlarm.all[0]
+	var lis := _zombie(ta.global_position + Vector3(0, 0, 10.0))
+	lis._noise_t = 0.0
+	var walker := _zombie(ta.global_position + Vector3(0.1, 0, 0.2))
+	TinAlarm.step_on(walker.global_position, walker)
+	_say("  a zombie walks through it: one 10 m off heard the rattle %s" % (lis._noise_t > 0.0))
+	walker.queue_free()
+	lis.queue_free()
+	p.global_position = ta.global_position
+	ta.interact(p)
+	await _wait(0.1)
+	_say("  taken down: '%s'; carrying %s" % [p.status_text, ", ".join(p.inv.slots.values().map(func(it): return Items.label(it)))])

@@ -85,6 +85,21 @@ stopped by itself. The phone rang 7 to 10 times in 200 looks (about once in 7 to
 off heard it; answered, it stopped; its cord pulled, it never rang again. The side table broken under the
 lamp: the lamp fell to the floor (in an earlier run it shattered).
 
+### The kitchen (22 Nov 2026: the second theme)
+
+| Piece | Cover | Zombie blows | What it does now |
+|---|---|---|---|
+| Sink | low | 5 | a counter section with a steel basin (part 29) and **a tap**: clear water into your bottle while the mains run, dry when they are cut; a cupboard under it |
+| Pantry | high | 9 | tall doors (part 31); two shelves of food and what is kept with it |
+| Wall cupboard | none (it hangs 1.45 m up: `KINDS` "lift") | 3 | a cupboard over the counter |
+| Kitchen bin | none | 1 | brushed steel (part 30, ramp `STEEL`); what was thrown away, each thing with a use |
+| Kettle | appliance | 1 | mains: boils the water in your bottle in 30 s, no fire |
+| Microwave | appliance | 1 | mains: dings 20 s after it is set (heard 16 m); with metal in it, a bang (26 m) and it is wrecked |
+| Dishwasher | appliance | 2 | racks to search; a 90 s wash heard 9 m off |
+
+Sheets `preview/kitchen.png` (the furnished kitchen) and `preview/kitchen_appliances.png`. The game's
+CLAUDE.md ("The kitchen") has the cloth and the odds and ends that came with it.
+
 What each is meant to do once the system it waits for exists (`FurnitureKit.LATER`; none of it is built): the
 fridge, wardrobe, dresser and counter are containers to search; the bed is for sleep; the couch and chairs for
 sitting to rest; the bookshelf for books; the stove for cooking and warmth (the fire you have to feed is built).
@@ -149,6 +164,7 @@ f.curtains(window_point, a_point_inside)                  # at the nearest windo
 | `preview/furniture_house.png` | The kit house furnished: the living room round its fireplace, the den, the kitchen |
 | `preview/living_room.png` | The living room's pieces, sound (the fire lit, one window's curtains drawn and one open) and worn out |
 | `preview/appliances.png` | The appliances off and on, by day and at night |
+| `preview/kitchen.png`, `preview/kitchen_appliances.png` | The kit house's kitchen furnished: sink, wall cupboard, pantry, bin; the kettle, microwave and dishwasher |
 | `../../../tools/preview/misc_living_room.png` | (in the repository's tools) candles, the toy robot and marbles in a room, by day and night |
 | `../../../rug.gd`, `window_curtains.gd`, `piano.gd` | (in the game's root) the rug, curtains at a window, a piano's keys |
 | `../../../appliance.gd`, `power.gd` | (in the game's root) the appliances and what they do; mains power |

@@ -260,7 +260,7 @@ const SIGHT_RAYS := 240                 # one every 1.5 degrees, all the way rou
 
 ## Weapons on the quick wheel, in slot order (slot 0 is at the left, going clockwise).
 const WEAPONS: Array[String] = ["fists", "gun", "throw"]
-const THROWABLES: Array[String] = ["bottle", "rock", "vinyl_record", "dvd", "book"]     # what "throw" throws, the first you have
+const THROWABLES: Array[String] = ["bottle", "plate", "rock", "vinyl_record", "dvd", "book"]     # what "throw" throws, the first you have
 const WEAPON_NAMES := {"fists": "Unarmed", "gun": "Gun", "throw": "Throw"}
 const WHEEL_MOUSE_RADIUS := 90.0        # pixels of mouse travel from center to the wheel's rim
 
@@ -1048,8 +1048,12 @@ func use_item(key: String) -> void:
 			lay_glass()
 		"rolled_rug":
 			lay_rug(key)
-		"table_lamp", "floor_lamp", "radio", "toy_robot", "kettle":
+		"table_lamp", "floor_lamp", "radio", "toy_robot", "kettle", "kitchen_timer":
 			set_down_appliance(key)
+		"empty_tin":
+			string_tins(key)
+		"bleach":
+			purify_water()
 		"candle":
 			if not inv.use("matches"):
 				show_status("You need a match to light it.", 1.6)
@@ -1136,10 +1140,13 @@ func eat() -> void:
 		show_status("You have nothing to eat.", 1.5)
 		return
 	var whole := inv.has("can_opener")
-	if not whole and not inv.has("hatchet"):
+	if not whole and not inv.has("hatchet") and inv.tool_for("blade") == "":
 		show_status("You have nothing to open the tin with.", 2.0)
 		return
 	inv.use("canned_food")
+	var tin := inv.add(Items.make("empty_tin"))          # the tin is kept: nothing is junk
+	if not tin.is_empty():
+		_drop(tin)
 	sheet.set_need("food", float(sheet.needs["food"]) + (meal if whole else meal * 0.5))
 	if not whole:
 		Earshot.make(global_position, 6.0, get_tree(), self, true)
@@ -1192,6 +1199,25 @@ func make_bracer() -> void:
 	show_status("You roll two magazines round your %s forearm and tie them tight." % ("left" if id == "magazine_bracer" else "right"), 2.2)
 
 
+## Three empty tins strung on a strip of cloth or a cord across the way in front of you: an alarm (tin_alarm.gd).
+func string_tins(key: String) -> void:
+	var it = inv.slots.get(key)
+	if it == null or it["id"] != "empty_tin" or int(it.get("n", 1)) < TinAlarm.TINS:
+		show_status("It takes %d empty tins to make an alarm." % TinAlarm.TINS, 1.8)
+		return
+	var tie := "cloth_strip" if inv.has("cloth_strip") else ("electric_cord" if inv.has("electric_cord") else "")
+	if tie == "":
+		show_status("You need something to string them on: a strip of cloth, or a cord.", 2.0)
+		return
+	for i in TinAlarm.TINS:
+		inv.use("empty_tin")
+	inv.use(tie)
+	recompute_stats()
+	TinAlarm.hang(get_parent(), global_position + facing * 0.7, facing, tie)
+	_body.reach()
+	show_status("You string the tins across the way. Whoever comes through will set them rattling.", 2.2)
+
+
 ## Scatter the marbles you carry on the floor in front of you (marbles.gd).
 func lay_marbles(key: String) -> void:
 	var it = inv.slots.get(key)
@@ -1221,6 +1247,8 @@ func set_down_appliance(key: String) -> void:
 		show_status("You wind it up and set it down. Off it clanks." if a.working() else "You set it down. Its batteries are flat.", 1.8)
 	elif a.kind == "candle":
 		show_status("You light the candle and set it down.", 1.6)
+	elif a.kind == "kitchen_timer":
+		show_status("You wind it and set it down: thirty seconds, then it rings.", 1.8)
 	else:
 		show_status("You stand the %s up. Click it to switch it on." % Appliance.KINDS[a.kind]["what"], 1.8)
 
@@ -1470,6 +1498,10 @@ func purify_water() -> void:
 		inv.use("purify_tabs")
 		Water.tablet(item)
 		show_status("A tablet goes in. Give it a minute.", 2.0)
+	elif inv.has("bleach") and not done.has("treated") and not item.has("tab_t"):
+		inv.use("bleach")
+		Water.tablet(item)                  # a few drops do what a tablet does
+		show_status("A few drops of bleach go in. Give it a minute.", 2.0)
 	else:
 		show_status("Nothing more you carry will help it. Fire would." if not done.has("boiled") else "You have done what you can for it.", 2.0)
 
@@ -1509,6 +1541,8 @@ func _step_in_it() -> void:
 	var crawl := posture == 2
 	if not Marbles.all.is_empty():
 		Marbles.step_on(global_position, self)
+	if not TinAlarm.all.is_empty():
+		TinAlarm.step_on(global_position, self)
 	var glass := Wreck.step_on(global_position, self, 0.5 if posture > 0 else 1.0, crawl or (barefoot and footed),
 		Wreck.CRAWL_CUT if crawl else Wreck.BARE_CUT)
 	if glass == 2 and not invulnerable and crawl:

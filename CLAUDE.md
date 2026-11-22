@@ -69,7 +69,9 @@ were built on 22 Nov 2026 (see The living room's appliances), not seen by the ow
 starting with its clothes session (its cloth and wearables: an apron, oven mitts, a tea towel, a shopping bag
 were on Claude's list, nothing built). The living room's miscellaneous session (the owner: "Now do the living
 room misc") was built on 22 Nov 2026, not seen by the owner, on `main` since 22 Nov 2026 (the owner said to
-push it; see The living room's odds and ends). That finishes the first theme; the kitchen is next.
+push it; see The living room's odds and ends). That finishes the first theme. The owner then said "Do the
+kitchen" (22 Nov 2026): all four of its sessions were built the same day, not seen by the owner, on the session
+branch only (see The kitchen).
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -1163,7 +1165,7 @@ sheets `tools/preview/misc_living_room.png` (the magazine guards worn, and the c
 room by day and night) and `tools/preview/loot_icons.png` (every item's picture, with a "misc" row now).
 
 - Throwing is any item with a `throw` record (`items.gd`: noise, keep, far, look; `Thrown` reads it, and
-  `Player.THROWABLES` is bottle, rock, record, DVD, book in that order). Rocks and bottles were given theirs.
+  `Player.THROWABLES` is bottle, plate, rock, record, DVD, book in that order). Rocks and bottles were given theirs.
   - Hardback book: lands with a thud heard 8 m and lies there to pick up again: a throw for indoors, where
     there are no rocks. Burns (`Items.FUEL` 150 s). A weak club.
   - Vinyl record: sails half as far again as anything else (21 m at Strength 10 against 14), clatters 9 m,
@@ -1213,6 +1215,67 @@ room by day and night) and `tools/preview/loot_icons.png` (every item's picture,
   (they work anywhere for now) or scattering as they are walked through; a candle tipping over or setting
   anything alight; the robot climbing, falling down stairs or being picked up while it walks (it can be,
   with Shift+click); raiders thinking about any of it.
+
+## The kitchen (built 22 Nov 2026, in review; not seen by the owner)
+
+The second theme, a middle-class kitchen. The owner: "Do the kitchen", so all four sessions in order. Every
+number is Claude's first guess. Test `tools/kitchen_test.gd` (PART=1 to 4). Sheets
+`tools/preview/kitchen_cloth.png` (front and side), `assets/buildings/furniture/preview/kitchen.png`,
+`kitchen_appliances.png`, `tools/preview/loot_icons.png`.
+
+- Session 1, its cloth:
+  - Kitchen apron (`outer`, so not with a jacket): a new front-only shape (`Clothes.SHAPES` "front", shader
+    shape 5: a wide skirt below the waist, a narrow bib above), cut `apron`. One pocket (1 kg). Cut 0.4,
+    bite 0.3 from in front only (`Clothes.over` lets half of what comes at the body past it). Cloud run, 400
+    cuts at the body: t-shirt alone stopped 16 to 30, with the apron 94 to 99.
+  - Oven mitts (`hands`, cut `mitts`, hand and wrist): cut 0.6, bite 0.45, and a new guard `clumsy` 0.25:
+    worn, aim is a quarter worse (`CharacterSheet.clumsy`, "Clumsy hands"). Whatever is on your hands now
+    keeps glass off them (`Player.hand_guard`): punching glass, and picking broken glass up by hand, which
+    can now cut you bare-handed (`Wreck.HAND_CUT` 0.12 a shard). Cloud run: 60 pickups bare, 2 cuts (a
+    second cut on the same arm joins the first wound, so likely more); in mitts, none.
+  - Tea towel (stack 3): torn in two (take it apart), two clean rags, with no water spent washing them.
+- Session 2, its furniture (`FurnitureKit.KINDS`; new ramp `STEEL`; shader parts 29 to 31):
+  - Sink (a counter section with a steel basin, under the north window): low cover, a cupboard under it,
+    and a tap (`WaterSource` "tap", `mains`): clear water (bugs 0.03) while the mains run, dry when Shift+N
+    cuts them (`power.gd` stands in for the water as well as the power).
+  - Pantry: tall, high cover, two shelves of food and what is kept with it (`Stash.KINDS` "only").
+  - Wall cupboard: hangs 1.45 m up over the counter (`KINDS` "lift"): no cover, a cupboard to search.
+  - Kitchen bin: a new kind of place, "bin" (`found`): what was thrown away, each thing with a use (bottles,
+    broken glass, torn cloth, broken plastic, scrap metal, magazines, empty tins).
+  - Cloud run: zombie blows sink 5, pantry 9, wall cupboard 3, bin 1; a sound pantry holds about 6 things.
+- Session 3, its appliances (`appliance.gd`; a cycle: `KINDS` "cycle", `_start`, `_cycle_done`):
+  - Electric kettle (on the counter; an item you can carry to any socket): pour your bottle in, 30 s on the
+    mains, it boils it (the bugs die, the mud stays), clicks off, and you pour it back. No wood, no fire.
+  - Microwave (on the counter): set running it hums 20 s and dings, heard 16 m: a timed lure. Shift+click
+    with a tin or scrap metal in hand puts it in: it sparks and bangs, heard 26 m, and is wrecked.
+  - Dishwasher (by the fridge): racks to search (a `Stash` searched through its click) and a 90 s wash
+    heard 9 m off the whole time; zombies that come beat on it while it runs.
+  - Cloud run: pond water boiled in the kettle came out "muddy, boiled", bugs 0; the ding reached 14 m,
+    not 19; the bang reached 19 m; the dishwasher was heard 8 m off.
+  - A fix: `Power.watch` with a lambda outlived a smashed appliance and crashed the next power cut. Watch
+    with a method or a static function (`Appliance._on_power`).
+- Session 4, its odds and ends:
+  - Kitchen knife (pierce 9, 0.38 s a swing, lasts 60, a blade; in a knife block on the counter with the
+    cleaver): quick and quiet, close. It opens a tin as a hatchet does (half spilt). Meat cleaver (chop 17,
+    a blade). Frying pan (on the stove; blunt 13, lasts 300; `does` "pot": it boils water on a fire as the
+    cooking pot does, which now also has "pot"). Rolling pin (blunt 10; burns). Cloud run, blows to put a
+    fresh zombie down by the head: knife 3, cleaver 2 to 3, pan 3 to 4, rolling pin 4 to 5.
+  - Dinner plate (stack 4, thrown before rocks): smashes where it lands, heard 13 m, and leaves 2 pieces of
+    broken glass there (`throw` "shards"): glass laid as a trap from across a room.
+  - Bleach (10 uses): treats water as a tablet does (Shift+I, or use it); after the tablets in that order.
+  - Kitchen timer: wind it and set it down; it ticks 30 s (2 m) and rings, heard 15 m (an `Appliance` of
+    power "wind"). Picked up and wound again. Cloud run: heard at 13 m when it rang and not before; not 18 m.
+  - Empty tin: eating a tin now leaves one (nothing is junk); found in bins. Three and a strip of cloth or
+    a cord, used, string a tin-can alarm across the way you face (`tin_alarm.gd`, `TinAlarm`, 1.4 m): whoever
+    walks through rattles it, heard 11 m. It stops nobody. Taken down by hand, the tins and the tie come back.
+    In a microwave, a tin is the bang.
+- In the kit house: the sink under the window, the counter with a wall cupboard over it, the kettle,
+  microwave and knife block on it, the pan on the stove, the dishwasher by the fridge, the pantry and bin
+  by the south wall. The rest is found searching (the counter, sink, wall cupboard, pantry, dishwasher, bin).
+- Not built: heat (nothing is hot: oven mitts only matter for glass and bites); cooking (a pan and a stove
+  boil water, nothing is cooked; the microwave heats nothing); food other than tins; the dishwasher washing
+  anything; washing up, hygiene; a knife's real look (a bar); throwing a knife; raiders using any of it;
+  a tin alarm on stairs or across a window; the timer's tick heard as a sound (it is only a noise).
 
 ## Themed item batches (owner, 21 Nov 2026; nothing built yet)
 

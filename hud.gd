@@ -44,6 +44,9 @@ Appliances  Click a lamp, the television or a radio to switch it; Shift+click pi
   to stand it down again). A radio set down plays until its batteries go: a decoy. Shift+N cuts the power.
   From your things (I): a toy robot walks off clanking, marbles scatter (they trip whoever walks on them), a
   candle is lit and set down (a match), two magazines and a strip of cloth make a guard for a forearm.
+Kitchen  The tap fills your bottle while the mains run. The kettle boils your water; the microwave dings 20 s
+  after you set it (Shift+click with a tin in hand: a bang). A wound kitchen timer rings in 30 s. Three empty
+  tins and a strip of cloth make an alarm across a doorway. Plates thrown leave broken glass.
 Torch  E steps through the hand torch (a beam where you face), the burning torch (light all round, burns away)
        and none. Both are in the tool box. You see by them, and they show you.
 Crouch  Ctrl (again to stand)      Prone  X (again to get up)

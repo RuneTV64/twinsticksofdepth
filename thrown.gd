@@ -88,6 +88,11 @@ func _rec() -> Dictionary:
 func _land() -> void:
 	var rec := _rec()
 	Earshot.make(to, float(rec.get("noise", 9.0)), get_tree(), thrower, true)
+	if int(rec.get("shards", 0)) > 0:
+		# It smashes, and its pieces lie where it landed: broken glass, as good as a trap laid by hand.
+		var n := int(rec["shards"])
+		Wreck.leave(get_parent(), Vector3(to.x, to.y if _second else 0.0, to.z), 0.5, {"glass": 1.0},
+			n / float(Materials.of("glass")["per_m2"]), "broken glass")
 	if bool(rec.get("keep", false)):
 		var p := ItemPickup.new()
 		p.title = Items.name_of(item)

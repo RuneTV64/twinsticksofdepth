@@ -498,6 +498,8 @@ func _leave_tracks() -> void:
 		_step_from = global_position
 		if not Marbles.all.is_empty():
 			Marbles.step_on(global_position, self)      # marbles on any floor (marbles.gd)
+		if not TinAlarm.all.is_empty():
+			TinAlarm.step_on(global_position, self)     # tins strung across the way (tin_alarm.gd)
 		if absf(global_position.y) > 0.5:
 			return       # indoors on another floor: no prints, no mud
 		_step_side = -_step_side

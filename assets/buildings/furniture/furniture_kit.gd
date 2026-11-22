@@ -338,6 +338,9 @@ static func mesh_of(kind: String, length := 0.0) -> ArrayMesh:
 				_box(st, at, Vector3(sx * 0.035, 0.035, 0), Vector3(0.04, 0.07, 0.05), PLASTIC)          # legs
 			_box(st, at, Vector3(0, 0.115, 0), Vector3(0.12, 0.09, 0.09), BRASS, RADIO_FRONT)           # tin body
 			_box(st, at, Vector3(0, 0.19, 0), Vector3(0.08, 0.06, 0.07), BEIGE)                           # head
+		"kitchen_timer":
+			_box(st, at, Vector3(0, 0.035, 0), Vector3(0.08, 0.07, 0.08), BEIGE, RADIO_FRONT)
+			_box(st, at, Vector3(0, 0.075, 0), Vector3(0.03, 0.012, 0.03), BRASS)                        # the knob
 		"kettle":
 			_box(st, at, Vector3(0, 0.015, 0), Vector3(0.18, 0.03, 0.16), PLASTIC)                       # its base
 			_box(st, at, Vector3(0, 0.13, 0.01), Vector3(0.15, 0.2, 0.14), ENAMEL)
@@ -557,6 +560,9 @@ static func furnish(in_level: Node, origin: Vector3, storeys := 1, worn := 0, wo
 	f.appliance("kettle", o + Vector3(6.32, 0.9, 0.5), "S", worktop)
 	f.appliance("microwave", o + Vector3(6.74, 0.9, 0.44), "S", worktop)
 	f.appliance("dishwasher", o + Vector3(6.32, 0, 2.45), "E")
+	# Its odds and ends: the knife block by the kettle, a pan on the stove; the rest are in its cupboards.
+	f.lying("Knife block", ["kitchen_knife", "meat_cleaver"], o + Vector3(6.95, 0.9, 0.3))
+	f.lying("On the stove", ["frying_pan"], o + Vector3(8.42, 0.9, 0.5))
 	f.put("fridge", o + Vector3(6.46, 0, 1.62), "E")
 	f.put("table", o + Vector3(7.75, 0, 3.0), "E")
 	f.put("chair", o + Vector3(6.98, 0, 3.0), "E")

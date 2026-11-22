@@ -60,7 +60,7 @@ func interact_point() -> Vector3:
 
 func prompt_text(p: Player) -> String:
 	if _can_boil(p):
-		return "Boil your water on the fire" if p.inv.has("cooking_pot") else "Boil your water (you need a pot to boil it in)"
+		return "Boil your water on the fire" if p.inv.tool_for("pot") != "" else "Boil your water (you need a pot or a pan to boil it in)"
 	if not lit:
 		if fuel <= 0.0 and _wood(p) == "":
 			return "A cold hearth: it wants wood"
@@ -72,7 +72,7 @@ func prompt_text(p: Player) -> String:
 
 func interact(p: Player) -> void:
 	if _can_boil(p):
-		if not p.inv.has("cooking_pot"):
+		if p.inv.tool_for("pot") == "":
 			p.show_status("You have nothing to boil it in. A cooking pot would do.", 2.5)
 			return
 		_player = p
