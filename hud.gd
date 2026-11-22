@@ -40,15 +40,15 @@ Camera in and out  Mouse wheel
 Throw  Pick up rocks and bottles (indoors, books, records, DVDs), choose Throw on the Tab wheel, hold Ready, left-click: it lands at the crosshair
   and the noise draws zombies and raiders. From behind cover a click throws without showing yourself.
 Take-down  Weapon raised, right behind a raider who hasn't noticed you, crosshair on him: left-click.
-Seasons  The menu's Testing page steps the season and turns the rain on and off. The ground follows.
-Light and dark  The Testing page steps the time of day (day, dusk, night, dawn). In the dark you are seen from less far and see
+Seasons  The menu's Admin submenu steps the season and turns the rain on and off. The ground follows.
+Light and dark  The Admin submenu steps the time of day (day, dusk, night, dawn). In the dark you are seen from less far and see
   less far; a fire or lamp lights whoever stands in it; a gunshot shows you up for a moment.
 Context menu (HOLD)  Left-click with the weapon away, held: a list of what you can do here and with yourself.
   Slide down to one and let go, or let go and click it (1-9 pick too). Esc, Ready or a click off it shuts it.
   A plain click still does what the prompt says. Boarding windows, shoes, laying glass, treating water and
   picking things up are in it.
 Appliances  Click a lamp, the television or a radio to switch it; in the menu, pick a lamp or radio up (use it
-  to stand it down again). A radio set down plays until its batteries go: a decoy. The Testing page cuts the power.
+  to stand it down again). A radio set down plays until its batteries go: a decoy. The Admin submenu cuts the power.
   From your things (I): a toy robot walks off clanking, marbles scatter (they trip whoever walks on them), a
   candle is lit and set down (a match), two magazines and a strip of cloth make a guard for a forearm.
 Torch  E (or the menu) steps through the hand torch (a beam where you face), the burning torch (light all round, burns away)
@@ -81,7 +81,7 @@ In cover: hunkered = hidden, safe from shots across it, but you see only a short
   Hold a move key toward low cover (or along it at an end) = peek: you see, they see you, small chance of a head hit.
   Ready = pop up or lean out to aim. Attack without Ready = blind fire. Hold the move key away from it = leave.
   Space while moving toward low cover = vault it.
-Test switches: hold left-click (weapon away), then "Test switches" at the bottom of the menu: season, rain, time
+Admin: hold left-click (weapon away), then "Admin" at the bottom of the menu: season, rain, time
   of day, power, the old ground, raiders and gunners at the crosshair, a test wound, free boarding, breaking what
   the crosshair is on, rust and rot, the cutaway, the horde readout, the low models. Stats: the character page (C), -/=.
 Crowd test: F5 +50 zombies   F6 clear   F7 can't be hurt
@@ -92,10 +92,10 @@ Corpse piles can be walked on: slow, bad footing, and what is still alive in the
 Character page: C. It shows attributes, needs, composure, your body, what you carry, and conditions.
 Wounds: H sits you down to treat them by hand with what you carry (a first-aid box is by the spawn).
   Your view closes in; hold ALT to look up. Moving puts it down. Keys 1-9 and 0 or a click pick a tool. Vodka or water washes a wound.
-  The Testing page gives you a test wound (a deep cut, a gunshot, a bite in turn).
+  The Admin submenu gives you a test wound (a deep cut, a gunshot, a bite in turn).
 Bites infect. Only taking the arm or leg off before it reaches the body can cure it (hatchet, in the treatment
   screen), and that takes luck. Steroids slow it. Run its course and you turn; your old self walks with your things.
-Horde: noise warms an area and draws zombies in from round about. The Testing page shows the readout. Killed ones don't come back.
+Horde: noise warms an area and draws zombies in from round about. The Admin submenu shows the readout. Killed ones don't come back.
 Breaking things: everything breaks. Ready, crosshair on it, close by, left-click: fists, or the hatchet (wood) or
   sledgehammer (brick, pavement) if you carry one; a gun shoots it. Zombies beat on what is in their way, weakest
   first. What is left can be picked through, and rusts and rots away. Broken glass crunches underfoot.
@@ -120,8 +120,8 @@ Breaking things: everything breaks. Ready, crosshair on it, close by, left-click
   goes there. Glass breaks; a rock through an upstairs window lands, and is heard, upstairs.
   At a window, crosshair on it, the menu boards it up (a hammer, 4 nails, 2 planks; it takes a while and is heard),
   or with a crowbar prises the boards off again.
-Cutaway: walls between the camera and you open up; indoors the whole building opens (windows stay, faint); Ready, it opens to the crosshair too. The Testing page switches it off and on.
-Raiders: a camp in the south-west of the yard. The Testing page adds one (or a test gunner) at the crosshair.
+Cutaway: walls between the camera and you open up; indoors the whole building opens (windows stay, faint); Ready, it opens to the crosshair too. The Admin submenu switches it off and on.
+Raiders: a camp in the south-west of the yard. The Admin submenu adds one (or a test gunner) at the crosshair.
 F1 hide help    F2 hide the UI (once: the clutter; twice: all of it)    Esc free mouse"""
 
 

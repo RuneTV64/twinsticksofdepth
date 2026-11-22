@@ -35,7 +35,7 @@ var _zone_t := 0.0
 # Crowd test (F5 / F6 / F7): extra shamblers to find out how many the game can take, and where the time goes.
 const CROWD_STEP := 50
 var _crowd: Array[Enemy] = []
-var _raiders: Array[Raider] = []   # added from the menu's Testing page
+var _raiders: Array[Raider] = []   # added from the menu's Admin submenu
 var _perf: Label
 var _perf_t := 0.0
 var _perf_frames := 0
@@ -99,7 +99,7 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.player = player
 	add_child(hud)
-	player.test_menu = test_rows
+	player.admin_menu = admin_rows
 	_make_perf_label()
 
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -108,7 +108,7 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	# What is left on keys: the screens (C, H, I; the character page's own keys while it is open), and the F
 	# keys. Everything else that was on a letter key is in the context menu (hold left-click, weapon away:
-	# context_menu.gd), the test switches on its Testing page (`test_rows` below). Owner, 22 Nov 2026.
+	# context_menu.gd), the test switches in its Admin submenu (`admin_rows` below). Owner, 22 Nov 2026.
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_ESCAPE:
@@ -141,11 +141,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
-# ------------------------------------------------------------------ the context menu's Testing page
-## The test switches that were on letter keys, as rows for the context menu's Testing page (ContextMenu.build
-## asks for them through `player.test_menu`). Each says what it will do now. Things "at the crosshair" use
+# ------------------------------------------------------------------ the context menu's Admin submenu
+## The test switches that were on letter keys, as rows for the context menu's Admin submenu (ContextMenu.build
+## asks for them through `player.admin_menu`). Each says what it will do now. Things "at the crosshair" use
 ## where the crosshair was when the menu opened.
-func test_rows() -> Array:
+func admin_rows() -> Array:
 	var r := func(label: String, c: Callable, key := "") -> Dictionary:
 		return {"label": label, "do": c, "key": key}
 	var rain: bool = Seasons.it != null and Seasons.it.raining
@@ -329,7 +329,7 @@ func _add_crowd(n: int) -> void:
 	player.show_status("Crowd: %d extra shamblers" % _crowd.size(), 1.5)
 
 
-## Cover test (the menu's Testing page): a stand-in for a raider. It stands where the crosshair is and shoots at you whenever it can see
+## Cover test (the menu's Admin submenu): a stand-in for a raider. It stands where the crosshair is and shoots at you whenever it can see
 ## you, so the cover rules can be tried before raiders exist.
 func _add_gunner() -> void:
 	var at := player.global_position + player.reticle_offset

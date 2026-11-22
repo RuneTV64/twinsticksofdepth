@@ -9,18 +9,19 @@ extends RefCounted
 ## New things the player does go here, not on a key: an entry for the thing in front of you (an interactable's
 ## `context_actions(p) -> [[label, id], ...]`, done by its `context_do(p, id)`), or one for yourself below.
 ## Each row: {"label", "do": Callable, "key": a key that does the same (shown greyed; "" for none), "stay": true
-## to keep the menu open (turning a page)}; a section title is {"head": text}. `page` "test" is the Testing
-## page: the level's test switches, which were all on letter keys until 22 Nov 2026 (main.gd `test_rows`).
+## to keep the menu open (turning a page)}; a section title is {"head": text}. `page` "admin" is the Admin
+## submenu: the level's test switches, which were all on letter keys until 22 Nov 2026 (main.gd `admin_rows`).
 ## Only what can be done now (or what you'd want told you can't) is listed.
 
 
 static func build(p: Player, page := "") -> Array:
 	var rows: Array = []
-	if page == "test":
-		# The level's test switches (main.gd `test_rows`): everything that was on a letter key for testing.
+	if page == "admin":
+		# The Admin submenu: the level's test switches (main.gd `admin_rows`), everything that was on a letter key.
+		rows.append({"head": "ADMIN"})
 		rows.append({"label": "< Back", "do": p.open_page.bind(""), "key": "", "stay": true})
-		if p.test_menu.is_valid():
-			rows.append_array(p.test_menu.call())
+		if p.admin_menu.is_valid():
+			rows.append_array(p.admin_menu.call())
 		return rows
 	var t: Node = p.interact_target
 	if t != null and is_instance_valid(t):
@@ -59,7 +60,7 @@ static func build(p: Player, page := "") -> Array:
 	if torch != "":
 		rows.append({"label": torch, "do": p.toggle_torch, "key": "E"})
 
-	if p.test_menu.is_valid():
-		rows.append({"head": "TESTING"})
-		rows.append({"label": "Test switches (the season, rain, night, raiders...) >", "do": p.open_page.bind("test"), "key": "", "stay": true})
+	if p.admin_menu.is_valid():
+		rows.append({"head": "ADMIN"})
+		rows.append({"label": "Admin  >", "do": p.open_page.bind("admin"), "key": "", "stay": true})
 	return rows

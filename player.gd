@@ -303,9 +303,9 @@ var _menu_press_t := -1.0         # seconds a lowered left-click has been held, 
 var _menu_release_picks := false   # opened by holding: letting go over a row picks it
 var _menu_moved := 0.0             # pointer travel since it opened
 var hud: Hud                       # set by the HUD itself (for the character page in the menu)
-var menu_page := ""                # "" the ordinary menu, "test" the Testing page
+var menu_page := ""                # "" the ordinary menu, "admin" the Admin submenu
 var menu_rev := 0                  # goes up when the rows change while it is open (a page turned)
-var test_menu: Callable            # the level's test switches as rows (main.gd `test_rows`); none, no Testing page
+var admin_menu: Callable           # the level's test switches as rows (main.gd `admin_rows`); none, no Admin submenu
 var _swing_t := 0.0                # > 0 while a punch is under way (windup + recovery left)
 var _swing_total := 0.0            # full length of the current punch
 var _swing_windup := 0.0           # windup part of the current punch
@@ -2875,7 +2875,7 @@ func open_menu() -> void:
 	menu_at = _reticle.global_position if _reticle != null else global_position
 
 
-## Turn to another page of the open menu (the Testing page, and back): the menu stays open at the top.
+## Turn to another page of the open menu (the Admin submenu, and back): the menu stays open at the top.
 func open_page(page: String) -> void:
 	menu_page = page
 	menu_rows = ContextMenu.build(self, page)

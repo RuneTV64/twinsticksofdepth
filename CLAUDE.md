@@ -81,7 +81,7 @@ zooming in, do misses feel like your own fault, does aiming near a house ever pi
 
 The owner asked on 22 Nov 2026 for a context menu in place of ever more keys (hold left-click, weapon
 lowered): built the same day on the session branch, not seen by the owner (see The context menu). Then
-(22 Nov 2026) the test keys went into it too, on a Testing page.
+(22 Nov 2026) the test keys went into it too, on a Admin submenu.
 
 What was next in the orders already given: sickness, then the new needs (hygiene, morale, toilet, warmth);
 the loot system and loading weapons (design together, sketch first); punches using the part picking; a pile
@@ -130,20 +130,21 @@ left click with your weapon lowered", which may move later.
   work, and show greyed in the row): your things (I), seeing to your wounds (H), the character page (C);
   and drinking from your bottle (otherwise only a right-click in your things), and the torch (E still works).
 - The test switches went in too (owner, 22 Nov 2026: "Move a lot of the additional controls mapped to random
-  keys to the context menu for now"). The menu's last row, "Test switches", turns to its Testing page
-  (`Player.open_page("test")`, rows from `main.gd` `test_rows()` through `Player.test_menu`; "< Back" turns
+  keys to the context menu for now"; then "Put those options in the context menu under a subcommand section
+  called Admin"). The menu's last section, ADMIN, has one row, "Admin >", that opens the Admin submenu
+  (`Player.open_page("admin")`, rows from `main.gd` `admin_rows()` through `Player.admin_menu`; "< Back" turns
   back; a row with `"stay": true` keeps the menu open). On it, saying what each will do now: next season,
   rain, next time of day, the power, the old plain ground; a raider or a test gunner at the crosshair and
   removing them, the crowd test's +50 and clear, can't be hurt; a test wound, barefoot for free, boarding
   the window by the crosshair for free, breaking what the crosshair is on (it looks under the crosshair
   itself, since the weapon is down), ten minutes of rust and rot; the cutaway, the horde readout, all
   zombies on the low model. Those were M, K, N, Shift+N, B, T, Shift+T, G, Shift+G, J, Shift+U, Shift+P, O,
-  Shift+O, V, Z and L: **wherever these notes still name one of those keys, it now means the Testing
-  page.** The stat keys 1 to 8 are gone (the character page's -/= edit every stat).
+  Shift+O, V, Z and L: **wherever these notes still name one of those keys, it now means the Admin
+  submenu.** The stat keys 1 to 8 are gone (the character page's -/= edit every stat).
 - Still on keys: moving (WASD, arrows), Ready (right mouse, Q), attack/use (left mouse), sprint (Shift),
   the wheel (Tab), cover and roll (Space), reload (R), crouch (Ctrl), prone (X), the torch (E), free look
   (F, middle mouse), look up (Alt), Esc; the screens C, H and I and their own keys while open; F1 help, F2
-  the UI, F3 input check, F5 F6 F7 the crowd test (also on the Testing page).
+  the UI, F3 input check, F5 F6 F7 the crowd test (also on the Admin submenu).
 - Test: `tools/menu_test.gd` (real mouse events in the real level). Not built: a picture of it (the HUD
   is 2D, but the level renders black in the cloud); rows for items you carry beyond water, shoes and glass
   (laying a rug, setting a radio down, a bracer: still from your things); submenus; anything greyed out
@@ -1496,7 +1497,7 @@ that switch on what was already built or promised and was waiting for an item. O
   as a small pickup. A stand-in until the loot screen. Sheet: `tools/preview/items_page.png`
   (`tools/items_preview.gd`; the page only: the level behind it is black in the cloud).
 - Keys: boarding or prising, boots on and off and treating water are in the context menu since 22 Nov 2026
-  (see The context menu; the old Shift+P and Shift+U test keys are on its Testing page); I is your things (see Searching
+  (see The context menu; the old Shift+P and Shift+U test keys are on its Admin submenu); I is your things (see Searching
   and the grid).
 - In the test level: a "Carpenter's box" (hammer, nails, 4 planks, crowbar) and "Boots and a helmet" by the
   spawn; batteries in the tool box; antibiotics in every first-aid box; "Kitchen things" (pot, matches, 3
@@ -1857,13 +1858,13 @@ changes, update both, and keep them the same files.
   a crosshair within `lock_on_mouse_radius` 1 m of a living enemy the player can see settles onto it (dead centre
   inside `lock_on_core` 0.5 m, fading to nothing at the radius, so it never sticks) and follows it; moving the
   mouse takes it off. Exports in the Lock-on group. (The stick version went with the controller.)
-- Test switches (on the context menu's Testing page since 22 Nov 2026; they were G, Shift+G, T, Shift+T, V, Z):
+- Test switches (on the context menu's Admin submenu since 22 Nov 2026; they were G, Shift+G, T, Shift+T, V, Z):
   a test gunner or a raider at the crosshair and removing them; the cutaway off and on; the horde readout.
 - The UI can be hidden (owner, 20 Nov 2026: "I can't see the game anymore"): F2 steps `Hud.ui_level`: 0
   everything, 1 only what you need to play (bars, ammo, prompts, conditions, the stance line), 2 nothing. The
   long help text now starts closed (F1 opens it), with a one-line hint in its place.
 - Keys: H treat wounds, F1 help, F2 hide the UI, C character page, F3 input check, F5/F6/F7 crowd test. The
-  power, a test wound and all zombies on the low model are on the context menu's Testing page. Don't bind F8 (the
+  power, a test wound and all zombies on the low model are on the context menu's Admin submenu. Don't bind F8 (the
   Godot editor's Stop Running Project; it closes the game even from the game window), nor F10/F11/F12 or other
   editor debugger keys.
 - Far zombies use the low model: `ZombieBody` swaps mid/low by distance from the camera's rest point over the player

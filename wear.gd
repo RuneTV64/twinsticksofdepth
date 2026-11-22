@@ -6,7 +6,7 @@ extends Node
 ## then it uses real seconds and the season's wetness (Seasons).
 
 const STEP := 5.0
-## Stand-in for the clock: how much faster than real time rust and rot run. The context menu's Testing page jumps ten minutes.
+## Stand-in for the clock: how much faster than real time rust and rot run. The context menu's Admin submenu jumps ten minutes.
 var speed := 1.0
 var _t := 0.0
 
