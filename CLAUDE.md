@@ -68,8 +68,8 @@ were built on 22 Nov 2026 (see The living room's appliances), not seen by the ow
 2026 (the owner said to push it). Then its miscellaneous session (books, music, movies, toys, trophies...); then the kitchen,
 starting with its clothes session (its cloth and wearables: an apron, oven mitts, a tea towel, a shopping bag
 were on Claude's list, nothing built). The living room's miscellaneous session (the owner: "Now do the living
-room misc") was built on 22 Nov 2026, not seen by the owner, on the session branch only (see The living room's
-odds and ends). That finishes the first theme; the kitchen is next.
+room misc") was built on 22 Nov 2026, not seen by the owner, on `main` since 22 Nov 2026 (the owner said to
+push it; see The living room's odds and ends). That finishes the first theme; the kitchen is next.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
@@ -1155,7 +1155,7 @@ furniture README has the table.
   lamps are flat circles); power per house or per street; poses for switching. Seen only on the software
   renderer.
 
-## The living room's odds and ends (built 22 Nov 2026, in review; not seen by the owner)
+## The living room's odds and ends (built 22 Nov 2026, in review; on `main`; not seen by the owner)
 
 The theme's fourth session, misc: books, music, films, toys, trophies. Each thing does something now (rule
 2); nothing is there only to be looked at. Every number is Claude's first guess. Test `tools/misc_test.gd`;
