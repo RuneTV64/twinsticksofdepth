@@ -99,6 +99,8 @@ func weather(dt: float, wet: float) -> void:
 ## of the time a shard goes into the foot (2) and is gone from the ground. Walking on glass never removes it
 ## otherwise: it has to be picked up by hand (owner, 21 Nov 2026). The caller does the wounding. Someone
 ## crawling over it passes `bare` true whatever is on their feet, and CRAWL_CUT as the chance.
+const HAND_CUT := 0.12            # the chance each shard picked up bare-handed cuts you
+
 static func step_on(pos: Vector3, who: Node, quiet := 1.0, bare := false, chance := BARE_CUT) -> int:
 	if glass <= 0:
 		return 0
@@ -207,6 +209,7 @@ func prompt_text(_p: Player) -> String:
 
 func interact(p: Player) -> void:
 	var took := 0
+	var shards := 0
 	var full := false
 	for m: String in lot.keys():
 		var id := str(Materials.of(m)["scrap"])
@@ -216,7 +219,15 @@ func interact(p: Player) -> void:
 				break
 			lot[m]["taken"] = int(lot[m]["taken"]) + 1
 			took += 1
+			if m == "glass":
+				shards += 1
 	p.recompute_stats()
+	# Broken glass picked up by hand: a cut now and then, unless something is on your hands (gloves, oven mitts).
+	if shards > 0 and randf() < (1.0 - pow(1.0 - HAND_CUT, shards)) * (1.0 - p.hand_guard("cut")) and not p.invulnerable:
+		p._wound("cut", 3.0, "ArmR" if randf() < 0.6 else "ArmL")
+		p.show_status("Took %d broken piece%s, and cut your hand on the glass." % [took, "" if took == 1 else "s"], 2.0)
+		_settle()
+		return
 	if took == 0:
 		p.show_status("No room for any of it.", 1.8)
 	else:

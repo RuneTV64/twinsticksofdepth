@@ -66,6 +66,7 @@ var speed_mult := 1.0
 var stamina_regen_mult := 1.0
 var stamina_cost_mult := 1.0
 var aim_mult := 1.0        # scales the aimed-shot bonus and headshot chance
+var clumsy := 0.0          # what is on your hands takes this share off your aim (oven mitts); set by the Player
 var spread_mult := 1.0     # scales blind fire's spread
 var heal_mult := 1.0
 var one_armed := false     # an arm is gone
@@ -293,6 +294,10 @@ func _rebuild() -> void:
 	if legs > 0:
 		_add("One-legged" if legs == 1 else "No legs", "-55% speed; no running, dashing, rolling or vaulting")
 		speed_mult *= 0.45 if legs == 1 else 0.2
+
+	if clumsy > 0.0:
+		_add("Clumsy hands", "-%d%% aim: thick mitts on your fingers" % roundi(clumsy * 100.0))
+		aim_mult *= 1.0 - clumsy
 
 	if composure < 20.0:
 		_add("Panicked", "-30% aim, blind fire 50% wilder")

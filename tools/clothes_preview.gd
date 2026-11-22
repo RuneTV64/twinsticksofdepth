@@ -35,6 +35,14 @@ func _outfits(row: int) -> Array:
 			["Shirt, buttoned", [_as(L("longsleeve", "#8aa0b8", {"detail": "buttons"}), "shirt")]],
 			["Hoodie", [_as(L("hoodie", "red", {"thick": 0.012}), "shirt")]],
 		]
+	if row == 4:
+		# The kitchen's cloth (ROW 4).
+		return [
+			["Start clothes", ["t_shirt", "jeans", "belt", "socks", "sneakers"]],
+			["Kitchen apron", ["t_shirt", "jeans", "belt", "socks", "sneakers", "apron"]],
+			["Oven mitts", ["t_shirt", "jeans", "belt", "socks", "sneakers", "oven_mitts"]],
+			["Apron, mitts, magazine guards", ["t_shirt", "jeans", "belt", "socks", "sneakers", "apron", "oven_mitts", "magazine_bracer", "magazine_bracer_r"]],
+		]
 	if row == 3:
 		# The living room's odds and ends: magazines rolled round a forearm (ROW 3).
 		return [
@@ -137,7 +145,7 @@ func _build(row: int) -> void:
 		p._body.material.shader = _skin
 		p.facing = turn
 		var layers := []
-		if row == 1 or row == 3:
+		if row == 1 or row == 3 or row == 4:
 			for k in p.inv.worn.keys():
 				p.inv.worn.erase(k)
 			for id: String in c[1]:

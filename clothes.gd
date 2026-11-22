@@ -194,6 +194,8 @@ const CUTS := {
 	"belt": {"torso": ["waist-0.02", "waist+0.02"]},
 	"band": {"arm": ["wrist+0.006", "wrist+0.034"]},
 	"bracer": {"arm": ["wrist+0.012", "elbow-0.025"]},
+	"apron": {"torso": ["thigh+0.04", "neck_lo-0.03"], "leg": ["knee+0.06", "top"]},
+	"mitts": {"hand": ["bottom", "top"], "arm": ["bottom", "wrist+0.07"]},
 	"ring": {"hand": ["knuckles-0.022", "knuckles-0.012"]},
 	"beanie": {"head": ["brow+0.012", "top"]},
 	"cap": {"head": ["brow+0.02", "top"]},
@@ -207,7 +209,7 @@ const CUTS := {
 	"pack": {"torso": ["waist+0.08", "shoulder-0.04"]},
 }
 const PATTERNS := {"plain": 0, "knit": 1, "denim": 2, "check": 3, "stripes": 4, "leather": 5, "lace": 6, "print": 7, "metal": 8, "glass": 9}
-const SHAPES := {"": 0, "strap": 1, "pack": 2, "lens": 3, "slot": 4}
+const SHAPES := {"": 0, "strap": 1, "pack": 2, "lens": 3, "slot": 4, "front": 5}
 const DETAILS := {"": 0, "buttons": 1, "zip": 2, "laces": 3, "jeans": 4}
 
 ## Which area of the body each bone's skin is: what the shell carries per vertex.
@@ -662,6 +664,8 @@ static func over(worn: Dictionary, part: String, spot: Array, body: String = DEF
 			if area == "torso" and randf() < 0.2:       # a strap is a narrow thing
 				out.append(it)
 			continue
+		if int(L["shape"]) == 5 and (not (area == "torso" or area == "leg") or randf() < 0.5):
+			continue                                     # the front only: half of what comes at the body
 		var r: Vector2 = L["cov"][area]
 		if float(spot[1]) >= r.x and float(spot[1]) <= r.y:
 			out.append(it)

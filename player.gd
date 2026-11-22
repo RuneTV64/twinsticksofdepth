@@ -1095,9 +1095,19 @@ func _drop(it: Dictionary) -> void:
 	get_parent().add_child(box)
 
 
+## What what you wear on your hands keeps out ("cut", "bite"...), less as it is torn; or its "clumsy".
+func hand_guard(kind: String) -> float:
+	var it = inv.worn.get("hands")
+	if it == null or not Items.DEFS.has(it["id"]):
+		return 0.0
+	var g := float((Items.DEFS[it["id"]].get("guard", {}) as Dictionary).get(kind, 0.0))
+	return g if kind == "clumsy" else g * (1.0 - float(it.get("tatter", 0.0)))
+
+
 ## What you wear has changed: bare feet or not, and the clothes drawn on you.
 func _worn_changed() -> void:
 	barefoot = not inv.worn.has("feet")
+	sheet.clumsy = hand_guard("clumsy")
 	_redress()
 	recompute_stats()
 
@@ -3038,7 +3048,7 @@ func _strike_breakable(power: float) -> void:
 	elif tool[1] == "chop":
 		_fire_cd = maxf(_fire_cd, 0.5)
 		stamina = maxf(stamina - 3.0, 0.0)
-	if bare and stuff == "glass" and randf() < 0.35:
+	if bare and stuff == "glass" and randf() < 0.35 * (1.0 - hand_guard("cut")):
 		_wound("cut", 6.0, "ArmR")
 		show_status("The glass opens your arm.", 1.6)
 	elif bare and hard and randf() < 0.15:

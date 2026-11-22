@@ -112,6 +112,16 @@ bool covers(int i, int k, vec3 r) {
 		if (r.z < fit_back.w && abs(r.x) < fit_back.y) return true;
 		return r.z > fit_back.w && abs(abs(r.x) - fit_back.z) < 0.022 && r.y > fit_eyes.z + 0.12;
 	}
+	if (shape == 5) {
+		// The front only (an apron): the front of the torso and of the thighs, nothing behind or on the arms.
+		if (k == 0) {
+			// A bib apron: a wide skirt below the waist, a narrow bib above it.
+			float bib = mix(lh.x, lh.y, 0.42);
+			return r.z > fit_back.w + 0.04 && abs(r.x) < (r.y > bib ? 0.095 : 0.165);
+		}
+		if (k == 3) return r.z > 0.0;
+		return false;
+	}
 	if (shape == 4 && k == 7 && abs(r.y - fit_face.z) < fit_eyes.x * 0.8 && abs(r.x) < fit_face.y * 0.8888889) {
 		return false;      // the slot for the eyes in a balaclava
 	}
