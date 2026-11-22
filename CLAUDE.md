@@ -64,8 +64,8 @@ living room's cloth. Not seen by the owner. Then the fit table per body and men'
 The theme's furniture (session 2) was built on 21 Nov 2026, not seen by the owner, on `main` since 22 Nov 2026
 (the owner said to push it; see The furniture kit, The living room). The owner then named the next theme, a
 middle-class kitchen (22 Nov 2026), and straight after said to finish the living room first: its appliances
-were built on 22 Nov 2026 (see The living room's appliances), not seen by the owner, on the session branch
-only. Next in the theme: its miscellaneous session (books, music, movies, toys, trophies...); then the kitchen,
+were built on 22 Nov 2026 (see The living room's appliances), not seen by the owner, on `main` since 22 Nov
+2026 (the owner said to push it). Next in the theme: its miscellaneous session (books, music, movies, toys, trophies...); then the kitchen,
 starting with its clothes session (its cloth and wearables: an apron, oven mitts, a tea towel, a shopping bag
 were on Claude's list, nothing built).
 
@@ -1105,7 +1105,7 @@ The owner: "make some furniture for the home you designed". Everything is in
   one size of each; `furnish` only knows the 3 by 2 house and leaves the basement empty; worn all over,
   not where hit.
 
-## The living room's appliances (built 22 Nov 2026, in review; not seen by the owner)
+## The living room's appliances (built 22 Nov 2026, in review; on `main`; not seen by the owner)
 
 The theme's third session. The owner: "We should do living room appliances yet." Every number is Claude's
 first guess. Test `tools/appliance_test.gd`; sheet `assets/buildings/furniture/preview/appliances.png`; the
