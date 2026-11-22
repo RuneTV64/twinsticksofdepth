@@ -61,8 +61,8 @@ slots come from clothes and everyone starts dressed ("every player will start in
 (see Clothes): every place to wear things, clothes drawn on the body, pockets from clothes, protection, and the
 living room's cloth. Not seen by the owner. Then the fit table per body and men's clothes that hang like cloth
 (see Clothes). All of it on `main` since 21 Nov 2026 (the owner said to push it).
-The theme's furniture (session 2) was built on 21 Nov 2026, not seen by the owner, on the session branch only
-(see The furniture kit, The living room). Next in the theme: appliances, then everything else.
+The theme's furniture (session 2) was built on 21 Nov 2026, not seen by the owner, on `main` since 22 Nov 2026
+(the owner said to push it; see The furniture kit, The living room). Next in the theme: appliances, then everything else.
 
 Held until the owner has play tested (owner, 21 Nov 2026: "We will hold off until play test"): whether
 shooting at what the cursor covers is too clunky, and whether firearms should lock on. Don't change aiming
